@@ -1,0 +1,16 @@
+{
+  "name": "mou-welfare",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "run:api:dev": "pnpm run --filter api start:dev",
+    "run:web:dev": "pnpm run --filter web dev",
+    "build:api": "pnpm run --filter api build",
+    "build:web": "pnpm run --filter web build-only"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.16.0"
+}
