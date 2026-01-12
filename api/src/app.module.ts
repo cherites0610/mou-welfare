@@ -5,6 +5,7 @@ import { WinstonModule } from 'nest-winston'
 import { AppController } from './app.controller.js'
 import { AppService } from './app.service.js'
 import { AuthModule } from './auth/auth.module.js'
+import { ChatModule } from './chat/chat.module.js'
 import { winstonConfig } from './config/winston.config.js'
 import { FmailyModule } from './family/family.module.js'
 import { NotificationsModule } from './notification/notifications.module.js'
@@ -45,6 +46,7 @@ import { WelfaresModule } from './welfare/welfare.module.js'
     AuthModule,
     FmailyModule,
     UserFamiliesModule,
+    ChatModule
   ],
   controllers: [AppController],
   providers: [AppService],
