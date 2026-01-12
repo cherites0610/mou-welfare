@@ -5,14 +5,13 @@ import { UserFamily } from '../../user-family/entities/user-family.entity.js'
 @Entity({ name: 'families' })
 export class Family {
   @ApiProperty({ description: 'ID', example: 1 })
-  @PrimaryGeneratedColumn()
-  id: number
+  @PrimaryGeneratedColumn('uuid')
+  id: string
 
   @ApiProperty({ description: '家庭名稱', example: '陳家大宅' })
   @Column({ name: 'name' })
   name: string
 
-  // 關聯到中間表
   @ApiProperty({ description: '家庭成員關聯', type: () => [UserFamily] })
   @OneToMany(() => UserFamily, (userFamily) => userFamily.family)
   userFamilies: UserFamily[]

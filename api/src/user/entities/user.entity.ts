@@ -5,9 +5,9 @@ import { Welfare } from '../../welfare/entities/welfare.entity.js'
 
 @Entity({ name: 'users' })
 export class User {
-  @ApiProperty({ description: 'ID', example: 1 })
-  @PrimaryGeneratedColumn()
-  id: number
+  @ApiProperty({ description: 'uuid', example: 1 })
+  @PrimaryGeneratedColumn('uuid')
+  id: string
 
   @ApiProperty({ description: '電子信箱', example: 'user@example.com' })
   @Column({ unique: true })
@@ -34,19 +34,19 @@ export class User {
   isSubscribed: boolean
 
   @ApiProperty({ description: 'Line ID', required: false, nullable: true })
-  @Column({ name: 'line_id', nullable: true, unique: true })
+  @Column({ name: 'line_id', type: 'varchar', nullable: true, unique: true })
   lineId: string | null
 
   @ApiProperty({ description: 'Google ID', required: false, nullable: true })
-  @Column({ name: 'google_id', nullable: true, unique: true })
+  @Column({ name: 'google_id', type: 'varchar', nullable: true, unique: true })
   googleId: string | null
 
   @ApiProperty({ description: '頭像 URL', example: 'https://example.com/avatar.jpg', required: false, nullable: true })
-  @Column({ name: 'avatar_url', nullable: true })
+  @Column({ name: 'avatar_url', type: 'varchar', nullable: true })
   avatarUrl: string | null
 
   @ApiProperty({ description: '地址', example: '台北市信義區...', required: false, nullable: true })
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'varchar' })
   address: string | null
 
   @ApiProperty({ description: '身份類別', type: [String], example: ['student', 'entrepreneur'] })

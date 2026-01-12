@@ -4,8 +4,14 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { WinstonModule } from 'nest-winston'
 import { AppController } from './app.controller.js'
 import { AppService } from './app.service.js'
+import { AuthModule } from './auth/auth.module.js'
 import { winstonConfig } from './config/winston.config.js'
+import { FmailyModule } from './family/family.module.js'
+import { NotificationsModule } from './notification/notifications.module.js'
 import { RedisModule } from './redis/redis.module.js'
+import { UserFamiliesModule } from './user-family/user-family.module.js'
+import { UsersModule } from './user/users.module.js'
+
 
 @Module({
   imports: [
@@ -31,7 +37,12 @@ import { RedisModule } from './redis/redis.module.js'
         synchronize: configService.get<string>('DB_SYNC') === 'true',
       }),
     }),
-    RedisModule
+    RedisModule,
+    NotificationsModule,
+    UsersModule,
+    AuthModule,
+    FmailyModule,
+    UserFamiliesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
