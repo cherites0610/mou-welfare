@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
@@ -14,6 +15,8 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
+import { Welfare } from '../welfare/entities/welfare.entity.js'
+import { AddFavoriteDto } from './dtos/add-favorite.dto.js'
 import { ForgotPasswordDto } from './dtos/forgot-password.dto.js'
 import { RegisterDto } from './dtos/register.dto.js'
 import { ResendVerificationDto } from './dtos/resend-verification.dto.js'
@@ -92,6 +95,41 @@ export class UsersController {
   async getProfile(@CurrentUser() user: User) {
     this.logger.log(`收到取得個人資料請求 User ID: ${user.id}`)
     return user
+  }
+
+  @Post('favorites')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: '加入收藏福利' })
+  async addFavorite(
+    @Body() dto: AddFavoriteDto,
+    @CurrentUser() user: User,
+  ): Promise<{ message: string }> {
+    await this.usersService.addFavorite(user.id, dto.welfareId)
+    return { message: '已加入收藏' }
+  }
+
+  @Delete('favorites/:welfareId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '移除收藏福利' })
+  async removeFavorite(
+    @Param('welfareId') welfareId: string,
+    @CurrentUser() user: User,
+  ): Promise<{ message: string }> {
+    await this.usersService.removeFavorite(user.id, welfareId)
+    return { message: '已移除收藏' }
+  }
+
+  @Get('favorites')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '取得我的收藏列表' })
+  async getFavorites(@CurrentUser() user: User): Promise<Welfare[]> {
+    return this.usersService.getFavorites(user.id)
   }
 
 }

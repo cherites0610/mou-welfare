@@ -13,6 +13,7 @@ import { Repository } from 'typeorm'
 import { NotificationsService } from '../notification/notifications.service.js'
 import { TemplateName } from '../notification/templates/notification-templates.js'
 import { REDIS_CLIENT } from '../redis/redis.module.js'
+import { Welfare } from '../welfare/entities/welfare.entity.js'
 import { ForgotPasswordDto } from './dtos/forgot-password.dto.js'
 import { RegisterDto } from './dtos/register.dto.js'
 import { ResendVerificationDto } from './dtos/resend-verification.dto.js'
@@ -27,6 +28,8 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Welfare)
+    private readonly welfareRepository: Repository<Welfare>,
     @Inject(REDIS_CLIENT)
     private readonly cacheManager: Redis,
     private readonly notificationsService: NotificationsService
@@ -162,5 +165,65 @@ export class UsersService {
     await this.cacheManager.del(`reset_pwd:${email}`)
 
     return { message: '密碼重設成功' }
+  }
+
+  async addFavorite(userId: string, welfareId: string): Promise<void> {
+    this.logger.log(`用戶 ${userId} 嘗試收藏福利 ${welfareId}`)
+
+    const welfare = await this.welfareRepository.findOne({ where: { id: welfareId } })
+    if (!welfare) {
+      throw new NotFoundException('福利不存在')
+    }
+
+    const count = await this.usersRepository
+      .createQueryBuilder('user')
+      .leftJoin('user.favoriteWelfares', 'welfare')
+      .where('user.id = :userId', { userId })
+      .andWhere('welfare.id = :welfareId', { welfareId })
+      .getCount()
+
+    if (count > 0) {
+      throw new ConflictException('已收藏過此福利')
+    }
+
+    await this.usersRepository
+      .createQueryBuilder()
+      .relation(User, 'favoriteWelfares')
+      .of(userId)
+      .add(welfareId)
+
+    this.logger.log(`收藏成功：User ${userId} -> Welfare ${welfareId}`)
+  }
+
+  async removeFavorite(userId: string, welfareId: string): Promise<void> {
+    this.logger.log(`用戶 ${userId} 嘗試移除收藏福利 ${welfareId}`)
+
+    await this.usersRepository
+      .createQueryBuilder()
+      .relation(User, 'favoriteWelfares')
+      .of(userId)
+      .remove(welfareId)
+
+    this.logger.log(`移除收藏成功：User ${userId} -> Welfare ${welfareId}`)
+  }
+
+  async getFavorites(userId: string): Promise<Welfare[]> {
+    this.logger.log(`查詢用戶 ${userId} 的收藏列表`)
+
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: ['favoriteWelfares'],
+      order: {
+        favoriteWelfares: {
+          createdAt: 'DESC',
+        },
+      },
+    })
+
+    if (!user) {
+      throw new NotFoundException('User not found')
+    }
+
+    return user.favoriteWelfares
   }
 }
