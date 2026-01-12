@@ -20,7 +20,7 @@ export class LlmService implements OnModuleInit {
     this.initializeProvider(LlmProvider.GEMINI, {
       apiKey: this.configService.getOrThrow('GEMINI_API_KEY'),
       baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-      model: 'gemini-1.5-flash',
+      model: 'gemini-2.5-flash-lite',
     })
 
     this.initializeProvider(LlmProvider.QWEN, {

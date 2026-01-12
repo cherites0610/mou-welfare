@@ -5,8 +5,8 @@ import { User } from '../../user/entities/user.entity.js'
 @Entity({ name: 'welfares' })
 export class Welfare {
   @ApiProperty({ description: 'ID', example: 1 })
-  @PrimaryGeneratedColumn()
-  id: number
+  @PrimaryGeneratedColumn('uuid')
+  id: string
 
   @ApiProperty({ description: '補助名稱', example: '青年創業補助計畫' })
   @Column({ name: 'name' })
@@ -36,6 +36,10 @@ export class Welfare {
   @Column('simple-array', { name: 'rewards' })
   rewards: string[]
 
+  @ApiProperty({ description: '原始文章標題', example: '114年資料' })
+  @Column({ type: 'text', name: 'original_name' })
+  originalName: string
+
   @ApiProperty({ description: '原始內文 HTML', example: '<div><p>公告內容...</p></div>' })
   @Column({ type: 'text', name: 'original_content' })
   originalContent: string
@@ -44,12 +48,30 @@ export class Welfare {
   @Column({ type: 'text', name: 'summary_content' })
   summaryContent: string
 
-  @ApiProperty({ description: '發布日期', example: '2023-10-01T10:00:00Z' })
-  @Column({ type: 'timestamp', name: 'publish_date' })
-  publishDate: Date
+  @ApiProperty({
+    description: '發布日期',
+    example: '2023-10-01T10:00:00Z',
+    required: false,
+    nullable: true
+  })
+  @Column({
+    type: 'timestamp',
+    name: 'publish_date',
+    nullable: true
+  })
+  publishDate: Date | null
 
-  @ApiProperty({ description: '截止日期', required: false, nullable: true, example: '2023-12-31T23:59:59Z' })
-  @Column({ type: 'timestamp', name: 'deadline', nullable: true })
+  @ApiProperty({
+    description: '截止日期',
+    required: false,
+    nullable: true,
+    example: '2023-12-31T23:59:59Z'
+  })
+  @Column({
+    type: 'timestamp',
+    name: 'deadline',
+    nullable: true
+  })
   deadline: Date | null
 
   @ApiProperty({ description: '收藏此福利的用戶', type: () => [User] })

@@ -11,6 +11,7 @@ import { NotificationsModule } from './notification/notifications.module.js'
 import { RedisModule } from './redis/redis.module.js'
 import { UserFamiliesModule } from './user-family/user-family.module.js'
 import { UsersModule } from './user/users.module.js'
+import { WelfaresModule } from './welfare/welfare.module.js'
 
 
 @Module({
@@ -40,6 +41,7 @@ import { UsersModule } from './user/users.module.js'
     RedisModule,
     NotificationsModule,
     UsersModule,
+    WelfaresModule,
     AuthModule,
     FmailyModule,
     UserFamiliesModule,
