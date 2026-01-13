@@ -15,9 +15,7 @@
     "start:prod": "cross-env NODE_ENV=production node dist/main"
   },
   "dependencies": {
-    "@google-cloud/discoveryengine": "^2.5.2",
     "@google-cloud/storage": "^7.18.0",
-    "@google-cloud/vertexai": "^1.10.0",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",
