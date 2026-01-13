@@ -13,7 +13,7 @@ export class ChatSession {
   @PrimaryGeneratedColumn('uuid')
   id: string
 
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', nullable: true, type: 'uuid' })
   userId: string
 
   @Column({ nullable: true })

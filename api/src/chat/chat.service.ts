@@ -1,8 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { LlmService } from '../llm/llm.service.js'
 import { LlmProvider } from '../llm/llm.types.js'
+import { UserFamily } from '../user-family/entities/user-family.entity.js'
+import { User } from '../user/entities/user.entity.js'
+import { Welfare } from '../welfare/entities/welfare.entity.js'
+import { MatchResult } from '../welfare/interfaces/traffic-light.interface.js'
+import { WelfareMatchingService } from '../welfare/services/welfare-matching.service.js'
 import { ChatMessage, MessageRole } from './entities/chat-message.entity.js'
 import { ChatSession } from './entities/chat-session.entity.js'
 import { VertexAiProvider } from './providers/vertex-ai.provider.js'
@@ -16,12 +21,20 @@ export class ChatService {
     private readonly sessionRepository: Repository<ChatSession>,
     @InjectRepository(ChatMessage)
     private readonly messageRepository: Repository<ChatMessage>,
+    @InjectRepository(Welfare)
+    private readonly welfareRepository: Repository<Welfare>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(UserFamily)
+    private readonly userFamilyRepository: Repository<UserFamily>,
     private readonly vertexAiProvider: VertexAiProvider,
     private readonly llmService: LlmService,
+    private readonly matchingService: WelfareMatchingService,
   ) { }
 
   async handleMessage(
-    userId: string,
+    userId: string, // 操作者 ID
+    familyId: string | null, // 選填：家庭 ID
     sessionId: string | null,
     userMessage: string,
   ) {
@@ -35,98 +48,193 @@ export class ChatService {
       await this.sessionRepository.save(session)
     }
 
-    // 2. 儲存用戶訊息 (Persistence)
+    // 2. 儲存用戶訊息
     await this.saveMessage(session.id, 'user', userMessage)
 
-    // 3. 讀取歷史訊息 (Context Window，例如取最近 5 則)
+    // 3. 讀取歷史訊息 (Context)
     const history = await this.messageRepository.find({
       where: { sessionId: session.id },
       order: { createdAt: 'DESC' },
       take: 5,
     })
-    const historyContext = history.reverse().map(m => `${m.role}: ${m.content}`).join('\n')
+    const historyContext = history.reverse().map((m) => `${m.role}: ${m.content}`).join('\n')
 
     this.logger.log(`開始並行處理訊息 Session: ${session.id}`)
 
     // =========================================================
-    // 4. 並行處理 (Parallel Execution)
+    // 4. 並行處理 (Parallel Execution): Context Loading + NLU + RAG
     // =========================================================
 
-    const [nluResult, ragDocuments] = await Promise.all([
-      // 任務 A: NLU 意圖識別 (Extraction)
+    const [userData, familyMembers, nluResult, ragSearchResults] = await Promise.all([
+      // Task 1: 撈取個人資料 (若有 userId)
+      userId ? this.userRepository.findOne({ where: { id: userId } }) : null,
+
+      // Task 2: 撈取家庭成員 (若有 familyId)
+      familyId
+        ? this.userFamilyRepository.find({
+          where: { familyId },
+          relations: ['user'],
+        })
+        : [],
+
+      // Task 3: NLU 意圖識別
       this.extractIntents(userMessage, historyContext),
 
-      // 任務 B: RAG 檢索 (Retrieval)
+      // Task 4: RAG 檢索 (回傳的是 Search Result Snippets，包含 ID)
       this.vertexAiProvider.searchWelfareDocs(userMessage),
     ])
 
     const { city, identities } = nluResult
     this.logger.log(`NLU 提取結果: City=${city}, Identities=${identities}`)
-    this.logger.log(`Vertex Search 找到 ${ragDocuments.length} 筆資料`)
+    this.logger.log(`Vertex Search 找到 ${ragSearchResults.length} 筆資料`)
 
     // =========================================================
-    // 5. 資料收斂與核對 (Convergence & Verification)
+    // 5. 資料收斂與紅綠燈計算 (Convergence & Calculation)
     // =========================================================
 
-    // 過濾邏輯：如果 LLM 提取出了特定縣市，我們就過濾掉明顯不符的文件
-    // (前提：Vertex Search 的 snippet 或 metadata 包含縣市資訊，或者依靠 Gemini 第二階段過濾)
-    // 這裡示範「軟過濾」：我們把提取出的資訊加到 Prompt 裡，要求 LLM 做嚴格比對
+    // 5.1 實體還原 (Hydration): 拿 ID 去 DB 撈完整的 Welfare (含 requirements 以供計算)
+    let enrichedWelfares: any[] = []
 
-    const validDocs = ragDocuments
+    if (ragSearchResults.length > 0) {
+      const welfareIds = ragSearchResults.map((r) => r.id).filter(Boolean)
+
+      const fullWelfares = await this.welfareRepository.find({
+        where: { id: In(welfareIds) },
+      })
+
+      // 5.2 計算紅綠燈
+      enrichedWelfares = fullWelfares.map((welfare) => {
+        let userMatch: MatchResult | null = null
+        let familyMatches: any[] = []
+
+        // A. 計算個人匹配 (如果 User 存在)
+        if (userData) {
+          userMatch = this.matchingService.calculate(userData, welfare)
+        }
+
+        // B. 計算家庭匹配 (如果 Family 存在)
+        if (familyMembers.length > 0) {
+          familyMatches = familyMembers
+            .map((member) => {
+              if (!member.user) return null
+              // 如果成員是當前用戶，且前面算過了，可以複用，或者重算也無妨
+              const match = this.matchingService.calculate(member.user, welfare)
+              return {
+                userId: member.user.id,
+                role: member.role,
+                match,
+              }
+            })
+            .filter(Boolean)
+        }
+
+        return {
+          ...welfare, // 包含 DB 完整資料
+          userMatch,  // 個人燈號
+          familyMatches, // 家庭燈號列表
+        }
+      })
+    }
 
     // =========================================================
-    // 6. 最終生成 (Generation)
+    // 6. 構建 Prompt Context (Prompt Engineering)
+    // =========================================================
+
+    // 6.1 構建用戶畫像描述
+    let userProfileDesc = '【用戶狀態】：未登入/未知'
+    if (userData) {
+      userProfileDesc = `【用戶個人資料】
+      - 年齡: ${userData.birthday ? new Date().getFullYear() - new Date(userData.birthday).getFullYear() : '未知'}
+      - 性別: ${userData.gender || '未知'}
+      - 身份標籤: ${userData.identities?.join(', ') || '無'}
+      - NLU提取意圖: ${city || '無'}, ${identities.join(', ')}`
+    }
+
+    // 6.2 構建福利與匹配結果描述 (這是給 LLM 看的關鍵資訊)
+    const welfareContext = enrichedWelfares.map((w, i) => {
+      let matchDesc = ''
+
+      // 描述個人的匹配狀況
+      if (w.userMatch) {
+        matchDesc += `\n   -> [個人適配度]: ${w.userMatch.light}燈 (原因: ${w.userMatch.reasons.join(', ')})`
+      }
+
+      // 描述家庭的匹配狀況
+      if (w.familyMatches.length > 0) {
+        const greenMembers = w.familyMatches.filter((m: any) => m.match.light === 'GREEN').map((m: any) => m.role)
+        const redMembers = w.familyMatches.filter((m: any) => m.match.light === 'RED').map((m: any) => m.role)
+        matchDesc += `\n   -> [家庭適配度]: 符合成員(${greenMembers.join(', ')}); 不符成員(${redMembers.join(', ')})`
+      }
+
+      return `[${i + 1}] 福利名稱: ${w.name}
+   摘要: ${w.searchSnippet || w.summaryContent}
+   ${matchDesc}`
+    }).join('\n\n')
+
+
+    // =========================================================
+    // 7. 最終生成 (Generation)
     // =========================================================
 
     const finalPrompt = `
-          你是一位熱心且專業的福利查詢小幫手，名字是「阿哞」。
+      你是一位熱心且專業的福利查詢小幫手，名字是「阿哞」。
+      你的任務是根據提供的【參考福利資料】與【適配度分析】，回答用戶問題。
 
-    你的任務是根據所提供的資料庫內容，為使用者提供政府福利相關的資訊。
-
-    回答原則：
-    1. 回答內容必須嚴格基於所提供的資料庫。
-    2. 清楚說明福利的名稱和相關內容，並以專業、熱心的口吻回答。
-    3. 每個回答的字數必須維持在 100 字以內，並力求簡潔明瞭。
-    4. 當使用者提供的資料不明確或不夠完整時，在回應的最後持續追問更多資訊，例如「請問您是哪個縣市的居民呢？」或「您方便提供更具體的資料嗎？」，以幫助使用者找到適合自己的福利。
-    5. 如果資料庫中找不到使用者提問的資訊，請禮貌地告知使用者目前無法提供相關資訊，並避免編造或猜測答案。
+      回答原則：
+      1. **結合適配度**：請優先推薦「綠燈」或「適配度高」的福利。如果用戶個人資料顯示「紅燈」，請委婉告知原因（例如年齡不符）。
+      2. **家庭視角**：若有家庭適配資訊，請明確指出家中「誰」可以申請（例如：「這項補助爸爸可以申請，但媽媽因年齡不符無法申請」）。
+      3. **簡潔明瞭**：回答字數維持在 150 字以內。
+      4. **主動追問**：若資料不足（黃燈），請追問細節。
+      5. **誠實**：若無相關資料，請告知。
     `
 
     const aiResponseText = await this.llmService.chat({
       provider: LlmProvider.GEMINI,
       systemPrompt: finalPrompt,
       userContent: `
-        【用戶資訊】
-      - 所在縣市: ${city || '未知'}
-      - 具備身份: ${identities.length > 0 ? identities.join(', ') : '未知'}
+      ${userProfileDesc}
 
-      【參考資料 (RAG)】
-      ${validDocs.map((d, i) => `[${i + 1}] ${d.name}\n摘要: ${d.summaryContent}`).join('\n\n')}
+      【參考福利資料 (含紅綠燈分析)】
+      ${welfareContext}
 
       【歷史對話】
       ${historyContext}
 
       【用戶最新問題】
       ${userMessage}
-      `
+      `,
     })
 
-    // 7. 儲存 AI 回答與 Metadata (Persistence)
+    // =========================================================
+    // 8. 儲存與回傳 (Persistence)
+    // =========================================================
+
     const savedAiMessage = await this.saveMessage(session.id, 'assistant', aiResponseText, {
       extractedCity: city,
       extractedIdentities: identities,
-      ragSources: validDocs.map(d => ({ id: d.id, title: d.name, uri: d.sourceUrl, summaryContent: d.summaryContent }))
+      ragSources: enrichedWelfares.map((w) => ({
+        id: w.id,
+        title: w.name,
+        uri: w.sourceUrl,
+        summaryContent: w.summaryContent,
+        userMatch: w.userMatch,     // 前端可直接顯示個人燈號
+        familyMatches: w.familyMatches // 前端可直接顯示家庭列表
+      })),
     })
 
     return {
       sessionId: session.id,
       reply: aiResponseText,
-      metadata: savedAiMessage.metadata
+      metadata: savedAiMessage.metadata,
     }
   }
 
-  // --- 輔助方法 ---
+  // --- 輔助方法 (保持不變) ---
 
-  private async extractIntents(query: string, history: string): Promise<{ city: string | null; identities: string[] }> {
+  private async extractIntents(
+    query: string,
+    history: string,
+  ): Promise<{ city: string | null; identities: string[] }> {
     const prompt = `
       分析以下對話與用戶最新問題，提取出用戶的「所在縣市(city)」與「身份關鍵字(identities)」。
       身份關鍵字列表參考: ["20歲以下", "20歲-65歲", "65歲以上", "男性", "女性", "中低收入戶", "低收入戶", "榮民", "身心障礙者", "原住民", "外籍配偶家庭"].
@@ -147,7 +255,7 @@ export class ChatService {
 
       最新問題:
       ${query}
-      `
+      `,
       })
       const cleanJson = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim()
       return JSON.parse(cleanJson)
@@ -161,13 +269,13 @@ export class ChatService {
     sessionId: string,
     role: MessageRole,
     content: string,
-    metadata?: any
+    metadata?: any,
   ): Promise<ChatMessage> {
     const msg = this.messageRepository.create({
       sessionId,
       role,
       content,
-      metadata
+      metadata,
     })
     return await this.messageRepository.save(msg)
   }

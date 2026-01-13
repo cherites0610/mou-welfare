@@ -5,6 +5,7 @@ import { LlmModule } from '../llm/llm.module.js'
 import { UserFamily } from '../user-family/entities/user-family.entity.js'
 import { User } from '../user/entities/user.entity.js'
 import { Welfare } from './entities/welfare.entity.js'
+import { GcsService } from './services/gcs.service.js'
 import { WelfareLlmService } from './services/welfare-llm.service.js'
 import { WelfareMatchingService } from './services/welfare-matching.service.js'
 import { WelfaresProcessor } from './services/welfare.processor.js'
@@ -24,8 +25,9 @@ import { WelfaresService } from './welfare.service.js'
     WelfaresService,
     WelfaresProcessor,
     WelfareLlmService,
-    WelfareMatchingService
+    WelfareMatchingService,
+    GcsService
   ],
-  exports: [WelfaresService],
+  exports: [WelfaresService, WelfareMatchingService],
 })
 export class WelfaresModule { }

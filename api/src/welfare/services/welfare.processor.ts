@@ -5,6 +5,7 @@ import { Job } from 'bullmq'
 import { Repository } from 'typeorm'
 import { IngestWelfareDto } from '../dtos/ingest-welfare.dto.js'
 import { Welfare } from '../entities/welfare.entity.js'
+import { GcsService } from './gcs.service.js'
 import { WelfareLlmService } from './welfare-llm.service.js'
 
 @Processor('welfare-processing')
@@ -15,6 +16,7 @@ export class WelfaresProcessor extends WorkerHost {
     @InjectRepository(Welfare)
     private readonly welfareRepository: Repository<Welfare>,
     private readonly welfareLlmService: WelfareLlmService,
+    private readonly gcsService: GcsService,
   ) {
     super()
   }
@@ -45,7 +47,8 @@ export class WelfaresProcessor extends WorkerHost {
         deadline: analysisResult.deadline ? new Date(analysisResult.deadline) : undefined,
       })
 
-      await this.welfareRepository.save(welfare)
+      // await this.welfareRepository.save(welfare)
+      await this.gcsService.appendAndUpload([welfare])
       this.logger.log(`福利資料處理並儲存成功 ID: ${welfare.id}`)
 
     } catch (error) {

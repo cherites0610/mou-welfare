@@ -11,4 +11,14 @@ export class SendMessageDto {
   @IsString()
   @ApiProperty({ required: true, description: '用戶最新問題' })
   message: string
+
+  @ApiProperty({ required: false, description: '家庭 uuid' })
+  @IsOptional()
+  @IsUUID()
+  familyId: string
+
+  @ApiProperty({ required: false, description: '用戶 uuid' })
+  @IsOptional()
+  @IsUUID()
+  userId: string
 }
