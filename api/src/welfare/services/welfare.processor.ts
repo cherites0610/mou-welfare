@@ -47,7 +47,7 @@ export class WelfaresProcessor extends WorkerHost {
         deadline: analysisResult.deadline ? new Date(analysisResult.deadline) : undefined,
       })
 
-      // await this.welfareRepository.save(welfare)
+      await this.welfareRepository.save(welfare)
       await this.gcsService.appendAndUpload([welfare])
       this.logger.log(`福利資料處理並儲存成功 ID: ${welfare.id}`)
 
