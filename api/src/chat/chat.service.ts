@@ -72,9 +72,8 @@ export class ChatService {
     // (前提：Vertex Search 的 snippet 或 metadata 包含縣市資訊，或者依靠 Gemini 第二階段過濾)
     // 這裡示範「軟過濾」：我們把提取出的資訊加到 Prompt 裡，要求 LLM 做嚴格比對
 
-    const validDocs = ragDocuments.map((d, index) => {
-      return `${index + 1}: ${d.title}`
-    })
+    const validDocs = ragDocuments
+
     // =========================================================
     // 6. 最終生成 (Generation)
     // =========================================================
@@ -101,7 +100,7 @@ export class ChatService {
       - 具備身份: ${identities.length > 0 ? identities.join(', ') : '未知'}
 
       【參考資料 (RAG)】
-      ${validDocs}
+      ${validDocs.map((d, i) => `[${i + 1}] ${d.name}\n摘要: ${d.summaryContent}`).join('\n\n')}
 
       【歷史對話】
       ${historyContext}
@@ -115,7 +114,7 @@ export class ChatService {
     const savedAiMessage = await this.saveMessage(session.id, 'assistant', aiResponseText, {
       extractedCity: city,
       extractedIdentities: identities,
-      ragSources: validDocs.map(d => ({ title: d, uri: d, snippet: d }))
+      ragSources: validDocs.map(d => ({ id: d.id, title: d.name, uri: d.sourceUrl, summaryContent: d.summaryContent }))
     })
 
     return {

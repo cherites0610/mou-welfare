@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import axios from 'axios'
 import { GoogleAuth } from 'google-auth-library'
 import * as path from 'path'
+import { Welfare } from '../../welfare/entities/welfare.entity.js'
 
 @Injectable()
 export class VertexAiProvider {
@@ -31,7 +32,7 @@ export class VertexAiProvider {
     return accessToken.token || ''
   }
 
-  async searchWelfareDocs(query: string): Promise<{ id: string, title: string, uri: string }[]> {
+  async searchWelfareDocs(query: string): Promise<Welfare[]> {
     const url = `https://discoveryengine.googleapis.com/v1alpha/projects/${this.projectId}/locations/global/collections/default_collection/engines/${this.engineId}/servingConfigs/default_search:search`
 
     this.logger.log(`正在執行 Vertex Search (REST): ${query}`)
@@ -60,14 +61,22 @@ export class VertexAiProvider {
       })
       const results = response.data.results || []
 
-      return results.map((result: any): { id: string, title: string, uri: string } => {
-        const data = result.document?.structData || {}
+      return results.map((r: any): Welfare => {
 
         return {
-          id: result.document?.id,
-          title: data.title || data.link,
-          uri: data.link,
-        }
+          id: r.document?.structData?.id || r.document?.id,
+          name: r.document?.structData?.title || r.document?.displayName,
+          summaryContent: r.document?.structData?.summary || r.document?.snippet,
+          originalContent: r.document?.structData?.detail,
+          rewards: r.document?.structData?.forward,
+          sourceUrl: r.document?.structData?.link,
+          sourceCity: r.document?.structData?.location,
+          publishDate: r.document?.structData?.publicationDate,
+          categories: r.document?.structData?.categories,
+          requirements: r.document?.structData?.applicationCriteria,
+          identity: [""],
+          originalName: "",
+        } as Welfare
       })
 
     } catch (error) {
