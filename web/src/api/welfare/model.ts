@@ -64,3 +64,8 @@ export interface WelfareResponse extends Welfare {
   familyMatches?: FamilyMatch[]
   overallScore?: number
 }
+
+export interface WelfareListResponse {
+  data: WelfareResponse[]
+  total: number
+}
