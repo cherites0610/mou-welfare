@@ -1,6 +1,7 @@
 export interface User {
   id: string
   email: string
+  name: string | null
   birthday: string | null
   gender: string | null
   isVerified: boolean
@@ -27,6 +28,7 @@ export interface LoginResponse {
 export interface RegisterDto {
   email: string
   password: string
+  name: string
   verificationCode: string
   birthday?: string
   gender?: string
