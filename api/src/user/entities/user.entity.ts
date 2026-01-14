@@ -13,6 +13,10 @@ export class User {
   @Column({ unique: true })
   email: string
 
+  @ApiProperty({ description: '名稱', example: 'John Doe' })
+  @Column({ name: 'name', type: 'varchar', nullable: true })
+  name: string
+
   @ApiProperty({ description: '哈希過的密碼', required: false })
   @Column({ name: 'password', select: false, nullable: true })
   password: string

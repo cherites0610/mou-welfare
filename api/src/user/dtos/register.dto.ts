@@ -21,6 +21,10 @@ export class RegisterDto {
   @MinLength(8)
   password: string
 
+  @ApiProperty({ description: '名稱', example: 'John Doe' })
+  @IsString()
+  name: string
+
   @ApiProperty({ description: '信箱驗證碼', example: '123456' })
   @IsString()
   @Length(6, 6)
