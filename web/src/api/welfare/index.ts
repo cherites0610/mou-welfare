@@ -6,5 +6,5 @@ enum Api {
 }
 
 export const getWelfares = (query: SearchWelfareDto) => {
-  return request.get<WelfareListResponse>(Api.search, { params: query })
+  return request.post<WelfareListResponse>(Api.search, query)
 }

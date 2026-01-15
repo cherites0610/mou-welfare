@@ -9,7 +9,8 @@ class Request {
 
     this.instance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const token = localStorage.getItem('token')
+        const token = JSON.parse(localStorage.getItem('user')).token
+
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
