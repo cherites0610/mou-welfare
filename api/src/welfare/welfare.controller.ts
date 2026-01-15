@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Logger, Post, UnauthorizedException } from '@nestjs/common'
+import { Body, Controller, Headers, Logger, Post, UnauthorizedException } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { IngestWelfareDto } from './dtos/ingest-welfare.dto.js'
 import { SearchWelfareDto } from './dtos/search-welfare.dto.js'
@@ -24,7 +24,8 @@ export class WelfaresController {
     return this.welfaresService.ingest(dto)
   }
 
-  @Get()
+  @Post()
+  @ApiOperation({ summary: '查詢福利資料' })
   async findAll(@Body() dto: SearchWelfareDto) {
     return this.welfaresService.search(dto)
   }
