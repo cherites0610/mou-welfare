@@ -4,10 +4,15 @@ import type { LoginDto, LoginResponse, RegisterDto, ResetPasswordDto, UpdateUser
 
 enum Api {
   Login = '/auth/login',
-  Register = '/users/register',
-  ResendVerification = '/users/resend-verification',
-  ForgotPassword = '/users/forgot-password',
-  ResetPassword = '/users/reset-password',
+  LoginOAuth = '/auth/login-oauth',
+  Register = '/auth/register',
+  ResendVerification = '/auth/resend-verification',
+  ForgotPassword = '/auth/forgot-password',
+  ResetPassword = '/auth/reset-password',
+
+  LineLoginLink = '/auth/line-login',
+  GoogleLoginLink = '/auth/google-login',
+
   Profile = '/users/profile',
   UpdateProfile = '/users/:id',
   Favorites = '/users/favorites',
@@ -15,8 +20,14 @@ enum Api {
   RemoveFavorite = '/users/favorites/:welfareId',
 }
 
+// --- Auth 相關 ---
+
 export const login = (data: LoginDto) => {
   return request.post<LoginResponse>(Api.Login, data)
+}
+
+export const loginWithOAuth = (code: string) => {
+  return request.post<LoginResponse>(Api.LoginOAuth, { code })
 }
 
 export const register = (data: RegisterDto) => {
@@ -34,6 +45,16 @@ export const forgotPassword = (email: string) => {
 export const resetPassword = (data: ResetPasswordDto) => {
   return request.post<{ message: string }>(Api.ResetPassword, data)
 }
+
+export const getLineLoginUrl = () => {
+  return request.get<{ url: string }>(Api.LineLoginLink)
+}
+
+export const getGoogleLoginUrl = () => {
+  return request.get<{ url: string }>(Api.GoogleLoginLink)
+}
+
+// --- User 相關 ---
 
 export const getProfile = () => {
   return request.get<User>(Api.Profile)

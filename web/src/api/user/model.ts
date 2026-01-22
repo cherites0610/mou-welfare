@@ -30,6 +30,7 @@ export interface RegisterDto {
   password: string
   name: string
   verificationCode: string
+  oauthCode?: string
   birthday?: string
   gender?: string
   isSubscribed?: boolean
@@ -46,4 +47,4 @@ export interface ResetPasswordDto {
   newPassword: string
 }
 
-export type UpdateUserDto = Partial<Omit<RegisterDto, 'email' | 'password' | 'verificationCode'>>
+export type UpdateUserDto = Partial<Omit<RegisterDto, 'email' | 'password' | 'verificationCode' | 'oauthCode'>>
