@@ -11,7 +11,7 @@ export const sendMessage = (data: SendMessageDto) => {
 }
 
 export const getSessions = () => {
-  return request.get<ChatSession[]>(Api.Session)
+  return request.get<ChatSession[]>(Api.Chat)
 }
 
 export const getSessionMessages = (sessionId: string) => {

@@ -9,7 +9,8 @@ class Request {
 
     this.instance.interceptors.request.use(
       (config: InternalAxiosRequestConfig) => {
-        const token = JSON.parse(localStorage.getItem('user')).token
+        const userJson = localStorage.getItem('user')
+        const token = userJson ? JSON.parse(userJson).token : null
 
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
@@ -32,7 +33,8 @@ class Request {
         }
       },
       (error) => {
-        return Promise.reject(error.response.data.error)
+        const errorMessage = error.response?.data?.error || error.message || 'Unknown Error'
+        return Promise.reject(new Error(errorMessage))
       }
     )
   }

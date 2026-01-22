@@ -18,7 +18,7 @@ const initAppData = async () => {
   try {
     await Promise.all([
       familyStore.loadFamilies(),
-      // chatStore.loadSessions()
+      chatStore.loadSessions()
     ])
   } catch (error: any) {
     if (error.response?.status === 401) {
