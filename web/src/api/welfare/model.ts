@@ -21,10 +21,11 @@ export interface Welfare {
 
 export interface SearchWelfareDto {
   keywords?: string
-  city?: string
-  category?: string
+  cities?: string[]
+  categories?: string[]
   userId?: string
   identities?: string[]
+  locations?: string[]
   familyId?: string
   page?: number
   limit?: number

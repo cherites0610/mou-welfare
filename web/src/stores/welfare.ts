@@ -15,8 +15,8 @@ export const useWelfareStore = defineStore(
       page: 1,
       limit: 10,
       keywords: '',
-      city: undefined,
-      category: undefined,
+      cities: [],
+      categories: [],
       identities: [],
       userId: undefined,
       familyId: undefined
@@ -60,8 +60,8 @@ export const useWelfareStore = defineStore(
     const resetSearch = () => {
       searchParams.page = 1
       searchParams.keywords = ''
-      searchParams.city = undefined
-      searchParams.category = undefined
+      searchParams.cities = undefined
+      searchParams.categories = undefined
       searchParams.familyId = undefined
       return executeSearch()
     }

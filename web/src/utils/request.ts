@@ -25,7 +25,7 @@ class Request {
       (response: AxiosResponse) => {
         const { statusCode, data, message } = response.data
 
-        if (statusCode === 200) {
+        if (statusCode === 200 || statusCode === 201) {
           return data
         } else {
           return Promise.reject(new Error(message || 'Error'))
