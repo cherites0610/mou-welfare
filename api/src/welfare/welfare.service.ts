@@ -61,6 +61,14 @@ export class WelfaresService {
       queryBuilder.andWhere('(welfare.name LIKE :kw)', { kw: `%${dto.keywords}%` })
     }
 
+    if (dto.cities && dto.cities.length > 0) {
+      queryBuilder.andWhere('welfare.sourceCity IN (:...cities)', { cities: dto.cities })
+    }
+
+    if (dto.categories && dto.categories.length > 0) {
+      queryBuilder.andWhere('welfare.categories IN (:...categories)', { categories: dto.categories })
+    }
+
     const lightWelfares = await queryBuilder.getMany()
     this.logger.log(`初步篩選完成, 共有 ${lightWelfares.length} 筆資料進入比對`)
 
@@ -179,7 +187,7 @@ export class WelfaresService {
         if (match.score > maxFamilyScore) maxFamilyScore = match.score
         return {
           userId: member.user.id,
-          name: member.role,
+          name: member.user.name,
           avatarUrl: member.user.avatarUrl,
           match,
         }

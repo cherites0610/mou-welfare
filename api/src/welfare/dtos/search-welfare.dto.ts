@@ -10,13 +10,15 @@ export class SearchWelfareDto {
 
   @ApiProperty({ description: '來源縣市', required: false })
   @IsOptional()
-  @IsString()
-  city?: string
+  @IsArray()
+  @IsString({ each: true })
+  cities?: string[]
 
   @ApiProperty({ description: '福利種類', required: false })
   @IsOptional()
-  @IsString()
-  category?: string
+  @IsArray()
+  @IsString({ each: true })
+  categories?: string[]
 
   @ApiProperty({ description: '當前用戶 ID (若已登入)', required: false })
   @IsOptional()
