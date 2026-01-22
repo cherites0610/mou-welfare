@@ -32,6 +32,32 @@ export class ChatService {
     private readonly matchingService: WelfareMatchingService,
   ) { }
 
+  async getUserSessions(userId: string): Promise<ChatSession[]> {
+    return this.sessionRepository.find({
+      where: { userId },
+      order: { updatedAt: 'DESC' },
+    })
+  }
+
+  async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+    const session = await this.sessionRepository.findOne({ where: { id: sessionId } })
+    if (!session) {
+      throw new NotFoundException(`Session with ID ${sessionId} not found`)
+    }
+
+    return this.messageRepository.find({
+      where: { sessionId },
+      order: { createdAt: 'ASC' },
+    })
+  }
+
+  async deleteSession(sessionId: string): Promise<void> {
+    const result = await this.sessionRepository.delete(sessionId)
+    if (result.affected === 0) {
+      throw new NotFoundException(`Session with ID ${sessionId} not found`)
+    }
+  }
+
   async handleMessage(
     userId: string, // 操作者 ID
     familyId: string | null, // 選填：家庭 ID
