@@ -27,13 +27,20 @@ export class RegisterDto {
 
   @ApiProperty({ description: '信箱驗證碼', example: '123456' })
   @IsString()
+  @IsOptional()
   @Length(6, 6)
-  verificationCode: string
+  verificationCode?: string
+
+  @ApiProperty({ description: 'OAuth Code', required: false })
+  @IsOptional()
+  @IsString()
+  oauthCode?: string
+
 
   @ApiProperty({ description: '生日', example: '1995-01-01', required: false })
   @IsOptional()
   @IsDateString()
-  birthday?: string
+  birthday?: Date
 
   @ApiProperty({ description: '性別', example: 'Male', required: false })
   @IsOptional()
