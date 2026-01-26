@@ -12,6 +12,11 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+.venv
+
+scraper/scraped_data.json
+scraper/failed_api_calls.json
+
 # OS
 .DS_Store
 

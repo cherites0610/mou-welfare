@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Logger, Post, UnauthorizedException } from '@nestjs/common'
+import { Body, Controller, Headers, Logger, Param, Post, UnauthorizedException } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { IngestWelfareDto } from './dtos/ingest-welfare.dto.js'
 import { SearchWelfareDto } from './dtos/search-welfare.dto.js'
@@ -22,6 +22,17 @@ export class WelfaresController {
 
     this.logger.log(`收到外部福利資料推送: ${dto.originalName}`)
     return this.welfaresService.ingest(dto)
+  }
+
+  @Post('delete/:city')
+  @ApiOperation({ summary: '接收外部爬蟲福利資料 (推入佇列)' })
+  async deleteByCity(@Headers('x-api-key') apikey: string, @Param("city") city: string) {
+    if (apikey !== process.env.API_KEY) {
+      throw new UnauthorizedException('Invalid API key')
+    }
+
+    this.logger.log(`收到刪除城市福利資料請求: ${city}`)
+    return this.welfaresService.deleteByCity(city)
   }
 
   @Post()

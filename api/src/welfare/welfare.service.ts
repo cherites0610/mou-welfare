@@ -10,6 +10,7 @@ import { SearchWelfareDto } from './dtos/search-welfare.dto.js'
 import { Welfare } from './entities/welfare.entity.js'
 import { FamilyMatch, MatchResult } from './interfaces/traffic-light.interface.js'
 import { WelfareResponse } from './interfaces/welfare-response.interface.js'
+import { GcsService } from './services/gcs.service.js'
 import { WelfareMatchingService } from './services/welfare-matching.service.js'
 
 @Injectable()
@@ -25,6 +26,7 @@ export class WelfaresService {
     @InjectRepository(UserFamily)
     private readonly userFamilyRepository: Repository<UserFamily>,
     private readonly matchingService: WelfareMatchingService,
+    private readonly gcsService: GcsService,
   ) { }
 
   async ingest(dto: IngestWelfareDto): Promise<{ message: string; jobId: string }> {
@@ -42,6 +44,18 @@ export class WelfaresService {
       message: '資料已推入處理佇列',
       jobId: job.id!,
     }
+  }
+
+  async deleteByCity(city: string): Promise<{ deletedCount: number }> {
+    this.logger.log(`執行刪除作業: ${city}`)
+
+    const deleteResult = await this.welfareRepository.delete({ sourceCity: city })
+    const dbDeletedCount = deleteResult.affected || 0
+    this.logger.log(`DB 已刪除 ${dbDeletedCount} 筆 ${city} 資料`)
+
+    await this.gcsService.removeByCity(city)
+
+    return { deletedCount: dbDeletedCount }
   }
 
   async search(dto: SearchWelfareDto): Promise<{ data: WelfareResponse[]; total: number }> {
@@ -196,8 +210,8 @@ export class WelfaresService {
       const sortWeight = (myScore * 1000) + maxFamilyScore
 
       return {
-        ...welfare,
         match: myMatchResult || undefined,
+        ...welfare,
         familyMatches,
         overallScore: sortWeight,
       } as WelfareResponse

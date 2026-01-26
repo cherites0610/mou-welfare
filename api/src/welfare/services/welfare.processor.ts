@@ -48,7 +48,7 @@ export class WelfaresProcessor extends WorkerHost {
       })
 
       await this.welfareRepository.save(welfare)
-      await this.gcsService.appendAndUpload([welfare])
+      await this.gcsService.addToBuffer(welfare)
       this.logger.log(`福利資料處理並儲存成功 ID: ${welfare.id}`)
 
     } catch (error) {
