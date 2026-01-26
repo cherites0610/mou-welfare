@@ -8,7 +8,7 @@ import { Welfare } from '../entities/welfare.entity.js'
 import { GcsService } from './gcs.service.js'
 import { WelfareLlmService } from './welfare-llm.service.js'
 
-@Processor('welfare-processing')
+@Processor('welfare-processing', { concurrency: 1, limiter: { max: 100, duration: 60000 } })
 export class WelfaresProcessor extends WorkerHost {
   private readonly logger = new Logger(WelfaresProcessor.name)
 
