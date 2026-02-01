@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import { Icon } from '@iconify/vue';
 
 const route = useRoute()
 const router = useRouter()
@@ -34,10 +35,13 @@ const userName = computed(() => userStore.userInfo?.email || 'User')
 </script>
 
 <template>
+
   <div class="layout-container">
-    <aside class="sidebar">
+    <aside class="sidebar ">
       <div class="logo-area">
         <h2>福利小幫手</h2>
+        <Icon icon="mdi-light:home" />
+
       </div>
 
       <nav class="nav-menu">

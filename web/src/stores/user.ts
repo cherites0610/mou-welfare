@@ -72,12 +72,12 @@ export const useUserStore = defineStore(
       userUpdateProfile,
       setToken,
       setUser,
-      clearState
+      clearState,
     }
   },
   {
     persist: {
-      pick: ['token', 'userInfo']
-    }
-  }
+      pick: ['token', 'userInfo'],
+    },
+  },
 )
