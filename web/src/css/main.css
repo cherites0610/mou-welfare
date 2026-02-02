@@ -1,1 +1,15 @@
 @import 'tailwindcss';
+
+@theme {
+  /* 在 v4，只要變數名稱是 --color-* 開頭，
+    Tailwind 會自動生成 bg-primary, text-primary, border-primary
+  */
+  --color-mygreen: #92C700;
+  --color-secondary: #E6A23C;
+  
+  --color-site: #f5f7fa;
+  --color-card: #ffffff;
+  
+  --color-main: #303133;
+  --color-sub: #909399;
+}
