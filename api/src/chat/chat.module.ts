@@ -13,6 +13,7 @@ import { VertexAiProvider } from './providers/vertex-ai.provider.js'
 @Module({
   imports: [TypeOrmModule.forFeature([ChatSession, ChatMessage, Welfare, User, UserFamily]), WelfaresModule],
   providers: [VertexAiProvider, ChatService],
-  controllers: [ChatController]
+  controllers: [ChatController],
+  exports: [ChatService],
 })
 export class ChatModule { }

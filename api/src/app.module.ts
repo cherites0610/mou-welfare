@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module.js'
 import { ChatModule } from './chat/chat.module.js'
 import { winstonConfig } from './config/winston.config.js'
 import { FmailyModule } from './family/family.module.js'
+import { LineModule } from './line/line.module.js'
 import { NotificationsModule } from './notification/notifications.module.js'
 import { RedisModule } from './redis/redis.module.js'
 import { UserFamiliesModule } from './user-family/user-family.module.js'
@@ -46,7 +47,8 @@ import { WelfaresModule } from './welfare/welfare.module.js'
     AuthModule,
     FmailyModule,
     UserFamiliesModule,
-    ChatModule
+    ChatModule,
+    LineModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -142,6 +142,21 @@ export class WelfaresService {
     return results.sort((a, b) => (b.match?.score || 0) - (a.match?.score || 0))
   }
 
+  async findRandom(limit: number = 3): Promise<Welfare[]> {
+    return this.welfareRepository
+      .createQueryBuilder('welfare')
+      .select([
+        'welfare.id',
+        'welfare.name',
+        'welfare.summaryContent',
+        'welfare.sourceCity',
+        'welfare.sourceUrl',
+      ])
+      .orderBy('RANDOM()')
+      .take(limit)
+      .getMany()
+  }
+
   private async processUserMode(welfares: Welfare[], userId: string): Promise<WelfareResponse[]> {
     this.logger.log(`進入個人查詢模式, UserID: ${userId}`)
     const user = await this.userRepository.findOne({ where: { id: userId } })
