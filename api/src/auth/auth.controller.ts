@@ -18,6 +18,7 @@ import { ResendVerificationDto } from '../user/dtos/resend-verification.dto.js'
 import { ResetPasswordDto } from '../user/dtos/reset-password.dto.js'
 import { AuthService } from './auth.service.js'
 import { LoginDto } from './dtos/login.dto.js'
+import { LiffLoginDto } from './dtos/liff-login.dto.js'
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -35,6 +36,14 @@ export class AuthController {
   async login(@Body() loginDto: LoginDto) {
     this.logger.log(`接收到登入請求: ${loginDto.email}`)
     return this.authService.login(loginDto)
+  }
+
+  @Post('liff-login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'LIFF 登入 (驗證 AccessToken 並換取內部 Code)' })
+  async loginWithLiff(@Body() dto: LiffLoginDto) {
+    this.logger.log(`收到 LIFF 登入請求`)
+    return this.authService.handleLiffLogin(dto.accessToken)
   }
 
   @Post('login-oauth')

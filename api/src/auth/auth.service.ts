@@ -65,6 +65,26 @@ export class AuthService {
     }
   }
 
+  async handleLiffLogin(accessToken: string) {
+    const response = await fetch('https://api.line.me/oauth2/v2.1/userinfo', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    })
+
+    const profileData = await response.json()
+
+    if (!response.ok) {
+      this.logger.error(`LIFF Token 驗證失敗: ${JSON.stringify(profileData)}`)
+      throw new BadRequestException('LIFF 登入失敗')
+    }
+
+    const email = profileData.email
+
+    return this.handleThirdPartyCallback(email, profileData, 'line')
+  }
+
   // --- 註冊與驗證流程 ---
 
   async register(registerDto: RegisterDto): Promise<User> {
