@@ -75,7 +75,9 @@ export class Welfare {
   deadline: Date | null
 
   @ApiProperty({ description: '收藏此福利的用戶', type: () => [User] })
-  @ManyToMany(() => User, (user) => user.favoriteWelfares)
+  @ManyToMany(() => User, (user) => user.favoriteWelfares, {
+    onDelete: 'CASCADE',
+  })
   favoritedByUsers: User[]
 
   @ApiProperty({ description: '建立時間' })

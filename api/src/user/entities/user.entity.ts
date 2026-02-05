@@ -57,8 +57,10 @@ export class User {
   @Column('simple-array', { name: 'identities', nullable: true })
   identities: string[]
 
-  @ApiProperty({ description: '收藏的福利', type: () => [Welfare] })
-  @ManyToMany(() => Welfare, (welfare) => welfare.favoritedByUsers)
+  @ApiProperty({ type: () => [Welfare] })
+  @ManyToMany(() => Welfare, (welfare) => welfare.favoritedByUsers, {
+    onDelete: 'CASCADE',
+  })
   @JoinTable({
     name: 'user_favorite_subsidies',
     joinColumn: {
