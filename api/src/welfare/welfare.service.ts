@@ -116,8 +116,8 @@ export class WelfaresService {
     const finalData = targetSlice.map(lightItem => {
       const fullDetail = fullDetails.find(f => f.id === lightItem.id)
       return {
-        ...fullDetail,
         ...lightItem,
+        ...fullDetail,
       }
     })
 
