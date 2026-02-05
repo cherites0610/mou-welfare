@@ -25,7 +25,6 @@ export interface SearchWelfareDto {
   categories?: string[]
   userId?: string
   identities?: string[]
-  locations?: string[]
   familyId?: string
   page?: number
   limit?: number
@@ -34,7 +33,7 @@ export interface SearchWelfareDto {
 export enum TrafficLight {
   RED = 'RED',
   YELLOW = 'YELLOW',
-  GREEN = 'GREEN'
+  GREEN = 'GREEN',
 }
 
 export interface MatchResult {

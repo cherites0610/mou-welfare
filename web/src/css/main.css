@@ -1,15 +1,39 @@
+/* src/assets/main.css */
 @import 'tailwindcss';
 
 @theme {
-  /* 在 v4，只要變數名稱是 --color-* 開頭，
-    Tailwind 會自動生成 bg-primary, text-primary, border-primary
-  */
-  --color-mygreen: #92C700;
-  --color-secondary: #E6A23C;
-  
-  --color-site: #f5f7fa;
-  --color-card: #ffffff;
-  
-  --color-main: #303133;
-  --color-sub: #909399;
+  --color-mygreen: #92c700;
+  --color-mygreen-400: #5D7A00;
+  --color-mygreen-300: #5A8700;
+  --color-mygreen-200: #73AA00;
+
+  --color-myorange: #FF9538;
+  --color-myblue: #3A90E0;
+  --color-mypurple: #E360DA;
+  --color-myblue-green: #00D3A9;
+  --color-myyellow: #FFEA53;
+  --color-myred: #D06262;
+
+  --color-mygray-100: #EDEDED;
+  --color-mygray-200: #CAD1D5;
+  --color-mygray-300: #7F8689;
+
+  /* 讓 Tailwind 的 primary 也能吃到下面的設定 */
+  --color-primary: var(--el-color-primary);
+}
+
+html body {
+  /* 1. 設定你的檸檬綠 #92C700 */
+  --el-color-primary: #5a8700;
+  /* 2. 設定淺色變體 (Hover 顏色) */
+  --el-color-primary-light-3: #b3d84d;
+  --el-color-primary-light-5: #c9e380;
+  --el-color-primary-light-7: #dff0b3;
+  --el-color-primary-light-8: #e9f6cc;
+  --el-color-primary-light-9: #f4fae6;
+
+  /* 3. 設定深色變體 (Active 顏色) */
+  --el-color-primary-dark-2: #759f00;
+  --el-input-focus-border-color: #92c700;
+  --el-component-size-large: 40px; /* 只是確保變數有生效的測試 */
 }

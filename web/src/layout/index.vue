@@ -89,7 +89,7 @@ const userName = computed(() => userStore.userInfo?.email || 'User')
       </div>
     </header>
 
-    <main class="flex-1 w-full max-w-7xl mx-auto p-4 pb-24 md:p-6 md:pb-6">
+    <main class="flex-1 w-full max-w-7xl mx-auto  pb-24 md:p-6 md:pb-6">
       <router-view v-slot="{ Component }">
         <keep-alive :include="['WelfareList', 'Chat']">
           <component :is="Component" />
