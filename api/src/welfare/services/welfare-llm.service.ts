@@ -4,6 +4,16 @@ import { LlmProvider } from '../../llm/llm.types.js'
 import { IngestWelfareDto } from '../dtos/ingest-welfare.dto.js'
 import { WelfareAnalysisResult } from '../interfaces/welfare-analysis.interface.js'
 
+const ALLOWED_IDENTITIES = [
+  "20歲以下", "20歲-65歲", "65歲以上", "男性", "女性",
+  "中低收入戶", "低收入戶", "榮民", "身心障礙者", "原住民", "外籍配偶家庭"
+]
+
+const ALLOWED_CATEGORIES = [
+  '兒童及青少年福利', '婦女與幼兒福利', '老人福利',
+  '社會救助福利', '身心障礙福利', '其他福利'
+]
+
 @Injectable()
 export class WelfareLlmService {
   private readonly logger = new Logger(WelfareLlmService.name)
@@ -12,25 +22,84 @@ export class WelfareLlmService {
     private readonly llmService: LlmService,
   ) { }
 
-
   async analyze(data: IngestWelfareDto): Promise<WelfareAnalysisResult> {
     this.logger.log(`正在呼叫 LLM 分析福利資料: ${data.originalName}`)
 
-    const response = await this.llmService.chat({
+    const userContent = `標題: ${data.originalName}, 內文: ${data.originalContent}`
+
+    let response = await this.llmService.chat({
       provider: LlmProvider.GEMINI,
       systemPrompt,
-      userContent: `標題: ${data.originalName}, 內文: ${data.originalContent}`,
+      userContent,
     })
 
-    const jsonStartIndex = response.indexOf('{')
-    const jsonEndIndex = response.lastIndexOf('}') + 1
-    const jsonString = response.substring(jsonStartIndex, jsonEndIndex)
+    let parsedData = this.parseResponse(response)
+    let validation = this.validateFields(parsedData)
 
-    const parsedData = JSON.parse(jsonString)
+    if (!validation.isValid) {
+      this.logger.warn(`LLM 回傳欄位不符規範，嘗試進行自動修正: ${data.originalName}`)
+
+      const retryPrompt = `
+      你上一次回傳的 JSON 資料中，以下欄位使用了不允許的值：
+      無效的 identity: ${JSON.stringify(validation.invalidIdentities)}
+      無效的 categories: ${JSON.stringify(validation.invalidCategories)}
+
+      請重新分析並輸出正確的 JSON。
+      嚴格遵守以下限制：
+      1. identity 只能包含: ${JSON.stringify(ALLOWED_IDENTITIES)}
+      2. categories 只能包含: ${JSON.stringify(ALLOWED_CATEGORIES)}
+      3. 若無符合項目，identity 回傳空陣列，categories 回傳 ["其他福利"]
+      `
+
+      response = await this.llmService.chat({
+        provider: LlmProvider.GEMINI,
+        systemPrompt,
+        userContent: `${userContent}\n\n${retryPrompt}`,
+      })
+
+      parsedData = this.parseResponse(response)
+      validation = this.validateFields(parsedData)
+    }
+
+    const finalIdentity = validation.invalidIdentities.length > 0 ? [] : parsedData.identity
+    const finalCategories = validation.invalidCategories.length > 0 ? ['其他福利'] : parsedData.categories
 
     return {
       ...parsedData,
+      identity: finalIdentity,
+      categories: finalCategories,
       deadline: parsedData.deadline ? new Date(parsedData.deadline) : undefined,
+    }
+  }
+
+  private parseResponse(response: string): any {
+    try {
+      const jsonStartIndex = response.indexOf('{')
+      const jsonEndIndex = response.lastIndexOf('}') + 1
+      const jsonString = response.substring(jsonStartIndex, jsonEndIndex)
+      return JSON.parse(jsonString)
+    } catch (e) {
+      this.logger.error('JSON 解析失敗', e)
+      return {
+        name: '',
+        summaryContent: '解析失敗',
+        identity: [],
+        rewards: [],
+        categories: ['其他福利'],
+        requirements: [],
+        deadline: ''
+      }
+    }
+  }
+
+  private validateFields(data: any): { isValid: boolean, invalidIdentities: string[], invalidCategories: string[] } {
+    const invalidIdentities = (data.identity || []).filter((id: string) => !ALLOWED_IDENTITIES.includes(id))
+    const invalidCategories = (data.categories || []).filter((cat: string) => !ALLOWED_CATEGORIES.includes(cat))
+
+    return {
+      isValid: invalidIdentities.length === 0 && invalidCategories.length === 0,
+      invalidIdentities,
+      invalidCategories
     }
   }
 }
@@ -146,13 +215,4 @@ const systemPrompt = `
 
 ## Initialization
 作為福利資訊精煉師，你必須遵守上述Rules，按照Workflows執行任務，並按照JSON格式輸出。
-- 步驟 1: 閱讀並瞭解政府福利文件（標題和內文）。
-- 步驟 2: 判斷文件是否包含有意義的福利資訊。若無，則停止後續步驟，直接輸出含輸入之標題及無摘要，其餘全部爲空array之JSON。
-- 步驟 3: 若文件包含有意義的福利信息，則從文件中提取關鍵資訊（福利內容、適用對象、獎勵和申請條件）。
-- 步驟 4: 從身分清單選擇適用身分別。
-- 步驟 5: 將福利可獲得的獎勵以數組形式提取。
-- 步驟 6: 根據福利內容，從福利種類清單選擇適用種類。不符其他種類時選'其他福利'。
-- 步驟 7: 將福利申請條件以數組形式提取，並以簡短文字描述。
-- 步驟 8: 將該福利截止日期以YYYY-MM-DD格式提取
-- 預期結果: 輸出格式化的福利信息，方便用戶快速了解自身可能符合的福利項目。若輸入檔案無意義，則輸出含輸入之標題及無摘要，其餘全部爲空array之JSON。
 `
