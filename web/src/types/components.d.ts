@@ -19,6 +19,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     WelfareCard: typeof import('./../components/welfareCard.vue')['default']
+    WelfareFilterBar: typeof import('./../components/WelfareFilterBar.vue')['default']
   }
   export interface GlobalDirectives {
     vInfiniteScroll: typeof import('element-plus/es')['ElInfiniteScroll']
@@ -34,4 +35,5 @@ declare global {
   const RouterLink: typeof import('vue-router')['RouterLink']
   const RouterView: typeof import('vue-router')['RouterView']
   const WelfareCard: typeof import('./../components/welfareCard.vue')['default']
+  const WelfareFilterBar: typeof import('./../components/WelfareFilterBar.vue')['default']
 }
