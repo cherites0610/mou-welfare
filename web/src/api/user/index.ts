@@ -5,6 +5,7 @@ import type { LoginDto, LoginResponse, RegisterDto, ResetPasswordDto, UpdateUser
 enum Api {
   Login = '/auth/login',
   LoginOAuth = '/auth/login-oauth',
+  LoginLiff = '/auth/login-liff',
   Register = '/auth/register',
   ResendVerification = '/auth/resend-verification',
   ForgotPassword = '/auth/forgot-password',
@@ -24,6 +25,10 @@ enum Api {
 
 export const login = (data: LoginDto) => {
   return request.post<LoginResponse>(Api.Login, data)
+}
+
+export const loginWithLiff = (lineAccessToken: string) => {
+  return request.post<{ code: string, action: string }>(Api.LoginLiff, { accessToken: lineAccessToken })
 }
 
 export const loginWithOAuth = (code: string) => {
