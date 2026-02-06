@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useChatStore } from '../../stores/chat'
+import { useFamilyStore } from '../../stores/family'
 import { useUserStore } from '../../stores/user'
+import { useWelfareStore } from '../../stores/welfare'
 
 const router = useRouter()
 const route = useRoute()
+
 const userStore = useUserStore()
+const familyStore = useFamilyStore()
+const chatStore = useChatStore()
+const welfareStore = useWelfareStore()
 
 const loading = ref(false)
 const errorMsg = ref('')
@@ -14,6 +21,20 @@ const form = reactive({
   email: 'user@example.com',
   password: '12345678'
 })
+
+const resetAllStores = () => {
+  userStore.clearState()
+  familyStore.clearState()
+  chatStore.clearState()
+  welfareStore.clearState()
+}
+
+const initAppData = async () => {
+  await Promise.all([
+    familyStore.loadFamilies(),
+    chatStore.loadSessions()
+  ])
+}
 
 const handleLogin = async () => {
   if (!form.email || !form.password) {
@@ -24,13 +45,20 @@ const handleLogin = async () => {
   loading.value = true
   errorMsg.value = ''
 
+  resetAllStores()
+
   try {
     await userStore.userLogin(form)
+
+    await initAppData()
+
     const redirect = route.query.redirect as string
     router.push(redirect || '/')
   } catch (err: any) {
     console.error(err)
     errorMsg.value = err.message || '登入失敗，請檢查帳號密碼'
+
+    resetAllStores()
   } finally {
     loading.value = false
   }
