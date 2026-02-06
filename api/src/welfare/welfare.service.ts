@@ -83,6 +83,14 @@ export class WelfaresService {
       queryBuilder.andWhere('welfare.categories IN (:...categories)', { categories: dto.categories })
     }
 
+    queryBuilder.addOrderBy(
+      `CASE
+        WHEN welfare.identity IS NOT NULL AND welfare.identity != '[]' THEN 0
+        ELSE 1
+      END`,
+      'ASC'
+    )
+
     const lightWelfares = await queryBuilder.getMany()
     this.logger.log(`初步篩選完成, 共有 ${lightWelfares.length} 筆資料進入比對`)
 
@@ -125,23 +133,6 @@ export class WelfaresService {
     return { data: finalData, total }
   }
 
-  private processManualMode(welfares: Welfare[], identities: string[]): WelfareResponse[] {
-    this.logger.log(`進入手動模擬模式, 模擬身分: ${identities.join(',')}`)
-    const mockUser = {
-      id: "uuid",
-      identities: identities,
-      gender: null,
-      birthday: null,
-    } as unknown as User
-
-    const results = welfares.map((welfare) => {
-      const match = this.matchingService.calculate(mockUser, welfare)
-      return { ...welfare, match }
-    })
-
-    return results.sort((a, b) => (b.match?.score || 0) - (a.match?.score || 0))
-  }
-
   async findRandom(limit: number = 3): Promise<Welfare[]> {
     return this.welfareRepository
       .createQueryBuilder('welfare')
@@ -157,6 +148,37 @@ export class WelfaresService {
       .getMany()
   }
 
+  private sortWelfares(a: WelfareResponse, b: WelfareResponse, useOverallScore = false): number {
+    const aHasIdentity = a.identity && a.identity.length > 0 ? 1 : 0
+    const bHasIdentity = b.identity && b.identity.length > 0 ? 1 : 0
+
+    if (aHasIdentity !== bHasIdentity) {
+      return bHasIdentity - aHasIdentity
+    }
+
+    const aScore = useOverallScore ? (a.overallScore || 0) : (a.match?.score || 0)
+    const bScore = useOverallScore ? (b.overallScore || 0) : (b.match?.score || 0)
+
+    return bScore - aScore
+  }
+
+  private processManualMode(welfares: Welfare[], identities: string[]): WelfareResponse[] {
+    this.logger.log(`進入手動模擬模式, 模擬身分: ${identities.join(',')}`)
+    const mockUser = {
+      id: "uuid",
+      identities: identities,
+      gender: null,
+      birthday: null,
+    } as unknown as User
+
+    const results = welfares.map((welfare) => {
+      const match = this.matchingService.calculate(mockUser, welfare)
+      return { ...welfare, match }
+    })
+
+    return results.sort((a, b) => this.sortWelfares(a, b, false))
+  }
+
   private async processUserMode(welfares: Welfare[], userId: string): Promise<WelfareResponse[]> {
     this.logger.log(`進入個人查詢模式, UserID: ${userId}`)
     const user = await this.userRepository.findOne({ where: { id: userId } })
@@ -170,7 +192,7 @@ export class WelfaresService {
       return { ...welfare, match }
     })
 
-    return results.sort((a, b) => (b.match?.score || 0) - (a.match?.score || 0))
+    return results.sort((a, b) => this.sortWelfares(a, b, false))
   }
 
   private async processFamilyMode(
@@ -184,21 +206,28 @@ export class WelfaresService {
       relations: ['user'],
     })
 
-    if (!allMembers.length) {
-      this.logger.warn(`家庭 ${familyId} 無成員資料`)
-      return welfares.map(w => ({ ...w })) as unknown as WelfareResponse[]
-    }
-
     let currentUserUser: User | null = null
     const otherMembers: { user: User; role: string }[] = []
 
+    const familyMemberMap = new Map<string, User>()
+    for (const member of allMembers) {
+      if (member.user) {
+        familyMemberMap.set(member.user.id, member.user)
+      }
+    }
+
+    if (currentUserId) {
+      if (familyMemberMap.has(currentUserId)) {
+        currentUserUser = familyMemberMap.get(currentUserId)!
+      } else {
+        currentUserUser = await this.userRepository.findOne({ where: { id: currentUserId } })
+      }
+    }
+
     for (const member of allMembers) {
       if (!member.user) continue
-      if (currentUserId && member.user.id === currentUserId) {
-        currentUserUser = member.user
-      } else {
-        otherMembers.push({ user: member.user, role: member.role })
-      }
+      if (currentUserId && member.user.id === currentUserId) continue
+      otherMembers.push({ user: member.user, role: member.role })
     }
 
     const results = welfares.map((welfare) => {
@@ -232,6 +261,6 @@ export class WelfaresService {
       } as WelfareResponse
     })
 
-    return results.sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0))
+    return results.sort((a, b) => this.sortWelfares(a, b, true))
   }
 }
