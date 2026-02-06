@@ -24,7 +24,7 @@ export class LineController {
     const events = body.events
 
     // 使用 Promise.all 並行處理多個事件 (例如同時有多人發訊)
-    await Promise.all(
+    Promise.all(
       events.map((event) => this.lineService.handleEvent(event))
     )
 

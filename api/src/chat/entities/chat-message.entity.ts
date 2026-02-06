@@ -13,7 +13,7 @@ export type MessageRole = 'user' | 'assistant' | 'system'
 export interface MessageMetadata {
   extractedCity?: string
   extractedIdentities?: string[]
-  ragSources?: { id: string, title: string; uri: string; snippet: string }[] // 引用來源
+  ragSources?: { id: string, title: string; uri: string; summaryContent: string }[] // 引用來源
   processingTime?: number
 }
 

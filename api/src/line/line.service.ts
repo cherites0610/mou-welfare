@@ -1,9 +1,10 @@
-import { messagingApi } from '@line/bot-sdk'
+import { FlexBubble, FlexComponent, FlexMessage, Message, messagingApi, TextMessage } from '@line/bot-sdk'
 import { Injectable, Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Between, Repository } from 'typeorm'
 import { ChatService } from '../chat/chat.service.js'
+import { MessageMetadata } from '../chat/entities/chat-message.entity.js'
 import { ChatSession } from '../chat/entities/chat-session.entity.js'
 import { User } from '../user/entities/user.entity.js'
 import { Welfare } from '../welfare/entities/welfare.entity.js'
@@ -14,6 +15,7 @@ export class LineService {
   private readonly client: messagingApi.MessagingApiClient
   private readonly logger = new Logger(LineService.name)
   private readonly channelSecret: string
+  private readonly frontendUrl: string
 
   constructor(
     private readonly configService: ConfigService,
@@ -25,60 +27,58 @@ export class LineService {
     private readonly welfaresService: WelfaresService,
   ) {
     this.channelSecret = this.configService.getOrThrow<string>('LINE_MESSAGEING_SECRET')
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'https://google.com'
     this.client = new messagingApi.MessagingApiClient({
       channelAccessToken: this.configService.getOrThrow<string>('LINE_MESSAGEING_ACCESS_TOKEN'),
     })
   }
 
-  // 處理 Webhook 事件的進入點
   async handleEvent(event: any) {
-    if (event.type !== 'message' || event.message.type !== 'text') {
-      return
+    try {
+      if (event.type !== 'message' || event.message.type !== 'text') {
+        return
+      }
+
+      const lineUserId = event.source.userId
+      const userMessage = event.message.text
+      const replyToken = event.replyToken
+
+      this.logger.log(`收到 LINE 訊息: ${lineUserId} - ${userMessage}`)
+
+      const user = await this.userRepository.findOne({ where: { lineId: lineUserId } })
+
+      if (!user) {
+        await this.handleGuestUser(replyToken)
+        return
+      }
+
+      await this.handleRegisteredUser(user, userMessage, replyToken)
+    } catch (error) {
+      this.logger.error('處理 LINE 事件時發生錯誤', error)
     }
-
-    const lineUserId = event.source.userId
-    const userMessage = event.message.text
-    const replyToken = event.replyToken
-
-    this.logger.log(`收到 LINE 訊息: ${lineUserId} - ${userMessage}`)
-
-    // 1. 身份識別
-    const user = await this.userRepository.findOne({ where: { lineId: lineUserId } })
-
-    // === 分支 A: 未綁定用戶 ===
-    if (!user) {
-      await this.handleGuestUser(replyToken)
-      return
-    }
-
-    // === 分支 B: 已綁定用戶 ===
-    await this.handleRegisteredUser(user, userMessage, replyToken)
   }
 
-  // 處理未登入用戶邏輯
   private async handleGuestUser(replyToken: string) {
-    // 1. 撈取隨機福利
     const randomWelfares = await this.welfaresService.findRandom(3)
+    const messages: Message[] = [
+      {
+        type: 'text',
+        text: '您尚未綁定帳號，無法使用智慧對話功能。\n\n請點擊以下連結進行綁定 (範例連結)，或是參考下方為您隨機推薦的福利：',
+      },
+    ]
 
-    // 2. 構建 Carousel Flex Message
-    const carouselMessage = this.buildWelfareCarousel(randomWelfares)
+    if (randomWelfares && randomWelfares.length > 0) {
+      const carouselMessage = this.buildWelfareCarousel(randomWelfares)
+      messages.push(carouselMessage)
+    }
 
-    // 3. 回覆訊息 (提示登入 + 推薦)
     await this.client.replyMessage({
       replyToken,
-      messages: [
-        {
-          type: 'text',
-          text: '您尚未綁定帳號，無法使用智慧對話功能。\n\n請點擊以下連結進行綁定 (範例連結)，或是參考下方為您隨機推薦的福利：',
-        },
-        carouselMessage,
-      ],
+      messages: messages as any,
     })
   }
 
-  // 處理已登入用戶邏輯
   private async handleRegisteredUser(user: User, message: string, replyToken: string) {
-    // 1. 檢查今日配額 (3次)
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
 
@@ -92,25 +92,26 @@ export class LineService {
       },
     })
 
-    // === 狀況 B-1: 配額已滿 ===
     if (sessionCount >= 3) {
       const randomWelfares = await this.welfaresService.findRandom(3)
-      const carouselMessage = this.buildWelfareCarousel(randomWelfares)
+      const messages: Message[] = [
+        {
+          type: 'text',
+          text: '抱歉，您今日的免費智慧對話次數已達上限 (3次)。\n\n我們明天見！在此之前，您可以看看這些推薦福利：',
+        },
+      ]
+
+      if (randomWelfares && randomWelfares.length > 0) {
+        messages.push(this.buildWelfareCarousel(randomWelfares))
+      }
 
       await this.client.replyMessage({
         replyToken,
-        messages: [
-          {
-            type: 'text',
-            text: '抱歉，您今日的免費智慧對話次數已達上限 (3次)。\n\n我們明天見！在此之前，您可以看看這些推薦福利：',
-          },
-          carouselMessage,
-        ],
+        messages: messages as any,
       })
       return
     }
 
-    // === 狀況 B-2: 配額未滿，檢查合併 ===
     const lastSession = await this.sessionRepository.findOne({
       where: { userId: user.id },
       order: { updatedAt: 'DESC' },
@@ -128,26 +129,33 @@ export class LineService {
       }
     }
 
-    // 2. 呼叫 ChatService 處理 AI 對話
-    // 注意：ChatService 回傳的是一個物件 { reply, metadata ... }
     const aiResult = await this.chatService.handleMessage(user.id, null, sessionId, message)
 
-    // 3. 回覆 AI 的答案
+    const messages: Message[] = [
+      { type: 'text', text: aiResult.reply }
+    ]
+
+    if (aiResult.metadata && Array.isArray(aiResult.metadata.ragSources) && aiResult.metadata.ragSources.length > 0) {
+      const flexMessage = this.createRagResultFlex(aiResult.metadata)
+      messages.push(flexMessage)
+    }
+
     await this.client.replyMessage({
       replyToken,
-      messages: [{ type: 'text', text: aiResult.reply }],
+      messages: messages as any,
     })
   }
 
-  // --- 輔助方法：製作 LINE Flex Carousel ---
-  private buildWelfareCarousel(welfares: Welfare[]): any {
-    const bubbles = welfares.map((welfare) => ({
+  private buildWelfareCarousel(welfares: Welfare[]): FlexMessage {
+    const safeWelfares = welfares.slice(0, 10)
+
+    const bubbles: FlexBubble[] = safeWelfares.map((welfare) => ({
       type: 'bubble',
-      size: 'micro', // 使用小尺寸卡片
+      size: 'micro',
       header: {
         type: 'box',
         layout: 'vertical',
-        backgroundColor: '#03C75A', // LINE 綠色風格
+        backgroundColor: '#03C75A',
         paddingAll: '10px',
         contents: [
           {
@@ -166,7 +174,7 @@ export class LineService {
         contents: [
           {
             type: 'text',
-            text: welfare.name,
+            text: welfare.name || '福利名稱',
             weight: 'bold',
             size: 'sm',
             wrap: true,
@@ -192,7 +200,7 @@ export class LineService {
             action: {
               type: 'uri',
               label: '查看詳情',
-              uri: welfare.sourceUrl || 'https://google.com',
+              uri: `${this.frontendUrl}/welfare/${welfare.id}`,
             },
             style: 'secondary',
             height: 'sm',
@@ -208,6 +216,147 @@ export class LineService {
         type: 'carousel',
         contents: bubbles,
       },
+    }
+  }
+
+  private createRagResultFlex(metadata: MessageMetadata): FlexMessage | TextMessage {
+    const sources = metadata.ragSources || []
+
+    if (sources.length === 0) {
+      return {
+        type: 'text',
+        text: '抱歉，未找到相關的福利資源。',
+      }
+    }
+
+    const safeSources = sources.slice(0, 10)
+
+    const bubbles: FlexBubble[] = safeSources.map((source) => {
+      const identities = metadata.extractedIdentities || []
+      const city = metadata.extractedCity || '全台'
+
+      const tags: FlexComponent[] = []
+
+      tags.push({
+        type: 'box',
+        layout: 'baseline',
+        contents: [
+          {
+            type: 'text',
+            text: city,
+            size: 'xs',
+            color: '#005c4b',
+            weight: 'bold',
+            flex: 0,
+            margin: 'none'
+          }
+        ],
+        backgroundColor: '#e0f2f1',
+        cornerRadius: '20px',
+        paddingAll: 'xs',
+        paddingStart: 'md',
+        paddingEnd: 'md',
+        margin: 'sm',
+        flex: 0
+      })
+
+      identities.slice(0, 3).forEach((identity) => {
+        tags.push({
+          type: 'box',
+          layout: 'baseline',
+          contents: [
+            {
+              type: 'text',
+              text: identity,
+              size: 'xs',
+              color: '#555555',
+              flex: 0,
+              margin: 'none'
+            }
+          ],
+          backgroundColor: '#f5f5f5',
+          cornerRadius: '20px',
+          paddingAll: 'xs',
+          paddingStart: 'md',
+          paddingEnd: 'md',
+          margin: 'sm',
+          flex: 0
+        })
+      })
+
+      return {
+        type: 'bubble',
+        size: 'mega',
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: source.title || '無標題資源',
+              weight: 'bold',
+              size: 'lg',
+              color: '#1f1f1f',
+              wrap: true,
+              maxLines: 2
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: tags,
+              margin: 'md'
+            },
+            {
+              type: 'text',
+              text: source.summaryContent || '點擊下方按鈕查看更多詳細資訊...',
+              size: 'sm',
+              color: '#888888',
+              wrap: true,
+              margin: 'md',
+              maxLines: 3,
+              lineSpacing: '4px'
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'separator',
+              color: '#f0f0f0',
+              margin: 'none'
+            },
+            {
+              type: 'button',
+              style: 'link',
+              height: 'sm',
+              action: {
+                type: 'uri',
+                label: '查看完整內容',
+                uri: source.uri || this.frontendUrl
+              },
+              color: '#00b900',
+              margin: 'sm'
+            }
+          ],
+          paddingAll: 'none'
+        },
+        styles: {
+          footer: {
+            separator: false
+          }
+        }
+      }
+    })
+
+    return {
+      type: 'flex',
+      altText: `為您找到 ${safeSources.length} 筆福利資源`,
+      contents: {
+        type: 'carousel',
+        contents: bubbles
+      }
     }
   }
 }
