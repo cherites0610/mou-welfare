@@ -65,11 +65,13 @@ export class FamiliesService {
     }
   }
 
-  async findAll(): Promise<Family[]> {
-    this.logger.log('查詢所有家庭資料')
-    return await this.familiesRepository.find({
-      relations: ['userFamilies'],
-    })
+  async findAll(userId: string): Promise<Family[]> {
+    return this.familiesRepository.createQueryBuilder('family')
+      .innerJoin('family.userFamilies', 'filterMyMembership')
+      .leftJoinAndSelect('family.userFamilies', 'allMembers')
+      .leftJoinAndSelect('allMembers.user', 'memberDetails')
+      .where('filterMyMembership.userId = :userId', { userId })
+      .getMany()
   }
 
   async findOne(id: string): Promise<Family> {

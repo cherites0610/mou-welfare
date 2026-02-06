@@ -41,7 +41,7 @@ export class FamiliesController {
   @ApiOperation({ summary: '取得所有家庭列表' })
   async findAll(@CurrentUser() user: User): Promise<Family[]> {
     this.logger.log(`查詢所有家庭列表請求, User ID: ${user.id}`)
-    return this.familiesService.findAll()
+    return this.familiesService.findAll(user.id)
   }
 
   @Get(':id')
