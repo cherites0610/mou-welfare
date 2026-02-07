@@ -4,9 +4,11 @@ import { Icon } from '@iconify/vue'
 import { useWelfareStore } from '@/stores/welfare'
 import type { WelfareResponse } from '../../api/welfare/model'
 import WelfareCard from '../../components/welfareCard.vue' // 引入子組件
-import { addFavorite, getFavorites } from '@/api/user'
+import { getFavorites } from '@/api/user'
 import WelfareFilterBar, { type FilterState } from '../../components/WelfareFilterBar.vue' // 引入子組件
 import { useUserStore } from '@/stores/user'
+import { useRouter } from 'vue-router'
+const router = useRouter()
 const userStore = useUserStore()
 const welfareStore = useWelfareStore()
 const favoriteIds = ref<Set<string>>(new Set())
@@ -24,16 +26,8 @@ onMounted(async () => {
     limit: 10,
   })
 
-  // 呼叫第一次載入
   loadMore()
-  try {
-    const favorites = await getFavorites()
-    if (Array.isArray(favorites)) {
-      favoriteIds.value = new Set(favorites.map((w) => w.id))
-    }
-  } catch (error) {
-    console.error('載入收藏失敗:', error)
-  }
+  await refreshFavorites() 
 })
 // --- 狀態管理 ---
 const search = ref('')
@@ -84,7 +78,7 @@ const handleSearch = () => {
   pagination.page = 1
   noMore.value = false
   welfareStore.updateParams({
-    keywords: search.value, // 👈 這裡直接把 input 的值塞進去
+    keywords: search.value,
     page: 1,
     limit: 10
   })
@@ -114,9 +108,21 @@ const handleFilterChange = (filters: FilterState) => {
   loadMore()
 }
 
-// Header 按鈕事件
 const collect = () => console.log('收藏')
-const question = () => console.log('常見問題')
+const question = () => {
+  router.push('/question')
+}
+
+const refreshFavorites = async () => {
+  try {
+    const favorites = await getFavorites()
+    if (Array.isArray(favorites)) {
+      favoriteIds.value = new Set(favorites.map((w) => w.id))
+    }
+  } catch (error) {
+    console.error('載入收藏失敗:', error)
+  }
+}
 </script>
 
 <template>
@@ -139,7 +145,7 @@ const question = () => console.log('常見問題')
       <ul v-infinite-scroll="loadMore" :infinite-scroll-disabled="loading || noMore" :infinite-scroll-distance="50"
         class="mx-auto pb-10">
         <li v-for="item in welfareList" :key="item.id">
-          <WelfareCard :favorites-welfare-ids="favoriteIds" :data="item" />
+          <WelfareCard :favorites-welfare-ids="favoriteIds" :data="item" @update-favorites="refreshFavorites"/>
         </li>
       </ul>
 
@@ -166,5 +172,11 @@ const question = () => console.log('常見問題')
 .overflow-y-auto::-webkit-scrollbar-thumb {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 3px;
+}
+
+@media screen and (max-width: 768px) {
+  :deep(.el-input__inner) {
+    font-size: 16px !important; /* 強制 16px，iOS 就不會縮放了 */
+  }
 }
 </style>

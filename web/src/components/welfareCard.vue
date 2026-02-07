@@ -2,15 +2,22 @@
 import { computed } from 'vue'
 import type { WelfareResponse } from '../api/welfare/model'
 import { Icon } from '@iconify/vue'
-
+import { addFavorite,removeFavorite } from '@/api/user'
+import { useTagColor } from '@/composables/useTagColor'
 const props = defineProps<{
   data: WelfareResponse
   favoritesWelfareIds: Set<string>
 }>()
-
+const emit = defineEmits<{
+  (e: 'update-favorites'): void
+}>()
+const { getTagColor } = useTagColor()
+// 3. 計算是否已收藏
+const isCollected = computed(() => props.favoritesWelfareIds.has(props.data.id))
+const loading = ref(false)
 console.log(props.favoritesWelfareIds)
 
-// 🚦 1. 處理左側燈號顏色 (根據 match.light)
+// 1. 處理左側燈號顏色
 const statusColor = computed(() => {
   const light = props.data.match?.light || 'RED'
   switch (light) {
@@ -23,27 +30,13 @@ const statusColor = computed(() => {
   }
 })
 
-// 處理標籤顏色
-const tagColorMap: Record<string, string> = {
-  '20歲以下': 'bg-myorange',
-  '20歲-65歲': 'bg-myorange',
-  '65歲以上': 'bg-myorange',
-  男性: 'bg-myblue',
-  女性: 'bg-myblue',
-  中低收入戶: 'bg-mypurple',
-  低收入戶: 'bg-mypurple',
-  榮民: 'bg-myblue-green',
-  身心障礙者: 'bg-myblue-green',
-  原住民: 'bg-myblue-green',
-  外籍配偶家庭: 'bg-myblue-green',
-}
-// 取得標籤顏色的函式
-const getTagColor = (tagName: string) => {
-  // 如果找不到對應的顏色，就回傳預設灰 (bg-gray-400)
-  return tagColorMap[tagName] || 'bg-gray-400'
-}
-// 取得第一分類 (避免分類太多太長)
-const mainCategory = computed(() => props.data.categories?.[0] || '一般福利')
+// 2. 處理主要分類顯示
+const mainCategory = computed(() => {
+  const cats = props.data.categories
+  // 如果沒有分類或陣列是空的，回傳預設值
+  if (!cats || cats.length === 0) return '一般福利'
+    return cats.join(' / ') 
+})
 
 const visibleFamilyMatches = computed(() => {
   return props.data.familyMatches || []
@@ -59,8 +52,28 @@ const getMemberBorderColor = (light: string) => {
 }
 
 // Header 按鈕事件
-const collect = () => console.log('收藏')
-const question = () => console.log('常見問題')
+const share = () => console.log('分享')
+
+const handleCollect = async () => {
+  // 防呆：防止連點
+  if (loading.value) return 
+  loading.value = true
+  try {
+    if (isCollected.value) {
+      await removeFavorite(props.data.id)
+      ElMessage.success('已取消收藏')
+    } else {
+      await addFavorite(props.data.id)
+      ElMessage.success('加入收藏成功！')
+    }
+    emit('update-favorites')
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('操作失敗，請稍後再試')
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
@@ -97,16 +110,17 @@ const question = () => console.log('常見問題')
         </h3>
       </div>
 
-      <div class="hidden md:flex  gap-3 ml-auto pl-2  border-gray-100">
+      <div class="hidden md:flex gap-3 ml-auto pl-2 border-gray-100">
         <Icon
-          icon="mdi:heart-outline"
-          class="text-2xl text-gray-400 hover:text-red-500 transition-colors mt-0.5"
-          @click.stop="collect"
+          :icon="isCollected ? 'mdi:heart' : 'mdi:heart-outline'"
+          class="text-2xl transition-colors mt-0.5"
+          :class="isCollected ? 'text-red-500' : 'text-gray-400 hover:text-red-500'"
+          @click.stop="handleCollect"
         />
         <Icon
           icon="uil:share"
           class="text-2xl text-gray-400 hover:text-mygreen transition-colors"
-          @click.stop="question"
+          @click.stop="share"
         />
       </div>
     </div>
@@ -132,17 +146,20 @@ const question = () => console.log('常見問題')
 
     <div class="flex md:hidden snap-center">
       <div
-        class="w-20 bg-gray-100 flex flex-col items-center justify-center text-gray-500 active:bg-red-100 active:text-red-500 transition-colors"
-        @click.stop="collect"
+        class="w-20 flex flex-col items-center justify-center transition-colors"
+        :class="isCollected ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-500 active:bg-red-100 active:text-red-500'"
+        @click.stop="handleCollect"
       >
-        <Icon icon="mdi:heart-outline" class="text-2xl mb-1" />
+        <Icon :icon="isCollected ? 'mdi:heart' : 'mdi:heart-outline'" class="text-2xl mb-1" />
+        <span class="text-xs">{{ isCollected ? '已收藏' : '收藏' }}</span>
       </div>
 
       <div
         class="w-20 bg-mygreen text-white flex flex-col items-center justify-center active:bg-green-700 transition-colors"
-        @click.stop="question"
+        @click.stop="share"
       >
         <Icon icon="uil:share" class="text-2xl mb-1" />
+        <span class="text-xs">詳情</span>
       </div>
     </div>
   </div>

@@ -53,8 +53,20 @@ const routes: RouteRecordRaw[] = [
         name: 'Profile',
         component: () => import('@/views/profile/index.vue'),
         meta: { title: '個人設定' }
+      },
+      {
+        path: 'question',
+        name: 'Question',
+        component: () => import('@/views/question/index.vue'),
+        meta: { title: '常見問題' }
       }
     ]
+  },
+  {
+      path: '/question',
+      name: 'Question',
+      component: () => import('@/views/question/index.vue'),
+      meta: { title: '常見問題' }
   },
   {
     path: '/:pathMatch(.*)*',
