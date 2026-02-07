@@ -159,7 +159,7 @@ const handleCollect = async () => {
         @click.stop="share"
       >
         <Icon icon="uil:share" class="text-2xl mb-1" />
-        <span class="text-xs">詳情</span>
+        <span class="text-xs">分享</span>
       </div>
     </div>
   </div>

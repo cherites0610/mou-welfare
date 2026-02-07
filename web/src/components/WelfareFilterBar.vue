@@ -448,7 +448,7 @@ const triggerChange = () => {
 
     <div
       v-if="isFilterOpen && !isDesktop"
-      class="fixed inset-0 z-30 bg-black/20"
+      class="fixed inset-0 z-30 "
       @click="closeFilter"
     ></div>
 
@@ -509,11 +509,7 @@ const triggerChange = () => {
     </transition>
   </div>
   <div v-if="activeDropdown" class="fixed inset-0 z-30" @click="activeDropdown = null"></div>
-  <div
-    v-if="isFilterOpen && !isDesktop"
-    class="fixed inset-0 z-30 bg-black/20"
-    @click="closeFilter"
-  ></div>
+
 </template>
 
 <style scoped>

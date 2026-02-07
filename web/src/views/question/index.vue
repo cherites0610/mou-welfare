@@ -49,7 +49,7 @@ onMounted(async () => {
     <div class="w-8"></div>
   </div>
 
-<div class="min-h-screen px-4 sm:px-6 lg:px-8 mt-4 md:mt-0">
+<div class="flex flex-col h-[calc(100dvh-6rem)] md:h-[calc(100vh-8rem)] overflow-hidden px-4 sm:px-6 lg:px-8 mt-4 md:mt-0">
       <div class="max-w-3xl mx-auto">
       <div v-if="loading" class="space-y-4">
         <el-skeleton :rows="3" animated />

@@ -69,6 +69,12 @@ const routes: RouteRecordRaw[] = [
       meta: { title: '常見問題' }
   },
   {
+      path: '/favorites',
+      name: 'Favorites',
+      component: () => import('@/views/favorites/index.vue'),
+      meta: { title: '我的最愛' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/'
   }

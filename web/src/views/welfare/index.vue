@@ -5,7 +5,7 @@ import { useWelfareStore } from '@/stores/welfare'
 import type { WelfareResponse } from '../../api/welfare/model'
 import WelfareCard from '../../components/welfareCard.vue' // 引入子組件
 import { getFavorites } from '@/api/user'
-import WelfareFilterBar, { type FilterState } from '../../components/WelfareFilterBar.vue' // 引入子組件
+import WelfareFilterBar, { type FilterState } from '../../components/WelfareFilterBar.vue'
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
 const router = useRouter()
@@ -27,7 +27,7 @@ onMounted(async () => {
   })
 
   loadMore()
-  await refreshFavorites() 
+  await refreshFavorites()
 })
 // --- 狀態管理 ---
 const search = ref('')
@@ -48,7 +48,7 @@ const loadMore = async () => {
   try {
     welfareStore.updateParams({
       page: pagination.page,
-      limit: pagination.limit
+      limit: pagination.limit,
     })
     // 2. 執行搜尋
     await welfareStore.executeSearch()
@@ -80,19 +80,17 @@ const handleSearch = () => {
   welfareStore.updateParams({
     keywords: search.value,
     page: 1,
-    limit: 10
+    limit: 10,
   })
 
   loadMore()
 }
 
 const handleFilterChange = (filters: FilterState) => {
-  // 1. 重置本地列表與狀態
   welfareList.value = []
   pagination.page = 1
   noMore.value = false
 
-  // 更新 Store 的篩選條件
   welfareStore.updateParams({
     keywords: search.value,
     cities: filters.cities,
@@ -101,14 +99,15 @@ const handleFilterChange = (filters: FilterState) => {
     userId: filters.userId || undefined,
     familyId: filters.family || undefined,
     page: 1,
-    limit: 10
+    limit: 10,
   })
 
-  // 3. 觸發載入
   loadMore()
 }
 
-const collect = () => console.log('收藏')
+const collect = () => {
+  router.push('/favorites')
+}
 const question = () => {
   router.push('/question')
 }
@@ -123,29 +122,56 @@ const refreshFavorites = async () => {
     console.error('載入收藏失敗:', error)
   }
 }
+
+// 修改 script setup 裡的 goToDetail
+const goToDetail = (item: WelfareResponse) => {
+  // 1. 把資料存進 Pinia
+  welfareStore.setCurrentWelfare(item)
+  
+  // 2. 單純跳轉，不用帶 state 了
+  router.push({ name: 'WelfareDetail' })
+}
 </script>
 
 <template>
-  <div class="flex flex-col h-screen">
+  <div class="flex flex-col h-[calc(100dvh-6rem)] md:h-[calc(100vh-8rem)] overflow-hidden">
     <div class="flex gap-3 items-center transition-colors duration-300 bg-mygreen md:bg-white p-4">
-      <el-input v-model="search" placeholder="Ex.租屋補助" class="w-60" clearable @keyup.enter="handleSearch"
-        @clear="handleSearch">
+      <el-input
+        v-model="search"
+        placeholder="Ex.租屋補助"
+        class="w-60"
+        clearable
+        @keyup.enter="handleSearch"
+        @clear="handleSearch"
+      >
         <template #prefix>
           <div class="flex items-center h-full">
             <Icon icon="mingcute:search-line" class="text-lg text-gray-400" />
           </div>
         </template>
       </el-input>
-      <Icon @click="collect" icon="mdi:heart-outline"
-        class="text-3xl cursor-pointer transition-all duration-300 hover:text-mygreen-400 hover:scale-110 active:scale-90" />
+      <Icon
+        @click="collect"
+        icon="mdi:heart-outline"
+        class="text-3xl cursor-pointer transition-all duration-300 hover:text-mygreen-400 hover:scale-110 active:scale-90"
+      />
       <Icon @click="question" icon="mingcute:question-line" class="text-3xl md:hidden" />
     </div>
     <WelfareFilterBar @change="handleFilterChange" />
     <div class="flex-1 overflow-y-auto">
-      <ul v-infinite-scroll="loadMore" :infinite-scroll-disabled="loading || noMore" :infinite-scroll-distance="50"
-        class="mx-auto pb-10">
+      <ul
+        v-infinite-scroll="loadMore"
+        :infinite-scroll-disabled="loading || noMore"
+        :infinite-scroll-distance="50"
+        class="mx-auto pb-10"
+      >
         <li v-for="item in welfareList" :key="item.id">
-          <WelfareCard :favorites-welfare-ids="favoriteIds" :data="item" @update-favorites="refreshFavorites"/>
+          <WelfareCard
+            :favorites-welfare-ids="favoriteIds"
+            :data="item"
+            @click="goToDetail(item)"
+            @update-favorites="refreshFavorites"
+          />
         </li>
       </ul>
 
