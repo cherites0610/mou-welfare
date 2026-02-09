@@ -1,13 +1,15 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
+import * as bcrypt from 'bcrypt'
 import { Repository } from 'typeorm'
 import { Welfare } from '../welfare/entities/welfare.entity.js'
-import { UpdateUserDto } from './dtos/update-user.dto.js'
 import { User } from './entities/user.entity.js'
 
 @Injectable()
@@ -63,6 +65,29 @@ export class UsersService {
     const user = await this.findOneById(id)
     Object.assign(user, updateData)
     return this.usersRepository.save(user)
+  }
+
+  async deleteAccount(userId: string, password: string): Promise<void> {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'password'],
+    })
+
+    if (!user) {
+      throw new NotFoundException('找不到使用者')
+    }
+
+    if (!user.password) {
+      throw new BadRequestException('此帳號未設定密碼，無法驗證 (可能是 OAuth 登入)')
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password)
+
+    if (!isMatch) {
+      throw new UnauthorizedException('密碼錯誤，無法刪除帳號')
+    }
+
+    await this.usersRepository.delete(userId)
   }
 
   // --- 使用者福利相關功能 (保留在此) ---

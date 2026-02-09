@@ -17,6 +17,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js'
 import { CurrentUser } from '../common/decorators/current-user.decorator.js'
 import { Welfare } from '../welfare/entities/welfare.entity.js'
 import { AddFavoriteDto } from './dtos/add-favorite.dto.js'
+import { DeleteAccountDto } from './dtos/delete-account.dto.js'
 import { UpdateUserDto } from './dtos/update-user.dto.js'
 import { User } from './entities/user.entity.js'
 import { UsersService } from './users.service.js'
@@ -35,8 +36,6 @@ export class UsersController {
   @ApiOperation({ summary: '取得個人資料' })
   async getProfile(@CurrentUser() user: User) {
     this.logger.log(`收到取得個人資料請求 User ID: ${user.id}`)
-    // 注意：CurrentUser 裝飾器通常是從 Request 解析出來的，資料可能不完整
-    // 建議重新查詢一次 DB 以確保資料最新
     return this.usersService.findOneById(user.id)
   }
 
@@ -55,6 +54,21 @@ export class UsersController {
     }
 
     return this.usersService.update(id, updateUserDto)
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: '刪除帳號 (需驗證密碼)' })
+  async deleteAccount(
+    @Param('id') id: string,
+    @Body() dto: DeleteAccountDto,
+    @CurrentUser() user: User,
+  ): Promise<void> {
+    if (id !== user.id) {
+      throw new ForbiddenException('你只能刪除自己的帳號')
+    }
+
+    return this.usersService.deleteAccount(user.id, dto.password)
   }
 
   // --- 收藏功能 ---
