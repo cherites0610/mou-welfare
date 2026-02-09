@@ -16,10 +16,7 @@ const initAppData = async () => {
   if (!userStore.token) return
 
   try {
-    await Promise.all([
-      familyStore.loadFamilies(),
-      chatStore.loadSessions()
-    ])
+    await Promise.all([familyStore.loadFamilies(), chatStore.loadSessions()])
   } catch (error: any) {
     if (error.response?.status === 401) {
       handleLogout()
@@ -36,6 +33,7 @@ const handleLogout = () => {
 }
 
 onMounted(() => {
+  // handleLogout()
   initAppData()
 })
 </script>

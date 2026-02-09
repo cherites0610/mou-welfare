@@ -107,15 +107,15 @@ const showOriginalContent = ref(false)
 </script>
 
 <template>
-  <div v-if="data" class="min-h-screen bg-[#F8FAFC] pb-24 md:pb-10 font-sans">
-    
+  <div>
+<div v-if="data" class="min-h-screen bg-[#F8FAFC] pb-24 md:pb-10 font-sans ">
     <div class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 h-14 flex items-center justify-between md:hidden shadow-sm">
       <button @click="goBack" class="w-8 h-8 flex items-center justify-center -ml-1 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
         <Icon icon="mingcute:left-line" class="text-2xl" />
       </button>
       <span class="font-bold text-lg text-gray-800 truncate max-w-[200px]">福利詳情</span>
       <button @click="toggleFavorite" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors">
-        <Icon :icon="isFavorite ? 'mingcute:heart-fill' : 'mingcute:heart-line'" class="text-2xl transition-transform active:scale-75 duration-200" :class="{ 'text-red-500': isFavorite }" />
+        <Icon :icon="isFavorite ? 'mdi:heart' : 'mdi:heart-outline'" class="text-2xl transition-transform active:scale-75 duration-200" :class="{ 'text-red-500': isFavorite }" />
       </button>
     </div>
 
@@ -171,7 +171,7 @@ const showOriginalContent = ref(false)
              <div class="hidden md:flex items-center gap-3">
                 <button @click="toggleFavorite" 
                    class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 active:scale-95 group">
-                   <Icon :icon="isFavorite ? 'mingcute:heart-fill' : 'mingcute:heart-line'" class="text-xl transition-colors group-hover:scale-110" :class="{ 'text-red-500': isFavorite }" />
+                   <Icon :icon="isFavorite ? 'mdi:heart' : 'mdi:heart-outline'" class="text-xl transition-colors group-hover:scale-110" :class="{ 'text-red-500': isFavorite }" />
                    {{ isFavorite ? '已收藏' : '收藏' }}
                 </button>
              </div>
@@ -317,7 +317,9 @@ const showOriginalContent = ref(false)
   <div v-else class="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
     <Icon icon="line-md:loading-loop" class="text-5xl text-mygreen/50" />
     <p class="text-gray-400 text-sm font-medium animate-pulse">正在讀取福利資料...</p>
+  </div>    
   </div>
+  
 </template>
 
 <style scoped>

@@ -134,7 +134,7 @@ const goToDetail = (item: WelfareResponse) => {
 </script>
 
 <template>
-  <div class="flex flex-col h-[calc(100dvh-6rem)] md:h-[calc(100vh-8rem)] overflow-hidden">
+  <div class="flex flex-col h-screen md:h-[calc(100vh-8rem)] overflow-hidden">
     <div class="flex gap-3 items-center transition-colors duration-300 bg-mygreen md:bg-white p-4">
       <el-input
         v-model="search"

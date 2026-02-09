@@ -29,7 +29,7 @@ const isActive = (path: string) => route.path.startsWith(path)
     </main>
 
     <nav
-      class="md:hidden fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom)] h-[calc(3.8rem+env(safe-area-inset-bottom))]"
+      class="md:hidden fixed bottom-0 w-full bg-white border-gray-00 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom)] h-[calc(3.8rem+env(safe-area-inset-bottom))]"
     >
       <router-link
         v-for="item in mobileMenuItems"

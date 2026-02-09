@@ -74,6 +74,18 @@ const routes: RouteRecordRaw[] = [
       component: () => import('@/views/favorites/index.vue'),
       meta: { title: '我的最愛' }
   },
+    {
+      path: '/private',
+      name: 'Private',
+      component: () => import('@/views/private/index.vue'),
+      meta: { title: '私人頁面' }
+  },
+    {
+      path: '/terms',
+      name: 'Terms',
+      component: () => import('@/views/terms/index.vue'),
+      meta: { title: '服務條款' }
+  },
   {
     path: '/:pathMatch(.*)*',
     redirect: '/'
