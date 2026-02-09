@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Logger, Param, Post, UnauthorizedException } from '@nestjs/common'
+import { Body, Controller, Get, Headers, Logger, Param, Post, Query, UnauthorizedException } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { IngestWelfareDto } from './dtos/ingest-welfare.dto.js'
 import { SearchWelfareDto } from './dtos/search-welfare.dto.js'
@@ -39,5 +39,14 @@ export class WelfaresController {
   @ApiOperation({ summary: '查詢福利資料' })
   async findAll(@Body() dto: SearchWelfareDto) {
     return this.welfaresService.search(dto)
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: '查詢單筆福利資料' })
+  async findOne(
+    @Param('id') id: string,
+    @Query('userId') userId?: string
+  ) {
+    return this.welfaresService.findOne(id, userId)
   }
 }

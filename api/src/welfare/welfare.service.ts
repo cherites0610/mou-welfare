@@ -133,6 +133,22 @@ export class WelfaresService {
     return { data: finalData, total }
   }
 
+  async findOne(id: string, userId?: string): Promise<WelfareResponse | null> {
+    const welfare = await this.welfareRepository.findOne({ where: { id } })
+
+    if (!welfare) {
+      return null
+    }
+
+    if (userId) {
+      this.logger.log(`查詢單筆福利, 套用用戶比對模式: ${userId}`)
+      const results = await this.processUserMode([welfare], userId)
+      return results.length > 0 ? results[0] : welfare
+    }
+
+    return welfare
+  }
+
   async findRandom(limit: number = 3): Promise<Welfare[]> {
     return this.welfareRepository
       .createQueryBuilder('welfare')
