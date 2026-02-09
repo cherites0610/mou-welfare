@@ -35,7 +35,7 @@ onMounted(async () => {
 <template>
   <AppHeader class="hidden md:block mb-5" />
   <div
-    class="sticky top-0 z-40 bg-white border-b border-gray-100 px-4 h-14 flex items-center justify-between md:hidden shadow-sm"
+    class="sticky top-0 z-40 bg-white border-b border-gray-100 px-6 h-14 flex items-center justify-between md:hidden shadow-sm"
   >
     <button
       @click="goBack"
@@ -49,8 +49,10 @@ onMounted(async () => {
     <div class="w-8"></div>
   </div>
 
-<div class="flex flex-col h-[calc(100dvh-6rem)] md:h-[calc(100vh-8rem)] overflow-hidden px-4 sm:px-6 lg:px-8 mt-4 md:mt-0">
-      <div class="max-w-3xl mx-auto">
+  <div class="flex flex-col h-[calc(100dvh-6rem)] md:h-[calc(100vh-8rem)] overflow-hidden px-4 sm:px-6 lg:px-8 mt-4 md:mt-0">
+    
+    <div class="w-full max-w-7xl mx-auto">
+      
       <div v-if="loading" class="space-y-4">
         <el-skeleton :rows="3" animated />
         <el-skeleton :rows="3" animated />
@@ -89,15 +91,15 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* 覆蓋 Element Plus 的部分預設樣式，使其更乾淨 */
+/* 樣式保持不變 */
 :deep(.el-collapse) {
   border-top: none;
   border-bottom: none;
 }
 
 :deep(.el-collapse-item__header) {
-  border-bottom: 1px solid #f3f4f6; /* Tailwind gray-100 */
-  height: auto; /* 讓高度自適應，避免標題太長被切掉 */
+  border-bottom: 1px solid #f3f4f6;
+  height: auto;
   min-height: 48px;
   line-height: 1.5;
 }
@@ -108,15 +110,14 @@ onMounted(async () => {
 
 :deep(.el-collapse-item:last-child .el-collapse-item__header),
 :deep(.el-collapse-item:last-child .el-collapse-item__wrap) {
-  border-bottom: none; /* 最後一個項目不要底線 */
+  border-bottom: none;
 }
 
-/* 讓箭頭 icon 稍微大一點 */
 :deep(.el-collapse-item__arrow) {
   font-size: 1.2rem;
   color: #9ca3af;
 }
 :deep(.el-collapse-item__content) {
-  padding-bottom: 5px; /* 把原本的 25px 改成 0，或你想要的數值 */
+  padding-bottom: 5px;
 }
 </style>

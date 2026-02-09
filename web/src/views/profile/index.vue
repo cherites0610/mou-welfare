@@ -71,6 +71,7 @@ const handleQuitFamily = async (familyId: string) => {
 }
 
 const goEditProfile = () => router.push('/profile/edit')
+const goQuestions = () => router.push('/question')
 const goFavorites = () => router.push('/favorites')
 const goTerms = () => router.push('/terms')
 const goPrivate = () => router.push('/private')
@@ -255,6 +256,7 @@ const goPrivate = () => router.push('/private')
           class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50"
         >
           <button
+            @click="goQuestions"
             class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group"
           >
             <Icon
