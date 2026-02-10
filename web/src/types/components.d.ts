@@ -13,13 +13,16 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AppHeader: typeof import('./../components/AppHeader.vue')['default']
+    CreateFamilyDialog: typeof import('./../components/Family/CreateFamilyDialog.vue')['default']
     ElCollapse: typeof import('element-plus/es')['ElCollapse']
     ElCollapseItem: typeof import('element-plus/es')['ElCollapseItem']
+    ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDropdown: typeof import('element-plus/es')['ElDropdown']
     ElDropdownItem: typeof import('element-plus/es')['ElDropdownItem']
     ElDropdownMenu: typeof import('element-plus/es')['ElDropdownMenu']
     ElInput: typeof import('element-plus/es')['ElInput']
     ElSkeleton: typeof import('element-plus/es')['ElSkeleton']
+    JoinFamilyDialog: typeof import('./../components/Family/JoinFamilyDialog.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     WelfareCard: typeof import('./../components/welfareCard.vue')['default']
@@ -33,13 +36,16 @@ declare module 'vue' {
 // For TSX support
 declare global {
   const AppHeader: typeof import('./../components/AppHeader.vue')['default']
+  const CreateFamilyDialog: typeof import('./../components/Family/CreateFamilyDialog.vue')['default']
   const ElCollapse: typeof import('element-plus/es')['ElCollapse']
   const ElCollapseItem: typeof import('element-plus/es')['ElCollapseItem']
+  const ElDialog: typeof import('element-plus/es')['ElDialog']
   const ElDropdown: typeof import('element-plus/es')['ElDropdown']
   const ElDropdownItem: typeof import('element-plus/es')['ElDropdownItem']
   const ElDropdownMenu: typeof import('element-plus/es')['ElDropdownMenu']
   const ElInput: typeof import('element-plus/es')['ElInput']
   const ElSkeleton: typeof import('element-plus/es')['ElSkeleton']
+  const JoinFamilyDialog: typeof import('./../components/Family/JoinFamilyDialog.vue')['default']
   const RouterLink: typeof import('vue-router')['RouterLink']
   const RouterView: typeof import('vue-router')['RouterView']
   const WelfareCard: typeof import('./../components/welfareCard.vue')['default']

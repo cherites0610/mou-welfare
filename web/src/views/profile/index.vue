@@ -8,6 +8,7 @@ import { useFamilyStore } from '@/stores/family'
 import { useTagColor } from '@/composables/useTagColor'
 import type { User } from '@/api/user/model'
 import type { Family } from '@/api/family/model'
+import { ElMessageBox } from 'element-plus'
 
 const DEFAULT_AVATAR = 'https://storage.googleapis.com/mou-welfare/web/meta.png'
 
@@ -25,6 +26,8 @@ interface FamilyUI extends Family {
 }
 
 const localFamilyList = ref<FamilyUI[]>([])
+const showCreateDialog = ref(false)
+const showJoinDialog = ref(false)
 
 // --- 資料同步 ---
 watch(
@@ -65,9 +68,50 @@ const toggleFamily = (id: string) => {
 }
 
 const handleQuitFamily = async (familyId: string) => {
-  if (!confirm('確定要退出此家庭嗎？')) return
-  console.log('退出家庭:', familyId)
-  // await familyStore.quitFamily(familyId)
+  const currentUserId = userStore.userInfo?.id
+  if (!currentUserId) {
+    ElMessage.warning('請先登入')
+    return
+  }
+  const targetFamily = familyStore.familyList.find(f => f.id === familyId)
+  if (!targetFamily) return
+  const myMembership = targetFamily.userFamilies?.find(m => m.userId === currentUserId)
+  if (!myMembership) {
+    ElMessage.error('找不到您的成員資料，無法退出')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `確定要退出「${targetFamily.name}」嗎？\n退出後需重新邀請才能加入。`,
+      '退出家庭',
+      {
+        confirmButtonText: '確定退出',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger' // 讓確認按鈕變紅色，警示作用
+      }
+    )
+    await familyStore.removeMember(myMembership.id)
+    await familyStore.loadFamilies()
+    ElMessage.success('已成功退出家庭')
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error(error)
+      ElMessage.error('退出失敗，請稍後再試')
+    }
+  }
+}
+
+const handleFamilyCommand = (command: 'create' | 'join') => {
+  if (command === 'create') {
+    showCreateDialog.value = true
+  } else if (command === 'join') {
+    showJoinDialog.value = true
+  }
+}
+
+const joinCode =()=>{
+  console.log('生成邀請碼')
 }
 
 const goEditProfile = () => router.push('/profile/edit')
@@ -136,9 +180,37 @@ const goPrivate = () => router.push('/private')
 
       <div class="flex justify-between items-center mb-4 px-2 md:px-0">
         <h2 class="text-xl font-bold text-gray-800">家庭列表</h2>
-        <button class="text-[#84cc16] hover:text-green-600 transition-transform active:scale-90">
-          <Icon icon="mingcute:add-circle-line" class="text-3xl" />
-        </button>
+        <div class="flex justify-between items-center mb-4 px-2 md:px-0">
+          <el-dropdown trigger="click" @command="handleFamilyCommand" placement="bottom-end">
+            <button class="text-[#84cc16] hover:text-green-600 transition-transform active:scale-90 outline-none">
+              <Icon icon="mingcute:add-circle-line" class="text-3xl" />
+            </button>
+
+            <template #dropdown>
+              <el-dropdown-menu class="rounded-xl overflow-hidden p-1">
+
+                <el-dropdown-item command="create" class="rounded-lg">
+                  <div class="flex items-center gap-2 py-1 px-1 text-gray-700">
+                    <div class="bg-green-100 text-[#84cc16] p-1 rounded-full">
+                      <Icon icon="mingcute:home-6-line" class="text-lg" />
+                    </div>
+                    <span class="font-bold">創建家庭</span>
+                  </div>
+                </el-dropdown-item>
+
+                <el-dropdown-item command="join" divided class="rounded-lg">
+                  <div class="flex items-center gap-2 py-1 px-1 text-gray-700">
+                    <div class="bg-blue-100 text-blue-500 p-1 rounded-full">
+                      <Icon icon="mingcute:group-2-line" class="text-lg" />
+                    </div>
+                    <span class="font-bold">加入家庭</span>
+                  </div>
+                </el-dropdown-item>
+
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
@@ -147,21 +219,16 @@ const goPrivate = () => router.push('/private')
           :key="family.id"
           class="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 border border-gray-100 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-shadow duration-300"
         >
-          <div
-            class="flex items-center justify-between cursor-pointer select-none"
-            @click="toggleFamily(family.id)"
-          >
+          <div class="flex items-center justify-between cursor-pointer select-none" @click="toggleFamily(family.id)">
             <h3 class="text-xl font-bold text-gray-800">
               {{ family.name }} ( {{ family.userFamilies?.length || 0 }} )
             </h3>
 
             <div class="flex items-center gap-4 text-gray-400">
-              <Icon icon="mingcute:grid-line" class="text-2xl hover:text-gray-600" />
-              <Icon
-                icon="mingcute:down-line"
-                class="text-2xl transition-transform duration-300"
-                :class="{ 'rotate-180': family.isOpen }"
-              />
+              <Icon @click.stop="joinCode()" icon="mingcute:grid-line" class="text-2xl hover:text-gray-600" />
+
+              <Icon icon="mingcute:down-line" class="text-2xl transition-transform duration-300"
+                :class="{ 'rotate-180': family.isOpen }" />
             </div>
           </div>
 
@@ -302,6 +369,8 @@ const goPrivate = () => router.push('/private')
       </div>
     </div>
   </div>
+  <CreateFamilyDialog v-model="showCreateDialog" />
+  <JoinFamilyDialog v-model="showJoinDialog" />
 </template>
 
 <style scoped></style>
