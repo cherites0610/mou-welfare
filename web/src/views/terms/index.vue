@@ -67,7 +67,7 @@ const goBack = () => {
             <section>
               <h2 class="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
                 <span class="bg-gray-800 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">3</span>
-                AI 技術應用與風險聲明（新增）
+                AI 技術應用與風險聲明
               </h2>
               <p class="mb-2">本服務部分功能採用了先進的 人工智慧（Artificial Intelligence, AI） 技術進行資料分析與內容生成。針對 AI 技術之特性，您理解並同意以下事項：</p>
               <ul class="list-disc pl-5 space-y-2 text-gray-600">
