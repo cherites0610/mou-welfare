@@ -13,7 +13,6 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Layout',
     component: () => import('@/layout/index.vue'),
-    redirect: '/welfares',
     meta: { requiresAuth: true },
     children: [
       {
@@ -63,28 +62,34 @@ const routes: RouteRecordRaw[] = [
     ]
   },
   {
-      path: '/question',
-      name: 'Question',
-      component: () => import('@/views/question/index.vue'),
-      meta: { title: '常見問題' }
+    path: '',
+    name: 'Home',
+    component: () => import('@/views/home/index.vue'),
+    meta: { title: '首頁', requiresAuth: false }
   },
   {
-      path: '/favorites',
-      name: 'Favorites',
-      component: () => import('@/views/favorites/index.vue'),
-      meta: { title: '我的最愛' }
+    path: '/question',
+    name: 'Question',
+    component: () => import('@/views/question/index.vue'),
+    meta: { title: '常見問題' }
   },
-    {
-      path: '/private',
-      name: 'Private',
-      component: () => import('@/views/private/index.vue'),
-      meta: { title: '私人頁面' }
+  {
+    path: '/favorites',
+    name: 'Favorites',
+    component: () => import('@/views/favorites/index.vue'),
+    meta: { title: '我的最愛' }
   },
-    {
-      path: '/terms',
-      name: 'Terms',
-      component: () => import('@/views/terms/index.vue'),
-      meta: { title: '服務條款' }
+  {
+    path: '/private',
+    name: 'Private',
+    component: () => import('@/views/private/index.vue'),
+    meta: { title: '私人頁面' }
+  },
+  {
+    path: '/terms',
+    name: 'Terms',
+    component: () => import('@/views/terms/index.vue'),
+    meta: { title: '服務條款' }
   },
   {
     path: '/:pathMatch(.*)*',
