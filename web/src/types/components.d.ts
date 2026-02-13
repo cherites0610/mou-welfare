@@ -13,6 +13,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AppHeader: typeof import('./../components/AppHeader.vue')['default']
+    ChatBoard: typeof import('./../components/Chat/ChatBoard.vue')['default']
     CreateFamilyDialog: typeof import('./../components/Family/CreateFamilyDialog.vue')['default']
     ElCollapse: typeof import('element-plus/es')['ElCollapse']
     ElCollapseItem: typeof import('element-plus/es')['ElCollapseItem']
@@ -36,6 +37,7 @@ declare module 'vue' {
 // For TSX support
 declare global {
   const AppHeader: typeof import('./../components/AppHeader.vue')['default']
+  const ChatBoard: typeof import('./../components/Chat/ChatBoard.vue')['default']
   const CreateFamilyDialog: typeof import('./../components/Family/CreateFamilyDialog.vue')['default']
   const ElCollapse: typeof import('element-plus/es')['ElCollapse']
   const ElCollapseItem: typeof import('element-plus/es')['ElCollapseItem']

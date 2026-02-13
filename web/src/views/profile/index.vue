@@ -9,7 +9,8 @@ import { useTagColor } from '@/composables/useTagColor'
 import type { User } from '@/api/user/model'
 import type { Family } from '@/api/family/model'
 import { ElMessageBox } from 'element-plus'
-
+import CreateFamilyDialog from '@/components/Family/CreateFamilyDialog.vue'
+import JoinFamilyDialog from '@/components/Family/JoinFamilyDialog.vue'
 const DEFAULT_AVATAR = 'https://storage.googleapis.com/mou-welfare/web/meta.png'
 
 const router = useRouter()

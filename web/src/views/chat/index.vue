@@ -1,9 +1,7 @@
 <script setup lang="ts">
+import ChatBoard from '@/components/Chat/ChatBoard.vue'
 </script>
 
 <template>
-  CHAT
+  <ChatBoard :is-mobile="true" />
 </template>
-
-<style scoped>
-</style>
