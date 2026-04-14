@@ -1,15 +1,18 @@
 import {
   createFamily,
+  deleteFamily as deleteFamilyApi,
   getFamilies,
   getFamilyById,
   joinFamilyByCode,
   removeFamilyMember,
+  updateFamily as updateFamilyApi,
   updateFamilyMemberRole
 } from '@/api/family'
 import type {
   CreateFamilyDto,
   Family,
   JoinFamilyDto,
+  UpdateFamilyDto,
   UpdateUserFamilyDto
 } from '@/api/family/model'
 import { defineStore } from 'pinia'
@@ -97,6 +100,35 @@ export const useFamilyStore = defineStore(
       }
     }
 
+    const renameFamily = async (familyId: string, data: UpdateFamilyDto) => {
+      try {
+        await updateFamilyApi(familyId, data)
+        if (data.name) {
+          const index = familyList.value.findIndex(f => f.id === familyId)
+          if (index !== -1) {
+            familyList.value[index]!.name = data.name
+          }
+          if (currentFamily.value?.id === familyId) {
+            currentFamily.value.name = data.name
+          }
+        }
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    }
+
+    const removeFamily = async (familyId: string) => {
+      try {
+        await deleteFamilyApi(familyId)
+        familyList.value = familyList.value.filter(f => f.id !== familyId)
+        if (currentFamily.value?.id === familyId) {
+          currentFamily.value = familyList.value[0] ?? null
+        }
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    }
+
     const updateMemberRole = async (memberId: string, data: UpdateUserFamilyDto) => {
       try {
         const updatedMember = await updateFamilyMemberRole(memberId, data)
@@ -126,6 +158,8 @@ export const useFamilyStore = defineStore(
       switchFamily,
       createNewFamily,
       joinViaCode,
+      renameFamily,
+      removeFamily,
       removeMember,
       updateMemberRole,
       clearState

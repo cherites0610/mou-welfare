@@ -54,6 +54,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '個人設定' }
       },
       {
+        path: 'profile/edit',
+        name: 'ProfileEdit',
+        component: () => import('@/views/profile/EditProfile.vue'),
+        meta: { title: '編輯個人資料' }
+      },
+      {
         path: 'question',
         name: 'Question',
         component: () => import('@/views/question/index.vue'),

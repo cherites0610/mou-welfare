@@ -10,6 +10,7 @@ import type { User } from '@/api/user/model'
 import type { Family } from '@/api/family/model'
 import { ElMessageBox } from 'element-plus'
 import CreateFamilyDialog from '@/components/Family/CreateFamilyDialog.vue'
+import EditFamilyDialog from '@/components/Family/EditFamilyDialog.vue'
 import JoinFamilyDialog from '@/components/Family/JoinFamilyDialog.vue'
 const DEFAULT_AVATAR = 'https://storage.googleapis.com/mou-welfare/web/meta.png'
 
@@ -29,16 +30,22 @@ interface FamilyUI extends Family {
 const localFamilyList = ref<FamilyUI[]>([])
 const showCreateDialog = ref(false)
 const showJoinDialog = ref(false)
+const showEditFamilyDialog = ref(false)
+const editingFamily = ref<Family | null>(null)
+const showDeleteFamilyDialog = ref(false)
+const deletingFamily = ref<Family | null>(null)
+const isDeleting = ref(false)
 
 // --- 資料同步 ---
 watch(
   storeFamilyList,
   (newList) => {
     if (newList && Array.isArray(newList)) {
-      // 邏輯：預設展開第一個家庭
-      localFamilyList.value = newList.map((f, index) => ({
+      const existingOpenStates = new Map(localFamilyList.value.map((f) => [f.id, f.isOpen]))
+      localFamilyList.value = newList.map((f) => ({
         ...f,
-        isOpen: index === 0,
+        // 已存在的家庭保留原展開狀態；新加入的家庭預設展開
+        isOpen: existingOpenStates.has(f.id) ? existingOpenStates.get(f.id)! : true,
       }))
     }
   },
@@ -111,7 +118,77 @@ const handleFamilyCommand = (command: 'create' | 'join') => {
   }
 }
 
-const joinCode =()=>{
+const isAdminOf = (family: Family) => {
+  const userId = userStore.userInfo?.id
+  if (!userId) return false
+  return family.userFamilies?.some(m => m.userId === userId && m.role === 'Admin') ?? false
+}
+
+const openEditFamilyDialog = (family: Family) => {
+  editingFamily.value = family
+  showEditFamilyDialog.value = true
+}
+
+const handleDeleteFamily = (family: Family) => {
+  deletingFamily.value = family
+  showDeleteFamilyDialog.value = true
+}
+
+const confirmDeleteFamily = async () => {
+  if (!deletingFamily.value) return
+  isDeleting.value = true
+  try {
+    await familyStore.removeFamily(deletingFamily.value.id)
+    ElMessage.success('家庭已刪除')
+    showDeleteFamilyDialog.value = false
+  } catch (error) {
+    console.error(error)
+    ElMessage.error('刪除失敗，請稍後再試')
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+const handleMemberCommand = async (command: string, memberId: string, memberName: string) => {
+  if (command === 'admin') {
+    try {
+      await familyStore.updateMemberRole(memberId, { role: 'Admin' })
+      ElMessage.success(`已將 ${memberName} 設為管理員`)
+    } catch {
+      ElMessage.error('更新失敗，請稍後再試')
+    }
+  } else if (command === 'member') {
+    try {
+      await familyStore.updateMemberRole(memberId, { role: 'Member' })
+      ElMessage.success(`已將 ${memberName} 設為一般成員`)
+    } catch {
+      ElMessage.error('更新失敗，請稍後再試')
+    }
+  } else if (command === 'remove') {
+    try {
+      await ElMessageBox.confirm(
+        `確定要移除「${memberName}」嗎？`,
+        '移除成員',
+        {
+          confirmButtonText: '確定移除',
+          cancelButtonText: '取消',
+          type: 'warning',
+          confirmButtonClass: 'el-button--danger',
+        },
+      )
+      await familyStore.removeMember(memberId)
+      await familyStore.loadFamilies()
+      ElMessage.success('已移除成員')
+    } catch (error) {
+      if (error !== 'cancel') {
+        console.error(error)
+        ElMessage.error('移除失敗，請稍後再試')
+      }
+    }
+  }
+}
+
+const joinCode = () => {
   console.log('生成邀請碼')
 }
 
@@ -221,13 +298,27 @@ const goPrivate = () => router.push('/private')
           class="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 border border-gray-100 hover:shadow-[0_4px_20px_rgba(0,0,0,0.06)] transition-shadow duration-300"
         >
           <div class="flex items-center justify-between cursor-pointer select-none" @click="toggleFamily(family.id)">
-            <h3 class="text-xl font-bold text-gray-800">
-              {{ family.name }} ( {{ family.userFamilies?.length || 0 }} )
-            </h3>
+            <div class="flex items-center gap-2">
+              <h3 class="text-xl font-bold text-gray-800">
+                {{ family.name }} ( {{ family.userFamilies?.length || 0 }} )
+              </h3>
+              <button
+                v-if="isAdminOf(family)"
+                @click.stop="openEditFamilyDialog(family)"
+                class="text-gray-300 hover:text-gray-500 transition-colors"
+              >
+                <Icon icon="mingcute:edit-line" class="text-lg" />
+              </button>
+            </div>
 
             <div class="flex items-center gap-4 text-gray-400">
               <Icon @click.stop="joinCode()" icon="mingcute:grid-line" class="text-2xl hover:text-gray-600" />
-
+              <Icon
+                v-if="isAdminOf(family)"
+                @click.stop="handleDeleteFamily(family)"
+                icon="mingcute:delete-2-line"
+                class="text-2xl hover:text-red-400 transition-colors"
+              />
               <Icon icon="mingcute:down-line" class="text-2xl transition-transform duration-300"
                 :class="{ 'rotate-180': family.isOpen }" />
             </div>
@@ -297,9 +388,38 @@ const goPrivate = () => router.push('/private')
                   </div>
                 </div>
 
-                <button class="text-gray-300 hover:text-gray-500">
-                  <Icon icon="mingcute:more-2-fill" class="text-xl" />
-                </button>
+                <el-dropdown
+                  v-if="isAdminOf(family) && member.userId !== userInfo?.id"
+                  trigger="click"
+                  placement="bottom-end"
+                  @command="(cmd: string) => handleMemberCommand(cmd, member.id, getDisplayName(member.user))"
+                >
+                  <button class="text-gray-300 hover:text-gray-500 outline-none" @click.stop>
+                    <Icon icon="mingcute:more-2-fill" class="text-xl" />
+                  </button>
+                  <template #dropdown>
+                    <el-dropdown-menu class="rounded-xl overflow-hidden p-1">
+                      <el-dropdown-item v-if="member.role === 'Member'" command="admin">
+                        <div class="flex items-center gap-2 py-0.5 px-1 text-gray-700">
+                          <Icon icon="mingcute:crown-line" class="text-base text-yellow-500" />
+                          <span>設為管理員</span>
+                        </div>
+                      </el-dropdown-item>
+                      <el-dropdown-item v-if="member.role === 'Admin'" command="member">
+                        <div class="flex items-center gap-2 py-0.5 px-1 text-gray-700">
+                          <Icon icon="mingcute:user-2-line" class="text-base text-gray-400" />
+                          <span>設為一般成員</span>
+                        </div>
+                      </el-dropdown-item>
+                      <el-dropdown-item command="remove" divided>
+                        <div class="flex items-center gap-2 py-0.5 px-1 text-red-500">
+                          <Icon icon="mingcute:user-remove-line" class="text-base" />
+                          <span>移除成員</span>
+                        </div>
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </template>
 
@@ -371,7 +491,39 @@ const goPrivate = () => router.push('/private')
     </div>
   </div>
   <CreateFamilyDialog v-model="showCreateDialog" />
+  <EditFamilyDialog v-model="showEditFamilyDialog" :family="editingFamily" />
   <JoinFamilyDialog v-model="showJoinDialog" />
+
+  <el-dialog
+    v-model="showDeleteFamilyDialog"
+    title="刪除家庭"
+    width="90%"
+    class="max-w-sm rounded-xl"
+    align-center
+  >
+    <p class="text-gray-700 text-sm leading-relaxed">
+      確定要刪除「<span class="font-bold">{{ deletingFamily?.name }}</span>」嗎？<br />
+      此操作無法復原，家庭內所有成員將被移除。
+    </p>
+    <template #footer>
+      <div class="flex gap-3">
+        <button
+          @click="showDeleteFamilyDialog = false"
+          class="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 font-bold hover:bg-gray-50 transition"
+        >
+          取消
+        </button>
+        <button
+          @click="confirmDeleteFamily"
+          :disabled="isDeleting"
+          class="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Icon v-if="isDeleting" icon="line-md:loading-loop" />
+          確定刪除
+        </button>
+      </div>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped></style>
