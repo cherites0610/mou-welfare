@@ -67,10 +67,10 @@ export class RegisterDto {
   @IsUrl()
   avatarUrl?: string
 
-  @ApiProperty({ description: '地址', required: false })
+  @ApiProperty({ description: '城市', required: false })
   @IsOptional()
   @IsString()
-  address?: string
+  city?: string
 
   @ApiProperty({ description: '身份類別', example: ['student'], required: false })
   @IsOptional()

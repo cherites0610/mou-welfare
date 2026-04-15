@@ -15,6 +15,7 @@ export const REDIS_CLIENT = 'REDIS_CLIENT'
         return new Redis({
           host: configService.getOrThrow<string>('REDIS_HOST'),
           port: configService.getOrThrow<number>('REDIS_PORT'),
+          username: configService.get<string>('REDIS_USERNAME'),
           password: configService.get<string>('REDIS_PASSWORD'),
           db: configService.get<number>('REDIS_DB'),
           maxRetriesPerRequest: 3,

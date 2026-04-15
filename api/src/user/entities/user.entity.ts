@@ -49,9 +49,9 @@ export class User {
   @Column({ name: 'avatar_url', type: 'varchar', nullable: true })
   avatarUrl: string | null
 
-  @ApiProperty({ description: '地址', example: '台北市信義區...', required: false, nullable: true })
+  @ApiProperty({ description: '城市', example: '台北市', required: false, nullable: true })
   @Column({ nullable: true, type: 'varchar' })
-  address: string | null
+  city: string | null
 
   @ApiProperty({ description: '身份類別', type: [String], example: ['student', 'entrepreneur'] })
   @Column('simple-array', { name: 'identities', nullable: true })
