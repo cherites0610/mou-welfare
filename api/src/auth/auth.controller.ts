@@ -17,8 +17,8 @@ import { RegisterDto } from '../user/dtos/register.dto.js'
 import { ResendVerificationDto } from '../user/dtos/resend-verification.dto.js'
 import { ResetPasswordDto } from '../user/dtos/reset-password.dto.js'
 import { AuthService } from './auth.service.js'
-import { LoginDto } from './dtos/login.dto.js'
 import { LiffLoginDto } from './dtos/liff-login.dto.js'
+import { LoginDto } from './dtos/login.dto.js'
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -38,7 +38,7 @@ export class AuthController {
     return this.authService.login(loginDto)
   }
 
-  @Post('liff-login')
+  @Post('login-liff')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'LIFF 登入 (驗證 AccessToken 並換取內部 Code)' })
   async loginWithLiff(@Body() dto: LiffLoginDto) {
@@ -112,14 +112,17 @@ export class AuthController {
   ) {
     this.logger.log(`收到 Line OAuth 回調，Code: ${code}`)
 
-    const { code: oauthCode, action } = await this.authService.handleLineLoginCallback(code, state)
+    const { code: oauthCode, action, email } = await this.authService.handleLineLoginCallback(code, state)
 
-    // 重定向回前端頁面，帶上 oauthCode 與 action
     const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_URL')
-    const redirectUrl = `${frontendUrl}/auth/callback?code=${oauthCode}&action=${action}`
 
-    this.logger.log(`重定向回前端: ${redirectUrl}`)
-    return res.redirect(redirectUrl)
+    const redirectUrl = new URL(`${frontendUrl}/oauth-callback`)
+    redirectUrl.searchParams.append('code', oauthCode)
+    redirectUrl.searchParams.append('action', action)
+    redirectUrl.searchParams.append('email', email)
+
+    this.logger.log(`重定向回前端: ${redirectUrl.toString()}`)
+    return res.redirect(redirectUrl.toString())
   }
 
   // --- Google OAuth ---
@@ -145,11 +148,16 @@ export class AuthController {
     @Res() res: Response
   ) {
     this.logger.log(`收到 Google OAuth 回調`)
-    const { code: oauthCode, action } = await this.authService.handleGoogleLoginCallback(code)
+    const { code: oauthCode, action, email } = await this.authService.handleGoogleLoginCallback(code)
 
     const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_URL')
-    const redirectUrl = `${frontendUrl}/auth/callback?code=${oauthCode}&action=${action}`
 
-    return res.redirect(redirectUrl)
+    const redirectUrl = new URL(`${frontendUrl}/oauth-callback`)
+    redirectUrl.searchParams.append('code', oauthCode)
+    redirectUrl.searchParams.append('action', action)
+    redirectUrl.searchParams.append('email', email)
+
+    this.logger.log(`Google 登入成功，重定向至: ${redirectUrl.toString()}`)
+    return res.redirect(redirectUrl.toString())
   }
 }

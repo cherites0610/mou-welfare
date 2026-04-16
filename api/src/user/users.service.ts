@@ -141,4 +141,19 @@ export class UsersService {
 
     return user.favoriteWelfares
   }
+
+  async findOneByProviderId(source: 'google' | 'line', providerId: string): Promise<User | null> {
+    const fieldMap = {
+      google: 'googleId',
+      line: 'lineId'
+    }
+
+    const field = fieldMap[source]
+
+    return this.usersRepository.findOne({
+      where: {
+        [field]: providerId
+      }
+    })
+  }
 }

@@ -12,14 +12,20 @@ export const REDIS_CLIENT = 'REDIS_CLIENT'
     {
       provide: REDIS_CLIENT,
       useFactory: (configService: ConfigService) => {
-        return new Redis({
+        const redisOptions: any = {
           host: configService.getOrThrow<string>('REDIS_HOST'),
           port: configService.getOrThrow<number>('REDIS_PORT'),
-          username: configService.get<string>('REDIS_USERNAME'),
-          password: configService.get<string>('REDIS_PASSWORD'),
           db: configService.get<number>('REDIS_DB'),
           maxRetriesPerRequest: 3,
-        })
+        }
+
+        const username = configService.get<string>('REDIS_USERNAME')
+        const password = configService.get<string>('REDIS_PASSWORD')
+
+        if (username) redisOptions.username = username
+        if (password) redisOptions.password = password
+
+        return new Redis(redisOptions)
       },
       inject: [ConfigService],
     },

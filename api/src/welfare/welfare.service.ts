@@ -59,7 +59,7 @@ export class WelfaresService {
   }
 
   async search(dto: SearchWelfareDto): Promise<{ data: WelfareResponse[]; total: number }> {
-    this.logger.log(`執行福利搜尋, 模式: ${dto.familyId ? '家庭' : dto.userId ? '個人' : '手動'}`)
+    // this.logger.log(`執行福利搜尋, 模式: ${dto.familyId ? '家庭' : dto.userId ? '個人' : '手動'}`)
 
     const queryBuilder = this.welfareRepository.createQueryBuilder('welfare')
       .select([
@@ -92,7 +92,7 @@ export class WelfaresService {
     )
 
     const lightWelfares = await queryBuilder.getMany()
-    this.logger.log(`初步篩選完成, 共有 ${lightWelfares.length} 筆資料進入比對`)
+    // this.logger.log(`初步篩選完成, 共有 ${lightWelfares.length} 筆資料進入比對`)
 
     let sortedResults: WelfareResponse[] = []
 
@@ -110,7 +110,7 @@ export class WelfaresService {
     const startIndex = (dto.page - 1) * dto.limit
     const targetSlice = sortedResults.slice(startIndex, startIndex + dto.limit)
 
-    this.logger.log(`排序與分頁完成, 當前頁碼: ${dto.page}, 取得 ${targetSlice.length} 筆資料進行詳細查詢`)
+    // this.logger.log(`排序與分頁完成, 當前頁碼: ${dto.page}, 取得 ${targetSlice.length} 筆資料進行詳細查詢`)
 
     if (targetSlice.length === 0) {
       return { data: [], total }
@@ -129,7 +129,7 @@ export class WelfaresService {
       }
     })
 
-    this.logger.log(`詳細資料合併完成, 準備回傳結果`)
+    // this.logger.log(`詳細資料合併完成, 準備回傳結果`)
     return { data: finalData, total }
   }
 

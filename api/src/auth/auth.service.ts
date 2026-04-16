@@ -87,16 +87,20 @@ export class AuthService {
 
   // --- 註冊與驗證流程 ---
 
-  async register(registerDto: RegisterDto): Promise<User> {
+  async register(registerDto: RegisterDto): Promise<User | { access_token: string; user: User }> {
     const { email, password, verificationCode, oauthCode, ...otherDetails } = registerDto
+    let lineId: string | undefined
+    let googleId: string | undefined
 
-    // 1. 驗證來源 (OAuth Code 或 Email Code)
     if (oauthCode) {
       const rawData = await this.cacheManager.get(`oauth:${oauthCode}`)
       if (!rawData) throw new BadRequestException('OAuth代碼無效或已過期')
+      console.log("提取資料:", rawData)
 
-      const payload: OAuthRedisPayload = JSON.parse(rawData)
-      if (payload.email !== email) throw new BadRequestException('Email與第三方登入資訊不符')
+      lineId = JSON.parse(rawData).providerData.source === 'line' ? JSON.parse(rawData).providerData.sub : undefined
+      googleId = JSON.parse(rawData).providerData.source === 'google' ? JSON.parse(rawData).providerData.id : undefined
+      console.log("googleId:", googleId)
+      console.log("lineId:", lineId)
 
       await this.cacheManager.del(`oauth:${oauthCode}`)
     } else {
@@ -105,16 +109,22 @@ export class AuthService {
       await this.cacheManager.del(`verify:${email}`)
     }
 
-    // 2. 密碼加密
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // 3. 呼叫 UsersService 寫入資料
-    return this.usersService.create({
+    const user = await this.usersService.create({
+      ...otherDetails,
       email,
       password: hashedPassword,
       isVerified: true,
-      ...otherDetails,
+      lineId,
+      googleId,
     })
+
+    if (oauthCode) {
+      return this.generateTokenResponse(user)
+    }
+
+    return user
   }
 
   async resendVerificationCode(dto: ResendVerificationDto): Promise<{ message: string }> {
@@ -178,6 +188,7 @@ export class AuthService {
       this.logger.error(`Line 驗證失敗: ${JSON.stringify(profileData)}`)
       throw new BadRequestException('Line 登入失敗')
     }
+
     const email = profileData.email
 
     return this.handleThirdPartyCallback(email, profileData, 'line')
@@ -233,7 +244,7 @@ export class AuthService {
     }
 
     await this.cacheManager.set(`oauth:${code}`, JSON.stringify(payload), 'EX', 300)
-    return { code, action }
+    return { code, action, email }
   }
 
   async loginWithOAuthCode(code: string) {
@@ -243,17 +254,25 @@ export class AuthService {
     const payload: OAuthRedisPayload = JSON.parse(rawData)
     if (payload.action !== 'LOGIN') throw new BadRequestException('此代碼僅供註冊使用')
 
-    const user = await this.usersService.findOneByEmail(payload.email)
-    if (!user) throw new NotFoundException('用戶不存在')
+    const { source, id, sub } = payload.providerData
+    const providerId = source === 'line' ? sub : id
 
-    if (payload.providerData.source === 'line' && payload.providerData.id !== user.lineId) {
-      await this.usersService.update(user.id, { lineId: payload.providerData.id })
-      user.lineId = payload.providerData.id
-    }
+    let user = await this.usersService.findOneByProviderId(source, providerId)
 
-    if (payload.providerData.source === 'google' && payload.providerData.id !== user.googleId) {
-      await this.usersService.update(user.id, { googleId: payload.providerData.id })
-      user.googleId = payload.providerData.id
+    if (!user) {
+      user = await this.usersService.findOneByEmail(payload.email)
+
+      if (!user) {
+        throw new NotFoundException('用戶不存在')
+      }
+
+      if (source === 'line') {
+        await this.usersService.update(user.id, { lineId: providerId })
+        user.lineId = providerId
+      } else if (source === 'google') {
+        await this.usersService.update(user.id, { googleId: providerId })
+        user.googleId = providerId
+      }
     }
 
     await this.cacheManager.del(`oauth:${code}`)
