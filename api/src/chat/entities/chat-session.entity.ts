@@ -19,6 +19,12 @@ export class ChatSession {
   @Column({ nullable: true })
   title: string
 
+  @Column({ name: 'auto_apply_profile', default: true })
+  autoApplyProfile: boolean
+
+  @Column({ name: 'generate_markdown', default: true })
+  generateMarkdown: boolean
+
   @OneToMany(() => ChatMessage, (message) => message.session)
   messages: ChatMessage[]
 

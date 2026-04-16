@@ -43,7 +43,7 @@ export class AuthController {
   @ApiOperation({ summary: 'LIFF 登入 (驗證 AccessToken 並換取內部 Code)' })
   async loginWithLiff(@Body() dto: LiffLoginDto) {
     this.logger.log(`收到 LIFF 登入請求`)
-    return this.authService.handleLiffLogin(dto.accessToken)
+    return this.authService.handleLiffLogin(dto.idToken)
   }
 
   @Post('login-oauth')

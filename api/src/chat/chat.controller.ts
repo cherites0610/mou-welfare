@@ -18,7 +18,7 @@ export class ChatController {
   async sendMessage(
     @Body() dto: SendMessageDto,
   ) {
-    return this.chatService.handleMessage(dto.userId ?? null, dto.familyId, dto.sessionId || null, dto.message)
+    return this.chatService.handleMessage(dto.userId ?? null, dto.familyId, dto.sessionId || null, dto.message, dto.autoApplyProfile ?? true, dto.generateMarkdown ?? true)
   }
 
   @Get()
@@ -27,13 +27,13 @@ export class ChatController {
     return this.chatService.getUserSessions(user.id)
   }
 
-  @Get(':sessionId/messages')
+  @Get('sessions/:sessionId/messages')
   @ApiOperation({ summary: '取得特定對話的所有訊息' })
   async getSessionMessages(@Param('sessionId', ParseUUIDPipe) sessionId: string) {
     return this.chatService.getSessionMessages(sessionId)
   }
 
-  @Delete(':sessionId')
+  @Delete('sessions/:sessionId')
   @ApiOperation({ summary: '刪除特定對話紀錄' })
   async deleteSession(@Param('sessionId', ParseUUIDPipe) sessionId: string) {
     return this.chatService.deleteSession(sessionId)

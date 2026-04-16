@@ -5,5 +5,5 @@ export class LiffLoginDto {
   @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiJ9...' })
   @IsString()
   @IsNotEmpty()
-  accessToken: string
+  idToken: string
 }

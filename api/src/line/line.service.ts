@@ -129,13 +129,13 @@ export class LineService {
       }
     }
 
-    const aiResult = await this.chatService.handleMessage(user.id, null, sessionId, message)
+    const aiResult = await this.chatService.handleMessage(user.id, null, sessionId, message, true, false)
 
     const messages: Message[] = [
       { type: 'text', text: aiResult.reply }
     ]
 
-    if (aiResult.metadata && Array.isArray(aiResult.metadata.ragSources) && aiResult.metadata.ragSources.length > 0) {
+    if (aiResult.metadata?.isConverged && Array.isArray(aiResult.metadata.ragSources) && aiResult.metadata.ragSources.length > 0) {
       const flexMessage = this.createRagResultFlex(aiResult.metadata)
       messages.push(flexMessage)
     }
@@ -232,57 +232,103 @@ export class LineService {
     const safeSources = sources.slice(0, 10)
 
     const bubbles: FlexBubble[] = safeSources.map((source) => {
-      const identities = metadata.extractedIdentities || []
-      const city = metadata.extractedCity || '全台'
-
+      // --- Tags：縣市 + 福利種類（最多 2 個）---
       const tags: FlexComponent[] = []
 
-      tags.push({
-        type: 'box',
-        layout: 'baseline',
-        contents: [
-          {
-            type: 'text',
-            text: city,
-            size: 'xs',
-            color: '#005c4b',
-            weight: 'bold',
-            flex: 0,
-            margin: 'none'
-          }
-        ],
-        backgroundColor: '#e0f2f1',
-        cornerRadius: '20px',
-        paddingAll: 'xs',
-        paddingStart: 'md',
-        paddingEnd: 'md',
-        margin: 'sm',
-        flex: 0
-      })
-
-      identities.slice(0, 3).forEach((identity) => {
+      if (source.sourceCity) {
         tags.push({
           type: 'box',
           layout: 'baseline',
-          contents: [
-            {
-              type: 'text',
-              text: identity,
-              size: 'xs',
-              color: '#555555',
-              flex: 0,
-              margin: 'none'
-            }
-          ],
+          contents: [{ type: 'text', text: source.sourceCity, size: 'xs', color: '#005c4b', weight: 'bold', flex: 0, margin: 'none' }],
+          backgroundColor: '#e0f2f1',
+          cornerRadius: '20px',
+          paddingAll: 'xs',
+          paddingStart: 'md',
+          paddingEnd: 'md',
+          margin: 'sm',
+          flex: 0,
+        })
+      }
+
+      source.categories?.slice(0, 2).forEach((cat) => {
+        tags.push({
+          type: 'box',
+          layout: 'baseline',
+          contents: [{ type: 'text', text: cat, size: 'xs', color: '#555555', flex: 0, margin: 'none' }],
           backgroundColor: '#f5f5f5',
           cornerRadius: '20px',
           paddingAll: 'xs',
           paddingStart: 'md',
           paddingEnd: 'md',
           margin: 'sm',
-          flex: 0
+          flex: 0,
         })
       })
+
+      // --- 適配燈號文字 ---
+      const matchLight: string | null = source.userMatch?.light ?? null
+      const matchColorMap: Record<string, string> = { GREEN: '#00b900', YELLOW: '#f5a623', RED: '#e53935' }
+      const matchLabelMap: Record<string, string> = { GREEN: '✓ 符合資格', YELLOW: '△ 部分符合', RED: '✗ 不符資格' }
+
+      // --- 截止日期 ---
+      const deadlineText = source.deadline
+        ? `截止日期：${new Date(source.deadline).toLocaleDateString('zh-TW')}`
+        : null
+
+      // --- Body contents ---
+      const bodyContents: FlexComponent[] = [
+        {
+          type: 'text',
+          text: source.title || '無標題資源',
+          weight: 'bold',
+          size: 'lg',
+          color: '#1f1f1f',
+          wrap: true,
+          maxLines: 2,
+        },
+      ]
+
+      if (tags.length > 0) {
+        bodyContents.push({
+          type: 'box',
+          layout: 'horizontal',
+          contents: tags,
+          margin: 'md',
+          spacing: 'sm',
+        } as any)
+      }
+
+      if (matchLight && matchColorMap[matchLight]) {
+        bodyContents.push({
+          type: 'text',
+          text: matchLabelMap[matchLight],
+          size: 'xs',
+          color: matchColorMap[matchLight],
+          weight: 'bold',
+          margin: 'md',
+        })
+      }
+
+      bodyContents.push({
+        type: 'text',
+        text: source.summaryContent || '點擊下方按鈕查看更多詳細資訊...',
+        size: 'sm',
+        color: '#888888',
+        wrap: true,
+        margin: 'md',
+        maxLines: 3,
+        lineSpacing: '4px',
+      })
+
+      if (deadlineText) {
+        bodyContents.push({
+          type: 'text',
+          text: `⏰ ${deadlineText}`,
+          size: 'xs',
+          color: '#e53935',
+          margin: 'sm',
+        })
+      }
 
       return {
         type: 'bubble',
@@ -290,73 +336,32 @@ export class LineService {
         body: {
           type: 'box',
           layout: 'vertical',
-          contents: [
-            {
-              type: 'text',
-              text: source.title || '無標題資源',
-              weight: 'bold',
-              size: 'lg',
-              color: '#1f1f1f',
-              wrap: true,
-              maxLines: 2
-            },
-            {
-              type: 'box',
-              layout: 'horizontal',
-              contents: tags,
-              margin: 'md'
-            },
-            {
-              type: 'text',
-              text: source.summaryContent || '點擊下方按鈕查看更多詳細資訊...',
-              size: 'sm',
-              color: '#888888',
-              wrap: true,
-              margin: 'md',
-              maxLines: 3,
-              lineSpacing: '4px'
-            }
-          ]
+          contents: bodyContents,
         },
         footer: {
           type: 'box',
           layout: 'vertical',
+          paddingAll: 'none',
           contents: [
-            {
-              type: 'separator',
-              color: '#f0f0f0',
-              margin: 'none'
-            },
+            { type: 'separator', color: '#f0f0f0', margin: 'none' },
             {
               type: 'button',
               style: 'link',
               height: 'sm',
-              action: {
-                type: 'uri',
-                label: '查看完整內容',
-                uri: source.uri || this.frontendUrl
-              },
+              action: { type: 'uri', label: '查看完整內容', uri: source.uri || this.frontendUrl },
               color: '#00b900',
-              margin: 'sm'
-            }
+              margin: 'sm',
+            },
           ],
-          paddingAll: 'none'
         },
-        styles: {
-          footer: {
-            separator: false
-          }
-        }
+        styles: { footer: { separator: false } },
       }
     })
 
     return {
       type: 'flex',
       altText: `為您找到 ${safeSources.length} 筆福利資源`,
-      contents: {
-        type: 'carousel',
-        contents: bubbles
-      }
+      contents: { type: 'carousel', contents: bubbles },
     }
   }
 }

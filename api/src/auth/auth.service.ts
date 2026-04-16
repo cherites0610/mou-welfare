@@ -65,26 +65,27 @@ export class AuthService {
     }
   }
 
-  async handleLiffLogin(accessToken: string) {
-    const response = await fetch('https://api.line.me/oauth2/v2.1/userinfo', {
-      method: 'GET',
+  async handleLiffLogin(idToken: string) {
+    // 這裡應該驗證 idToken 並提取用戶資料
+    const clientId = this.configService.getOrThrow<string>('LINE_LOGIN_CLIENT_ID')
+    const clientSecret = this.configService.getOrThrow<string>('LINE_LOGIN_CLIENT_SECRET')
+
+    const profileResponse = await fetch('https://api.line.me/oauth2/v2.1/verify', {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `${clientSecret}`,
       },
+      body: new URLSearchParams({ id_token: idToken, client_id: clientId }),
     })
 
-    const profileData = await response.json()
-
-    if (!response.ok) {
+    const profileData = await profileResponse.json()
+    if (!profileResponse.ok) {
       this.logger.error(`LIFF Token 驗證失敗: ${JSON.stringify(profileData)}`)
       throw new BadRequestException('LIFF 登入失敗')
     }
 
-    const lineId = profileData.sub
-
-    const user = await this.usersService.findOneByProviderId('line', lineId)
-
-    return this.handleThirdPartyCallback(user?.email ?? 'user@example.com', profileData, 'line')
+    return this.handleThirdPartyCallback(profileData.email, profileData, 'line')
   }
 
   // --- 註冊與驗證流程 ---

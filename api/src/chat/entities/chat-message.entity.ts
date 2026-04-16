@@ -10,10 +10,38 @@ import { ChatSession } from './chat-session.entity.js'
 
 export type MessageRole = 'user' | 'assistant' | 'system'
 
+export interface RagSource {
+  id: string
+  title: string
+  sourceCity: string
+  uri: string
+  categories: string[]
+  requirements: string[]
+  identity: string[]
+  rewards: string[]
+  originalName: string
+  originalContent: string
+  summaryContent: string
+  publishDate: Date | null
+  deadline: Date | null
+  userMatch: any | null
+  familyMatches: any[]
+}
+
+export type WelfareCategory =
+  | '兒童及青少年福利'
+  | '婦女與幼兒福利'
+  | '老人福利'
+  | '社會救助福利'
+  | '身心障礙福利'
+  | '其他福利'
+
 export interface MessageMetadata {
   extractedCity?: string
   extractedIdentities?: string[]
-  ragSources?: { id: string, title: string; uri: string; summaryContent: string }[] // 引用來源
+  extractedCategory?: WelfareCategory | null
+  isConverged?: boolean
+  ragSources?: RagSource[] // 引用來源
   processingTime?: number
 }
 
