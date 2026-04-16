@@ -80,9 +80,11 @@ export class AuthService {
       throw new BadRequestException('LIFF 登入失敗')
     }
 
-    const email = profileData.email
+    const lineId = profileData.sub
 
-    return this.handleThirdPartyCallback(email, profileData, 'line')
+    const user = await this.usersService.findOneByProviderId('line', lineId)
+
+    return this.handleThirdPartyCallback(user?.email ?? 'user@example.com', profileData, 'line')
   }
 
   // --- 註冊與驗證流程 ---
