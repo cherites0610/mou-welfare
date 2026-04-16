@@ -2,16 +2,21 @@ import { createPinia } from 'pinia'
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import { createApp } from 'vue'
 import App from './App.vue'
-import router from './router'
 import './css/main.css'
+import router from './router'
+import { initLiff } from './utils/liff'
+(async () => {
+  const app = createApp(App)
 
-const app = createApp(App)
+  const pinia = createPinia()
+  pinia.use(piniaPluginPersistedstate)
 
-const pinia = createPinia()
+  app.use(router)
+  app.use(pinia)
 
-pinia.use(piniaPluginPersistedstate)
+  if (import.meta.env.VITE_LIFF_ID) {
+    await initLiff().catch(() => { })
+  }
 
-app.use(router)
-app.use(pinia)
-
-app.mount('#app')
+  app.mount('#app')
+})()

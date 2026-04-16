@@ -1,3 +1,4 @@
+import { useSession } from '@/composables/useSession'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import axios from 'axios'
 
@@ -24,6 +25,10 @@ class Request {
 
     this.instance.interceptors.response.use(
       (response: AxiosResponse) => {
+        if (response.status === 204) {
+          return null
+        }
+
         const { statusCode, data, message } = response.data
 
         if (statusCode === 200 || statusCode === 201) {
@@ -33,6 +38,13 @@ class Request {
         }
       },
       (error) => {
+        if (error.response?.status === 401) {
+          const url: string = error.config?.url ?? ''
+          const isAuthEndpoint = url.startsWith('/auth/')
+          if (!isAuthEndpoint) {
+            useSession().clearSession()
+          }
+        }
         const errorMessage = error.response?.data?.error || error.message || 'Unknown Error'
         return Promise.reject(new Error(errorMessage))
       }
@@ -67,5 +79,5 @@ class Request {
 export default new Request({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 10000,
-  headers: { 'Content-Type': 'application/json;charset=utf-8' }
+  // headers: { 'Content-Type': 'application/json;charset=utf-8' }
 })

@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { Icon } from '@iconify/vue'
-import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
-import { useChatStore } from '@/stores/chat' // 引入您提供的 Chat Store
+import { useChatStore } from '@/stores/chat'
+import { Icon } from '@iconify/vue'
+import DOMPurify from 'dompurify'
 import { ElMessage } from 'element-plus'
+import { marked } from 'marked'
+import { storeToRefs } from 'pinia'
+import { nextTick, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+
+marked.setOptions({ breaks: true })
+
+const renderMarkdown = (content: string): string => {
+  return DOMPurify.sanitize(marked.parse(content) as string)
+}
 
 // --- Props & Emits ---
 const props = defineProps<{
@@ -149,13 +157,18 @@ const handleHeaderAction = () => {
                {{ msg.content }}
              </div>
 
-             <div 
-              v-else
-              class="px-4 py-3 rounded-2xl text-[15px] leading-relaxed shadow-sm break-words whitespace-pre-wrap"
-              :class="msg.role === 'user' ? 'bg-[#84cc16] text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'"
+             <div
+              v-else-if="msg.role === 'user'"
+              class="px-4 py-3 rounded-2xl rounded-tr-none text-[15px] leading-relaxed shadow-sm break-words whitespace-pre-wrap bg-[#84cc16] text-white"
             >
               {{ msg.content }}
             </div>
+
+            <div
+              v-else
+              class="prose prose-sm max-w-none px-4 py-3 rounded-2xl rounded-tl-none text-[15px] leading-relaxed shadow-sm break-words bg-white text-gray-800 border border-gray-100"
+              v-html="renderMarkdown(msg.content)"
+            />
 
              <div v-if="msg.role === 'assistant' && msg.metadata?.ragSources?.length" class="space-y-2">
                <div class="text-xs text-gray-400 font-bold ml-1 flex items-center gap-1">
@@ -240,7 +253,94 @@ const handleHeaderAction = () => {
 }
 @media screen and (max-width: 768px) {
   .chat-input {
-    font-size: 16px !important; /* 強制設定為 16px，防止 iOS 縮放 */
+    font-size: 16px !important;
   }
+}
+
+/* Markdown 渲染樣式 */
+:deep(.prose) {
+  color: inherit;
+}
+:deep(.prose p) {
+  margin: 0 0 0.5em;
+}
+:deep(.prose p:last-child) {
+  margin-bottom: 0;
+}
+:deep(.prose h1),
+:deep(.prose h2),
+:deep(.prose h3) {
+  font-weight: 700;
+  margin: 0.75em 0 0.25em;
+  line-height: 1.3;
+}
+:deep(.prose h1) { font-size: 1.15em; }
+:deep(.prose h2) { font-size: 1.05em; }
+:deep(.prose h3) { font-size: 1em; }
+:deep(.prose ul),
+:deep(.prose ol) {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+:deep(.prose li) {
+  margin: 0.2em 0;
+}
+:deep(.prose strong) {
+  font-weight: 700;
+}
+:deep(.prose em) {
+  font-style: italic;
+}
+:deep(.prose code) {
+  background: #f3f4f6;
+  color: #374151;
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-family: ui-monospace, monospace;
+}
+:deep(.prose pre) {
+  background: #1f2937;
+  color: #e5e7eb;
+  padding: 0.75em 1em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+:deep(.prose pre code) {
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-size: 0.82em;
+}
+:deep(.prose blockquote) {
+  border-left: 3px solid #84cc16;
+  padding-left: 0.75em;
+  color: #6b7280;
+  margin: 0.5em 0;
+}
+:deep(.prose a) {
+  color: #84cc16;
+  text-decoration: underline;
+}
+:deep(.prose hr) {
+  border-color: #e5e7eb;
+  margin: 0.75em 0;
+}
+:deep(.prose table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+  margin: 0.5em 0;
+}
+:deep(.prose th),
+:deep(.prose td) {
+  border: 1px solid #e5e7eb;
+  padding: 0.4em 0.6em;
+  text-align: left;
+}
+:deep(.prose th) {
+  background: #f9fafb;
+  font-weight: 700;
 }
 </style>

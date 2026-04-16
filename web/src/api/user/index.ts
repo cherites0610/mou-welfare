@@ -16,6 +16,7 @@ enum Api {
 
   Profile = '/users/profile',
   UpdateProfile = '/users/:id',
+  DeleteAccount = '/users/:id',
   Favorites = '/users/favorites',
   AddFavorite = '/users/favorites',
   RemoveFavorite = '/users/favorites/:welfareId',
@@ -28,7 +29,7 @@ export const login = (data: LoginDto) => {
 }
 
 export const loginWithLiff = (lineAccessToken: string) => {
-  return request.post<{ code: string, action: string }>(Api.LoginLiff, { accessToken: lineAccessToken })
+  return request.post<{ code: string; action: 'LOGIN' | 'REGISTER'; email: string }>(Api.LoginLiff, { accessToken: lineAccessToken })
 }
 
 export const loginWithOAuth = (code: string) => {
@@ -36,7 +37,7 @@ export const loginWithOAuth = (code: string) => {
 }
 
 export const register = (data: RegisterDto) => {
-  return request.post<User>(Api.Register, data)
+  return request.post<User | LoginResponse>(Api.Register, data)
 }
 
 export const resendVerification = (email: string) => {
@@ -67,6 +68,10 @@ export const getProfile = () => {
 
 export const updateProfile = (id: string, data: UpdateUserDto) => {
   return request.patch<User>(Api.UpdateProfile.replace(':id', id), data)
+}
+
+export const deleteAccount = (id: string, data: { password: string }) => {
+  return request.delete<{ message: string }>(Api.DeleteAccount.replace(':id', id), { data })
 }
 
 export const addFavorite = (welfareId: string) => {

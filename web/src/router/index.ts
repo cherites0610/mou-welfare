@@ -10,11 +10,51 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '登入', requiresAuth: false }
   },
   {
+    path: '/oauth-callback',
+    name: 'OAuthCallback',
+    component: () => import('@/views/oauth-callback/index.vue'),
+    meta: { title: '登入處理中', requiresAuth: false }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/register/index.vue'),
+    meta: { title: '創建帳號', requiresAuth: false }
+  },
+  {
+    path: '/register/profile',
+    name: 'RegisterProfile',
+    component: () => import('@/views/register/Profile.vue'),
+    meta: { title: '填寫個人資料', requiresAuth: false }
+  },
+  {
+    path: '/verify',
+    name: 'Verify',
+    component: () => import('@/views/verify/index.vue'),
+    meta: { title: '驗證信箱', requiresAuth: false }
+  },
+  {
+    path: '/forgot-password',
+    name: 'ForgotPassword',
+    component: () => import('@/views/forgot-password/index.vue'),
+    meta: { title: '忘記密碼', requiresAuth: false }
+  },
+  {
+    path: '/reset-password',
+    name: 'ResetPassword',
+    component: () => import('@/views/reset-password/index.vue'),
+    meta: { title: '密碼重設', requiresAuth: false }
+  },
+  {
     path: '/',
     name: 'Layout',
     component: () => import('@/layout/index.vue'),
     meta: { requiresAuth: true },
     children: [
+      {
+        path: '',
+        redirect: { name: 'WelfareList' }
+      },
       {
         path: 'welfares',
         name: 'WelfareList',
@@ -68,12 +108,6 @@ const routes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: '',
-    name: 'Home',
-    component: () => import('@/views/home/index.vue'),
-    meta: { title: '首頁', requiresAuth: false }
-  },
-  {
     path: '/question',
     name: 'Question',
     component: () => import('@/views/question/index.vue'),
@@ -99,7 +133,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/'
+    redirect: '/welfares'
   }
 ]
 
@@ -117,8 +151,8 @@ router.beforeEach((to, from, next) => {
 
   if (to.meta.requiresAuth && !userStore.token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (to.name === 'Login' && userStore.token) {
-    next('/')
+  } else if (['Login', 'Register', 'ForgotPassword'].includes(to.name as string) && userStore.token) {
+    next('/welfares')
   } else {
     next()
   }

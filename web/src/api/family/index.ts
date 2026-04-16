@@ -40,7 +40,7 @@ export const addFamilyMember = (data: CreateUserFamilyDto) => {
 }
 
 export const joinFamilyByCode = (data: JoinFamilyDto) => {
-  return request.post<UserFamily>(Api.Join, data)
+  return request.post<UserFamily>(`${Api.Member}/join`, data)
 }
 
 export const updateFamilyMemberRole = (id: string, data: UpdateUserFamilyDto) => {
@@ -49,4 +49,8 @@ export const updateFamilyMemberRole = (id: string, data: UpdateUserFamilyDto) =>
 
 export const removeFamilyMember = (id: string) => {
   return request.delete<void>(`${Api.Member}/${id}`)
+}
+
+export const generateJoinCode = (id: string) => {
+  return request.post<{ code: string }>(`${Api.Member}/invite-code`, { familyId: id })
 }

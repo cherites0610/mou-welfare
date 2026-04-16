@@ -16,11 +16,18 @@
     "format": "prettier --write --experimental-cli src/"
   },
   "dependencies": {
+    "@line/liff": "^2.28.0",
     "@tailwindcss/vite": "^4.1.18",
+    "@types/dompurify": "^3.0.5",
+    "@types/qrcode": "^1.5.6",
     "axios": "^1.13.2",
+    "dompurify": "^3.4.0",
     "element-plus": "^2.13.2",
+    "jsqr": "^1.4.0",
+    "marked": "^18.0.0",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
+    "qrcode": "^1.5.4",
     "tailwindcss": "^4.1.18",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"

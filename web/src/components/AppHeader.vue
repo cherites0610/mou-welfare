@@ -1,12 +1,14 @@
 <script setup lang="ts">
+import { useSession } from '@/composables/useSession'
+import { Icon } from '@iconify/vue'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user' 
-import { Icon } from '@iconify/vue'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const { clearSession } = useSession()
 
 const desktopMenuItems = [
   { path: '/welfares', name: '首頁', icon: 'mdi:home-search-outline' },
@@ -18,7 +20,7 @@ const isActive = (path: string) => route.path.startsWith(path)
 
 const handleLogout = async () => {
   await userStore.userLogout()
-  router.push('/login')
+  clearSession()
 }
 
 const userName = computed(() => userStore.userInfo?.email || 'User')

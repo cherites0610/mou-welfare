@@ -9,7 +9,7 @@ export interface User {
   lineId: string | null
   googleId: string | null
   avatarUrl: string | null
-  address: string | null
+  city: string | null
   identities: string[]
   createdAt: string
   updatedAt: string
@@ -28,8 +28,8 @@ export interface LoginResponse {
 export interface RegisterDto {
   email: string
   password: string
-  name: string
-  verificationCode: string
+  name?: string
+  verificationCode?: string
   oauthCode?: string
   birthday?: string
   gender?: string
@@ -37,7 +37,7 @@ export interface RegisterDto {
   lineId?: string
   googleId?: string
   avatarUrl?: string
-  address?: string
+  city?: string
   identities?: string[]
 }
 
@@ -47,4 +47,12 @@ export interface ResetPasswordDto {
   newPassword: string
 }
 
-export type UpdateUserDto = Partial<Omit<RegisterDto, 'email' | 'password' | 'verificationCode' | 'oauthCode'>>
+export type UpdateUserDto = Partial<
+  Omit<
+    RegisterDto,
+    'email' | 'password' | 'verificationCode' | 'oauthCode' | 'lineId' | 'googleId'
+  >
+> & {
+  lineId?: string | null
+  googleId?: string | null
+}

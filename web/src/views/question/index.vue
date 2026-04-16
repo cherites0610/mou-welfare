@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
 import { getFaqs } from '@/api/utils'
 import type { Faq } from '@/api/utils/model'
-import { useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 const faqList = ref<Faq[]>([])
 const loading = ref(true)
 const activeNames = ref<string[]>([])
@@ -35,12 +35,8 @@ onMounted(async () => {
 <template>
   <AppHeader class="hidden md:block mb-5" />
   <div
-    class="sticky top-0 z-40 bg-white border-b border-gray-100 px-6 h-14 flex items-center justify-between md:hidden shadow-sm"
-  >
-    <button
-      @click="goBack"
-      class="p-1 -ml-1 text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-    >
+    class="sticky top-0 z-40 border-b border-gray-100 px-6 h-14 flex items-center justify-between md:hidden shadow-sm">
+    <button @click="goBack" class="p-1 -ml-1 text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
       <Icon icon="mingcute:left-line" class="text-2xl" />
     </button>
 
@@ -49,28 +45,23 @@ onMounted(async () => {
     <div class="w-8"></div>
   </div>
 
-  <div class="flex flex-col h-[calc(100dvh-6rem)] md:h-[calc(100vh-8rem)] overflow-hidden px-4 sm:px-6 lg:px-8 mt-4 md:mt-0">
-    
+  <div
+    class=" flex flex-col h-[calc(100dvh-6rem)] md:h-[calc(100vh-8rem)] overflow-hidden px-4 sm:px-6 lg:px-8 mt-4 md:mt-0">
+
     <div class="w-full max-w-7xl mx-auto">
-      
+
       <div v-if="loading" class="space-y-4">
         <el-skeleton :rows="3" animated />
         <el-skeleton :rows="3" animated />
         <el-skeleton :rows="3" animated />
       </div>
 
-      <div v-else class="bg-white md:shadow overflow-hidden sm:rounded-lg">
+      <div v-else class="md:shadow overflow-hidden sm:rounded-lg">
         <el-collapse v-model="activeNames" class="border-none">
-          <el-collapse-item
-            v-for="item in faqList"
-            :key="item.id"
-            :name="item.id"
-            class="px-4 sm:px-6"
-          >
+          <el-collapse-item v-for="item in faqList" :key="item.id" :name="item.id" class="px-4 sm:px-6">
             <template #title>
               <div
-                class="flex items-center gap-2 text-base sm:font-bold font-medium text-gray-800 hover:text-mygreen transition-colors py-2"
-              >
+                class="flex items-center gap-2 text-base sm:font-bold font-medium text-gray-800 hover:text-mygreen transition-colors py-2">
                 <span class="text-mygreen font-bold">Q:</span>
                 {{ item.question }}
               </div>
@@ -117,6 +108,7 @@ onMounted(async () => {
   font-size: 1.2rem;
   color: #9ca3af;
 }
+
 :deep(.el-collapse-item__content) {
   padding-bottom: 5px;
 }
