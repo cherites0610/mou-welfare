@@ -45,7 +45,8 @@ class Request {
             useSession().clearSession()
           }
         }
-        const errorMessage = error.response?.data?.error || error.message || 'Unknown Error'
+        const errorMessage = error.response?.data?.error.message || error.message || 'Unknown Error'
+
         return Promise.reject(new Error(errorMessage))
       }
     )

@@ -2,7 +2,7 @@
 import { useAppInit } from '@/composables/useAppInit'
 import { useSession } from '@/composables/useSession'
 import { useUserStore } from '@/stores/user'
-import { getLiffAccessToken, isLiffEnvironment, isLiffLoggedIn, liffLogin } from '@/utils/liff'
+import { getLiffIdToken, getLiffProfile, isLiffEnvironment, isLiffLoggedIn, liffLogin } from '@/utils/liff'
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -36,7 +36,11 @@ onMounted(async () => {
       return
     }
     try {
-      const result = await userStore.userLoginWithLiff(getLiffAccessToken())
+      console.log(getLiffIdToken())
+      console.log(getLiffProfile())
+
+
+      const result = await userStore.userLoginWithLiff(getLiffIdToken())
       if (result.action === 'LOGIN') {
         await initAppData()
         startFamilyPolling()

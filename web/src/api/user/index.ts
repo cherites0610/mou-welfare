@@ -28,8 +28,8 @@ export const login = (data: LoginDto) => {
   return request.post<LoginResponse>(Api.Login, data)
 }
 
-export const loginWithLiff = (lineAccessToken: string) => {
-  return request.post<{ code: string; action: 'LOGIN' | 'REGISTER'; email: string }>(Api.LoginLiff, { accessToken: lineAccessToken })
+export const loginWithLiff = (lineIdToken: string) => {
+  return request.post<{ code: string; action: 'LOGIN' | 'REGISTER'; email: string }>(Api.LoginLiff, { idToken: lineIdToken })
 }
 
 export const loginWithOAuth = (code: string) => {

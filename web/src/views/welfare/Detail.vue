@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { addFavorite, getFavorites, removeFavorite } from '@/api/user' // 請確認路徑
+import { useUserStore } from '@/stores/user'
 import { useWelfareStore } from '@/stores/welfare' // 請確認路徑
 import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
@@ -9,10 +10,12 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const welfareStore = useWelfareStore()
+const userStore = useUserStore()
 
 // 從 Store 取得當前選中的福利資料
 // (路由守衛已確保進入此頁時必定有資料)
 const { currentWelfare: data } = storeToRefs(welfareStore)
+const { userInfo } = storeToRefs(userStore)
 
 // --- 狀態管理 ---
 const isFavorite = ref(false)
@@ -103,6 +106,9 @@ const getLightInfo = (light: string) => {
 const validFamilyMatches = computed(() => {
   return data.value?.familyMatches?.filter((m: any) => m.userId) || []
 })
+
+// 5. 本人 match
+const selfMatch = computed(() => data.value?.match ?? null)
 const showOriginalContent = ref(false)
 </script>
 
@@ -194,15 +200,54 @@ const showOriginalContent = ref(false)
           </div>
         </div>
 
-        <div v-if="validFamilyMatches.length > 0" class="space-y-4">
+        <div v-if="selfMatch || validFamilyMatches.length > 0" class="space-y-4">
           <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2 px-1">
-            <div class="w-8 h-8 rounded-full  text-blue-500 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-full text-blue-500 flex items-center justify-center">
               <Icon icon="mingcute:group-fill" class="text-lg" />
             </div>
-            家庭成員資格分析
+            資格分析
           </h2>
 
           <div class="grid gap-4 sm:grid-cols-2">
+
+            <!-- 本人分析卡 -->
+            <div v-if="selfMatch"
+              class="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col h-full">
+              <div class="flex items-center gap-4 mb-3">
+                <div class="relative shrink-0">
+                  <img :src="userInfo?.avatarUrl || 'https://storage.googleapis.com/mou-welfare/web/logo.png'"
+                    class="w-12 h-12 rounded-full border-2 bg-white object-cover"
+                    :class="getLightInfo(selfMatch.light).border" />
+                  <div class="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-50">
+                    <Icon v-if="selfMatch.light === 'GREEN'" icon="mingcute:check-circle-fill" class="text-green-500 text-lg" />
+                    <Icon v-else-if="selfMatch.light === 'RED'" icon="mingcute:close-circle-fill" class="text-red-500 text-lg" />
+                    <Icon v-else icon="mingcute:warning-fill" class="text-yellow-500 text-lg" />
+                  </div>
+                </div>
+                <div>
+                  <h3 class="font-bold text-gray-800 text-lg leading-tight">{{ userInfo?.name || '我' }}</h3>
+                  <span class="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    :class="[getLightInfo(selfMatch.light).bg, getLightInfo(selfMatch.light).color]">
+                    {{ getLightInfo(selfMatch.light).text }}
+                  </span>
+                </div>
+              </div>
+              <div v-if="selfMatch.reasons?.length > 0 && selfMatch.light !== 'GREEN'" class="flex-1">
+                <div class="bg-red-50/60 rounded-xl p-3 border border-red-100/50">
+                  <ul class="space-y-1.5">
+                    <li v-for="(reason, idx) in selfMatch.reasons" :key="idx"
+                      class="text-xs text-gray-700 font-medium flex items-start gap-1.5">
+                      <Icon icon="mingcute:close-line" class="text-red-500 shrink-0 mt-0.5" />
+                      <span>{{ reason }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="absolute bottom-0 left-0 right-0 h-1 opacity-50"
+                :class="getLightInfo(selfMatch.light).bg"></div>
+            </div>
+
+            <!-- 家庭成員卡 -->
             <div v-for="member in validFamilyMatches" :key="member.userId"
               class="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col h-full">
               <div class="flex items-center gap-4 mb-3">

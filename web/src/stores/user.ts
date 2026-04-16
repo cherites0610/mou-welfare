@@ -52,9 +52,9 @@ export const useUserStore = defineStore(
       // await logout()
     }
 
-    const userLoginWithLiff = async (accessToken: string) => {
+    const userLoginWithLiff = async (idToken: string) => {
       try {
-        const liffResult = await loginWithLiff(accessToken)
+        const liffResult = await loginWithLiff(idToken)
         if (liffResult.action === 'LOGIN') {
           const res = await loginWithOAuth(liffResult.code)
           setToken(res.access_token)
