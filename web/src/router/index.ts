@@ -146,6 +146,11 @@ const router = createRouter({
   }
 })
 
+router.afterEach((to) => {
+  const title = to.meta.title as string | undefined
+  document.title = title ? `${title} | 哞福利` : '哞福利 | 一站式政府福利查詢平台'
+})
+
 router.beforeEach((to, from, next) => {
   const userStore = useUserStore()
 

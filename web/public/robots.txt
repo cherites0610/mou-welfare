@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Allow: /question
+Allow: /terms
+Allow: /private
+Disallow: /login
+Disallow: /register
+Disallow: /oauth-callback
+Disallow: /verify
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /welfares
+Disallow: /chat
+Disallow: /family
+Disallow: /profile
+Disallow: /favorites
+
+Sitemap: https://mou-welfare.com/sitemap.xml
