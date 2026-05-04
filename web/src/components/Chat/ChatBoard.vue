@@ -127,25 +127,25 @@ const handleSendMessage = async () => {
 // RAG 來源紅綠燈
 const getRagLightDot = (light?: string) => {
   switch (light) {
-    case 'GREEN':  return 'bg-green-500'
+    case 'GREEN': return 'bg-green-500'
     case 'YELLOW': return 'bg-yellow-400'
-    default:       return 'bg-red-400'
+    default: return 'bg-red-400'
   }
 }
 
 const getRagLightBorder = (light?: string) => {
   switch (light) {
-    case 'GREEN':  return 'border-green-300'
+    case 'GREEN': return 'border-green-300'
     case 'YELLOW': return 'border-yellow-300'
-    default:       return 'border-gray-200'
+    default: return 'border-gray-200'
   }
 }
 
 const getRagLightLabel = (light?: string) => {
   switch (light) {
-    case 'GREEN':  return '高度符合'
+    case 'GREEN': return '高度符合'
     case 'YELLOW': return '部分符合'
-    default:       return '參考資料'
+    default: return '參考資料'
   }
 }
 
@@ -224,7 +224,8 @@ const handleHeaderAction = () => {
               class="prose prose-sm max-w-none px-4 py-3 rounded-2xl rounded-tl-none text-[15px] leading-relaxed shadow-sm break-words bg-white text-gray-800 border border-gray-100"
               v-html="renderMarkdown(msg.content)" />
 
-            <div v-if="msg.role === 'assistant' && msg.metadata?.isConverged && msg.metadata?.ragSources?.length" class="space-y-2">
+            <div v-if="msg.role === 'assistant' && msg.metadata?.isConverged && msg.metadata?.ragSources?.length"
+              class="space-y-2">
               <div class="text-xs text-gray-400 font-bold ml-1 flex items-center gap-1">
                 <Icon icon="mingcute:book-2-line" />
                 參考資料來源：
@@ -232,11 +233,9 @@ const handleHeaderAction = () => {
               <div class="grid gap-2">
                 <button v-for="source in msg.metadata.ragSources" :key="source.id" type="button"
                   class="block w-full bg-white p-3 rounded-xl border hover:shadow-md transition-all group text-left"
-                  :class="getRagLightBorder(source.match?.light)"
-                  @click="handleRagSourceClick(source)">
+                  :class="getRagLightBorder(source.match?.light)" @click="handleRagSourceClick(source)">
                   <div class="flex items-center gap-1.5 mb-1">
-                    <span v-if="source.match?.light"
-                      class="w-2 h-2 rounded-full shrink-0"
+                    <span v-if="source.match?.light" class="w-2 h-2 rounded-full shrink-0"
                       :class="getRagLightDot(source.match.light)" />
                     <span class="text-[10px] font-medium text-gray-400">
                       {{ getRagLightLabel(source.match?.light) }}
@@ -270,29 +269,22 @@ const handleHeaderAction = () => {
       </div>
     </div>
 
-    <div class="relative p-3 bg-white border-t border-gray-100 transition-all" :class="isMobile
-      ? 'fixed left-0 w-full z-40 bottom-[calc(3.8rem+env(safe-area-inset-bottom))]'
-      : 'shrink-0'">
+<div class="chat-footer p-3 bg-white border-t border-gray-100 transition-all">
       <div class="flex items-center justify-end gap-2 px-1 pb-2">
-        <button
-          type="button"
-          @click="chatStore.initNewSession()"
-          :disabled="sending"
-          class="flex items-center gap-1 text-xs text-gray-400 hover:text-[#84cc16] disabled:opacity-40 disabled:cursor-not-allowed transition-colors mr-auto"
-        >
+        <button type="button" @click="chatStore.initNewSession()" :disabled="sending"
+          class="flex items-center gap-1 text-xs text-gray-400 hover:text-[#84cc16] disabled:opacity-40 disabled:cursor-not-allowed transition-colors mr-auto">
           <Icon icon="mingcute:add-circle-line" class="text-base" />
           新對話
         </button>
         <div v-if="familyList.length > 0" class="relative">
           <button type="button"
-            class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors"
-            :class="selectedFamilyId
+            class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border transition-colors" :class="selectedFamilyId
               ? 'bg-green-50 border-green-300 text-[#84cc16]'
               : 'bg-gray-100 border-gray-200 text-gray-500 hover:border-gray-300'"
             @click="showFamilyPanel = !showFamilyPanel">
             <Icon icon="mingcute:group-line" class="text-sm shrink-0" />
             <span class="max-w-16 truncate">
-              {{ selectedFamilyId ? familyList.find(f => f.id === selectedFamilyId)?.name : '不帶家庭' }}
+              {{selectedFamilyId ? familyList.find(f => f.id === selectedFamilyId)?.name : '不帶家庭'}}
             </span>
             <Icon icon="mingcute:down-line" class="text-xs shrink-0 transition-transform"
               :class="showFamilyPanel ? 'rotate-180' : ''" />
@@ -320,16 +312,12 @@ const handleHeaderAction = () => {
           </Transition>
         </div>
         <span class="text-xs text-gray-500">是否套用個人資料</span>
-        <button
-          type="button"
-          @click="autoApplyProfile = !autoApplyProfile"
+        <button type="button" @click="autoApplyProfile = !autoApplyProfile"
           class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200"
-          :class="autoApplyProfile ? 'bg-[#84cc16]' : 'bg-gray-200'"
-        >
+          :class="autoApplyProfile ? 'bg-[#84cc16]' : 'bg-gray-200'">
           <span
             class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200"
-            :class="autoApplyProfile ? 'translate-x-4' : 'translate-x-0'"
-          />
+            :class="autoApplyProfile ? 'translate-x-4' : 'translate-x-0'" />
         </button>
       </div>
       <!-- 歷史對話面板 -->
@@ -350,11 +338,9 @@ const handleHeaderAction = () => {
             </div>
             <button v-else v-for="session in sessions" :key="session.id" type="button"
               class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0"
-              :class="session.id === currentSessionId ? 'bg-green-50' : ''"
-              @click="handleSwitchSession(session.id)">
+              :class="session.id === currentSessionId ? 'bg-green-50' : ''" @click="handleSwitchSession(session.id)">
               <div class="flex items-center gap-2 min-w-0">
-                <Icon icon="mingcute:chat-2-line"
-                  class="text-base shrink-0"
+                <Icon icon="mingcute:chat-2-line" class="text-base shrink-0"
                   :class="session.id === currentSessionId ? 'text-[#84cc16]' : 'text-gray-400'" />
                 <span class="text-sm text-gray-700 truncate">{{ session.title || '未命名對話' }}</span>
               </div>
@@ -395,6 +381,7 @@ const handleHeaderAction = () => {
 .slide-up-leave-active {
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
+
 .slide-up-enter-from,
 .slide-up-leave-to {
   opacity: 0;
@@ -526,5 +513,24 @@ const handleHeaderAction = () => {
 :deep(.prose th) {
   background: #f9fafb;
   font-weight: 700;
+}
+
+@media screen and (max-width: 768px) {
+  .chat-footer {
+    position: fixed !important;
+    left: 0;
+    width: 100%;
+    z-index: 40;
+    /* 這裡使用原生 css 的 calc，就不會有 Tailwind 語法失效的問題 */
+    bottom: calc(3.8rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* 💻 電腦版：懸浮視窗內，正常待在底部即可 */
+@media screen and (min-width: 769px) {
+  .chat-footer {
+    position: relative;
+    flex-shrink: 0;
+  }
 }
 </style>
