@@ -194,14 +194,26 @@ const toggleChat = () => {
         </div>
       </transition>
 
-      <button @click="toggleChat"
-        class="w-16 h-16 rounded-full shadow-[0_4px_20px_rgba(132,204,22,0.4)] bg-white hover:bg-[#497606] transition-all duration-300 flex items-center justify-center group active:scale-95">
-        <transition name="scale" mode="out-in">
-          <img v-if="!isChatOpen" src="https://storage.googleapis.com/mou-welfare/web/fv.png"
-            class="w-10 h-10 object-contain group-hover:scale-110 transition-transform" />
-          <Icon v-else icon="mingcute:close-line" class="text-3xl text-white" />
-        </transition>
-      </button>
+     <button
+  @click="toggleChat"
+  class="w-16 h-16 rounded-full shadow-[0_4px_20px_rgba(132,204,22,0.4)] bg-white hover:bg-[#497606] transition-all duration-300 flex items-center justify-center group active:scale-95"
+>
+  <transition name="scale" mode="out-in">
+    <!-- 聊天室關閉時：顯示彩色的阿哞 -->
+    <img
+      v-if="!isChatOpen"
+      src="https://storage.googleapis.com/mou-welfare/web/fv.png"
+      class="w-10 h-10 object-contain group-hover:scale-110 transition-transform"
+    />
+
+    <!-- 聊天室打開時：顯示黑白的阿哞 (替換掉原本隱形的 Icon) -->
+    <img
+      v-else
+      src="https://storage.googleapis.com/mou-welfare/web/black-fv.png"
+      class="w-10 h-10 object-contain group-hover:scale-110 transition-transform"
+    />
+  </transition>
+</button>
     </div>
 
     <transition name="slide-up">

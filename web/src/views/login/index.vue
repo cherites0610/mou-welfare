@@ -75,7 +75,7 @@ const handleLineLogin = async () => {
     <form @submit.prevent="handleLogin" class="space-y-4">
       <div class="relative">
         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-          <Icon icon="mingcute:user-line" class="text-lg" />
+          <Icon icon="mdi:email-outline" class="text-lg" />
         </span>
         <input v-model="form.email" type="email" placeholder="請輸入帳號"
           :disabled="isEmailDisabled"
