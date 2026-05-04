@@ -27,7 +27,9 @@ onMounted(async () => {
   })
 
   loadMore()
-  await refreshFavorites()
+  if (userStore.token) {
+    await refreshFavorites()
+  }
 })
 // --- 狀態管理 ---
 const search = ref('')
@@ -106,6 +108,10 @@ const handleFilterChange = (filters: FilterState) => {
 }
 
 const collect = () => {
+  if (!userStore.token) {
+    router.push({ name: 'Login', query: { redirect: '/favorites' } })
+    return
+  }
   router.push('/favorites')
 }
 const question = () => {
@@ -125,11 +131,15 @@ const refreshFavorites = async () => {
 
 const goToDetail = (item: WelfareResponse) => {
   welfareStore.setCurrentWelfare(item)
-  router.push({ name: 'WelfareDetail' })
+  router.push({ name: 'WelfareDetail', params: { id: item.id } })
 }
 
 const isChatOpen = ref(false)
 const toggleChat = () => {
+  if (!userStore.token) {
+    router.push({ name: 'Login', query: { redirect: '/welfares' } })
+    return
+  }
   isChatOpen.value = !isChatOpen.value
 }
 </script>
@@ -195,7 +205,7 @@ const toggleChat = () => {
     </div>
 
     <transition name="slide-up">
-      <div v-show="isChatOpen"
+      <div v-if="isChatOpen"
         class="fixed bottom-8 right-28 z-40 w-95 h-150 max-h-[80vh] bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden md:flex">
         <ChatBoard @close="isChatOpen = false" />
       </div>

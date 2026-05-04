@@ -322,7 +322,7 @@ const triggerChange = () => {
             </div>
           </div>
 
-          <div class="relative">
+          <div v-if="user.token" class="relative">
             <div
               @click="toggleDropdown('family')"
               class="flex items-center gap-1 cursor-pointer hover:text-gray-900 select-none"
@@ -369,6 +369,7 @@ const triggerChange = () => {
 
         <div class="flex items-center gap-3">
           <div
+            v-if="user.token"
             @click="toggleAutoFilter"
             class="flex items-center gap-1 cursor-pointer select-none transition-colors"
             :class="isAutoFilter ? 'text-mygreen font-bold' : 'text-gray-500'"

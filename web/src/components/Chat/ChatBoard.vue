@@ -39,7 +39,7 @@ const showFamilyPanel = ref(false)
 
 const handleRagSourceClick = (source: WelfareResponse) => {
   welfareStore.setCurrentWelfare(source)
-  router.push({ name: 'WelfareDetail' })
+  router.push({ name: 'WelfareDetail', params: { id: source.id } })
 }
 const { messages, sending, currentSessionId, sessions, loading } = storeToRefs(chatStore)
 

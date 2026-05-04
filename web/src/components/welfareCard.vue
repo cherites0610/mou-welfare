@@ -2,10 +2,15 @@
 import { addFavorite, removeFavorite } from '@/api/user'
 import { useTagColor } from '@/composables/useTagColor'
 import { isLiffEnvironment } from '@/utils/liff'
+import { useUserStore } from '@/stores/user'
 import { Icon } from '@iconify/vue'
 import liff from '@line/liff'
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { WelfareResponse } from '../api/welfare/model'
+
+const router = useRouter()
+const userStore = useUserStore()
 
 const props = defineProps<{
   data: WelfareResponse
@@ -170,6 +175,10 @@ const share = async () => {
 }
 
 const handleCollect = async () => {
+  if (!userStore.token) {
+    router.push({ name: 'Login', query: { redirect: `/welfares/${props.data.id}` } })
+    return
+  }
   if (loading.value) return
   loading.value = true
   try {

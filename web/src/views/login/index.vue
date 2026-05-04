@@ -134,5 +134,13 @@ const handleLineLogin = async () => {
         創建帳號
       </button>
     </div>
+
+    <div class="mt-6 text-center">
+      <button @click="router.push('/welfares')"
+        class="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+        <Icon icon="mingcute:left-line" class="text-sm" />
+        回首頁
+      </button>
+    </div>
   </AuthCard>
 </template>

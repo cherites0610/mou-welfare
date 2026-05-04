@@ -12,6 +12,22 @@ const router = useRouter()
 const goBack = () => {
   router.back()
 }
+const injectFaqSchema = (faqs: Faq[]) => {
+  const script = document.createElement('script')
+  script.id = 'page-schema'
+  script.type = 'application/ld+json'
+  script.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map(faq => ({
+      '@type': 'Question',
+      name: faq.question,
+      acceptedAnswer: { '@type': 'Answer', text: faq.answer }
+    }))
+  })
+  document.head.appendChild(script)
+}
+
 onMounted(async () => {
   try {
     loading.value = true
@@ -20,9 +36,8 @@ onMounted(async () => {
       faqList.value = res.sort((a: Faq, b: Faq) => a.order_index - b.order_index)
       if (faqList.value.length > 0) {
         const firstId = faqList.value[0]?.id
-        if (firstId) {
-          activeNames.value = [firstId]
-        }
+        if (firstId) activeNames.value = [firstId]
+        injectFaqSchema(faqList.value)
       }
     }
   } catch (err) {

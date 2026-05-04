@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { useWelfareStore } from '../stores/welfare'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -59,21 +58,13 @@ const routes: RouteRecordRaw[] = [
         path: 'welfares',
         name: 'WelfareList',
         component: () => import('@/views/welfare/index.vue'),
-        meta: { title: '福利搜尋', keepAlive: true }
+        meta: { title: '福利搜尋', keepAlive: true, requiresAuth: false }
       },
       {
-        path: 'welfares/detail',
+        path: 'welfares/:id',
         name: 'WelfareDetail',
         component: () => import('@/views/welfare/Detail.vue'),
-        meta: { title: '福利詳情', requiresAuth: true },
-        beforeEnter: (to, from, next) => {
-          const welfareStore = useWelfareStore()
-          if (!welfareStore.hasCurrentWelfare()) {
-            next({ name: 'WelfareList', replace: true })
-          } else {
-            next()
-          }
-        }
+        meta: { title: '福利詳情', requiresAuth: false },
       },
       {
         path: 'chat',
@@ -146,9 +137,30 @@ const router = createRouter({
   }
 })
 
+const noIndexRoutes = new Set(['Login', 'Register', 'RegisterProfile', 'Verify', 'ForgotPassword', 'ResetPassword', 'OAuthCallback'])
+
 router.afterEach((to) => {
   const title = to.meta.title as string | undefined
   document.title = title ? `${title} | 哞福利` : '哞福利 | 一站式政府福利查詢平台'
+
+  const url = `https://mou-welfare.com${to.path}`
+
+  // canonical
+  const canonical = document.querySelector('link[rel="canonical"]')
+  if (canonical) canonical.setAttribute('href', url)
+
+  // og:url
+  const ogUrl = document.querySelector('meta[property="og:url"]')
+  if (ogUrl) ogUrl.setAttribute('content', url)
+
+  // noindex for auth pages
+  const robotsMeta = document.querySelector('meta[name="robots"]')
+  if (robotsMeta) {
+    robotsMeta.setAttribute('content', noIndexRoutes.has(to.name as string) ? 'noindex, nofollow' : 'index, follow')
+  }
+
+  // 清除前頁注入的 JSON-LD
+  document.getElementById('page-schema')?.remove()
 })
 
 router.beforeEach((to, from, next) => {

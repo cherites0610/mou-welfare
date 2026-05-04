@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { addFavorite, getFavorites, removeFavorite } from '@/api/user' // 請確認路徑
+import { getWelfare } from '@/api/welfare'
+import { addFavorite, getFavorites, removeFavorite } from '@/api/user'
 import { useUserStore } from '@/stores/user'
-import { useWelfareStore } from '@/stores/welfare' // 請確認路徑
+import { useWelfareStore } from '@/stores/welfare'
 import { Icon } from '@iconify/vue'
 import { ElMessage } from 'element-plus'
 import { storeToRefs } from 'pinia'
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
+const route = useRoute()
 const router = useRouter()
 const welfareStore = useWelfareStore()
 const userStore = useUserStore()
 
-// 從 Store 取得當前選中的福利資料
-// (路由守衛已確保進入此頁時必定有資料)
 const { currentWelfare: data } = storeToRefs(welfareStore)
 const { userInfo } = storeToRefs(userStore)
 
@@ -21,9 +21,46 @@ const { userInfo } = storeToRefs(userStore)
 const isFavorite = ref(false)
 const loadingFavorite = ref(false)
 
-// --- 初始化檢查收藏狀態 ---
+// 動態更新頁面 title、OG meta 與 JSON-LD
+watch(data, (welfare) => {
+  if (!welfare) return
+  document.title = `${welfare.name} | 哞福利`
+  document.querySelector('meta[property="og:title"]')?.setAttribute('content', `${welfare.name} | 哞福利`)
+  const desc = welfare.summaryContent || `${welfare.sourceCity}｜${welfare.categories?.join('、')}`
+  document.querySelector('meta[name="description"]')?.setAttribute('content', desc)
+  document.querySelector('meta[property="og:description"]')?.setAttribute('content', desc)
+
+  document.getElementById('page-schema')?.remove()
+  const script = document.createElement('script')
+  script.id = 'page-schema'
+  script.type = 'application/ld+json'
+  script.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'GovernmentService',
+    name: welfare.name,
+    description: desc,
+    areaServed: welfare.sourceCity,
+    serviceType: welfare.categories?.join('、'),
+    url: `https://mou-welfare.com/welfares/${welfare.id}`,
+    ...(welfare.publishDate && { datePublished: welfare.publishDate }),
+    ...(welfare.deadline && { expires: welfare.deadline }),
+  })
+  document.head.appendChild(script)
+}, { immediate: true })
+
+// --- 初始化：store 沒有資料時用 route id fallback ---
 onMounted(async () => {
-  if (!data.value) return
+  const id = route.params.id as string
+  if (!data.value || data.value.id !== id) {
+    try {
+      const welfare = await getWelfare(id)
+      welfareStore.setCurrentWelfare(welfare)
+    } catch {
+      router.replace({ name: 'WelfareList' })
+      return
+    }
+  }
+  if (!userStore.token) return
   try {
     const favorites = await getFavorites()
     if (Array.isArray(favorites)) {
@@ -46,6 +83,10 @@ const goToSource = () => {
 }
 
 const toggleFavorite = async () => {
+  if (!userStore.token) {
+    router.push({ name: 'Login', query: { redirect: route.fullPath } })
+    return
+  }
   if (!data.value || loadingFavorite.value) return
   loadingFavorite.value = true
   try {
@@ -113,8 +154,8 @@ const showOriginalContent = ref(false)
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F8FAFC]">
-    <div v-if="data" class="min-h-screen bg-[#F8FAFC] pb-24 md:pb-10 font-sans ">
+  <div class="min-h-screen">
+    <div v-if="data" class="min-h-screenGS pb-24 md:pb-10 font-sans ">
       <div
         class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 h-14 flex items-center justify-between md:hidden shadow-sm">
         <button @click="goBack"

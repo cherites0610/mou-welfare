@@ -1,5 +1,7 @@
 User-agent: *
 Allow: /
+Allow: /welfares
+Allow: /welfares/
 Allow: /question
 Allow: /terms
 Allow: /private
@@ -9,7 +11,6 @@ Disallow: /oauth-callback
 Disallow: /verify
 Disallow: /forgot-password
 Disallow: /reset-password
-Disallow: /welfares
 Disallow: /chat
 Disallow: /family
 Disallow: /profile
