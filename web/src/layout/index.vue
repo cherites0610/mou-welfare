@@ -60,8 +60,10 @@ const handleMenuClick = (item: any) => {
       </router-view>
     </main>
 
-    <nav
-      class="md:hidden fixed bottom-0 w-full bg-white border-t border-gray-100 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom)] h-[calc(3.8rem+env(safe-area-inset-bottom))]">
+<nav
+  class="md:hidden fixed bottom-0 w-full bg-white border-t border-gray-100 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom)] h-[calc(3.8rem+env(safe-area-inset-bottom))]"
+  style="transform: translateZ(0); will-change: transform;"
+>
       <button v-for="item in mobileMenuItems" :key="item.path"
         class="flex flex-col items-center justify-center w-full h-full transition-colors duration-200"
         :class="isActive(item.path) ? 'text-mygreen' : 'text-gray-400 hover:text-gray-600'"
