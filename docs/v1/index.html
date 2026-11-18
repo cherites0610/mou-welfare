@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>哞福利 API 端點總覽</title>
+<link rel="icon" href="assets/favicon.ico">
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #fff; --text: #1f2328; --muted: #6b7280; --border: #e5e7eb;
+    --get: #2563eb; --post: #16a34a; --patch: #d97706; --delete: #dc2626;
+    --jwt: #7c3aed; --key: #0891b2; --public: #6b7280; --warn-bg: #fef2f2; --warn: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111318; --card: #1a1d24; --text: #e6e7ea; --muted: #9aa0aa; --border: #2b2f38; --warn-bg: #2a1616; --warn: #f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; }
+  header { padding: 28px 24px 12px; max-width: 1200px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .sub code { background: var(--card); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; }
+  .toolbar { position: sticky; top: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .toolbar-inner { max-width: 1200px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type=search] { flex: 1 1 260px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 14px; }
+  .chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; font-size: 13px; }
+  .chip.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .stats { color: var(--muted); font-size: 13px; margin-left: auto; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px 24px 48px; }
+  section { margin-bottom: 28px; }
+  section h2 { font-size: 18px; margin: 0 0 4px; display: flex; align-items: baseline; gap: 8px; }
+  section h2 .count { font-size: 13px; color: var(--muted); font-weight: normal; }
+  section .desc { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .method { display: inline-block; min-width: 62px; text-align: center; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 5px; color: #fff; font-family: ui-monospace, monospace; }
+  .GET { background: var(--get); } .POST { background: var(--post); } .PATCH { background: var(--patch); } .DELETE { background: var(--delete); }
+  .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; word-break: break-all; }
+  .path .prefix { color: var(--muted); }
+  .auth { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+  .auth.jwt { color: var(--jwt); } .auth.key { color: var(--key); } .auth.public { color: var(--public); }
+  .params { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); }
+  .params b { color: var(--text); font-weight: 600; }
+  .warn { margin-top: 6px; background: var(--warn-bg); color: var(--warn); font-size: 12px; padding: 4px 8px; border-radius: 6px; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  .hidden { display: none; }
+  footer { max-width: 1200px; margin: 0 auto; padding: 0 24px 32px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<nav style="background:#92c700"><div style="max-width:1200px;margin:0 auto;padding:0 24px;display:flex;gap:4px;align-items:center;height:52px">
+  <img src="assets/meta.png" alt="" style="width:30px;height:30px;border-radius:6px;margin-right:12px">
+  <a href="index.html" style="background:#fff;color:#5a8700;text-decoration:none;padding:6px 14px;border-radius:999px;font-size:14px;font-weight:600">API 端點</a>
+  <a href="pages.html" style="color:#fff;text-decoration:none;padding:6px 14px;border-radius:999px;font-size:14px;font-weight:600">前端頁面</a>
+  <a href="styles.html" style="color:#fff;text-decoration:none;padding:6px 14px;border-radius:999px;font-size:14px;font-weight:600">樣式指南</a>
+</div></nav>
+
+<header>
+  <h1>哞福利 API 端點總覽</h1>
+  <div class="sub">
+    Base URL：<code>/api/v1</code>　·　Swagger：<code>/api/docs</code>　·　回應格式：<code>{ statusCode, message: "success", data }</code>
+  </div>
+  <div class="legend">
+    <span><span class="auth jwt">JWT</span> 需 <code>Authorization: Bearer &lt;token&gt;</code></span>
+    <span><span class="auth key">API Key</span> 需 <code>x-api-key</code> header</span>
+    <span><span class="auth public">公開</span> 無需驗證</span>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="toolbar-inner">
+    <input type="search" id="q" placeholder="搜尋路徑、說明、參數…">
+    <button class="chip active" data-m="ALL">全部</button>
+    <button class="chip" data-m="GET">GET</button>
+    <button class="chip" data-m="POST">POST</button>
+    <button class="chip" data-m="PATCH">PATCH</button>
+    <button class="chip" data-m="DELETE">DELETE</button>
+    <button class="chip" data-w="1">⚠ 只看有問題的</button>
+    <span class="stats" id="stats"></span>
+  </div>
+</div>
+
+<main id="main"></main>
+
+<footer>
+  依 <code>api/src/**/*.controller.ts</code> 整理（branch: api，commit <code>029c192</code>）。「⚠」標註為程式碼審閱時發現的權限 / 安全疑慮。
+</footer>
+
+<script>
+const GROUPS = [
+  {
+    name: 'App', file: 'app.controller.ts', desc: '健康檢查與檔案上傳',
+    endpoints: [
+      { m: 'GET', p: '/health-check', auth: 'public', s: '健康檢查' },
+      { m: 'POST', p: '/upload', auth: 'public', s: '上傳圖片（上傳至 GCS，回傳 url）', params: 'multipart/form-data: <b>file</b>',
+        warn: 'JwtAuthGuard 在 029c192 被註解掉，任何人都能上傳檔案到 GCS' },
+    ],
+  },
+  {
+    name: 'Auth', file: 'auth/auth.controller.ts', desc: '登入、註冊、密碼重設、第三方 OAuth（LINE / Google / LIFF）',
+    endpoints: [
+      { m: 'POST', p: '/auth/login', auth: 'public', s: 'Email / 密碼登入，回傳 access_token', params: 'body: <b>email</b>, <b>password</b>' },
+      { m: 'POST', p: '/auth/login-liff', auth: 'public', s: 'LIFF 登入（以 LINE /verify 驗證 ID Token，換取內部 OAuth code）', params: 'body: <b>idToken</b>',
+        warn: '若 LINE 帳號無 email，email 為 undefined，TypeORM 會忽略條件而取到第一位使用者' },
+      { m: 'POST', p: '/auth/login-oauth', auth: 'public', s: '以 OAuth code 換取 JWT（已註冊用戶）', params: 'body: <b>code</b>' },
+      { m: 'POST', p: '/auth/register', auth: 'public', s: '註冊（一般註冊需 verificationCode，OAuth 註冊需 oauthCode）',
+        params: 'body: <b>email</b>, <b>password</b>, <b>name</b>, verificationCode?, oauthCode?, birthday?, gender?, isSubscribed?, lineId?, googleId?, avatarUrl?, address?, identities?' },
+      { m: 'POST', p: '/auth/resend-verification', auth: 'public', s: '寄送註冊驗證碼（5 分鐘有效）', params: 'body: <b>email</b>',
+        warn: '無頻率限制；驗證碼以 Math.random 產生' },
+      { m: 'POST', p: '/auth/forgot-password', auth: 'public', s: '忘記密碼，寄送重設驗證碼（10 分鐘有效）', params: 'body: <b>email</b>',
+        warn: '回應會透露 email 是否已註冊；無頻率限制' },
+      { m: 'POST', p: '/auth/reset-password', auth: 'public', s: '以驗證碼重設密碼', params: 'body: <b>email</b>, <b>verificationCode</b>, <b>newPassword</b>',
+        warn: '6 位數驗證碼無嘗試次數限制，可被暴力破解' },
+      { m: 'GET', p: '/auth/line-login', auth: 'public', s: '取得 LINE OAuth 授權連結', params: '→ { url }' },
+      { m: 'GET', p: '/auth/line-callback', auth: 'public', s: 'LINE OAuth 回調，處理後 302 導回 FRONTEND_URL/oauth-callback?code=&action=&email=', params: 'query: <b>code</b>, state',
+        warn: 'state 未驗證（CSRF）' },
+      { m: 'GET', p: '/auth/google-login', auth: 'public', s: '取得 Google OAuth 授權連結', params: '→ { url }' },
+      { m: 'GET', p: '/auth/google-callback', auth: 'public', s: 'Google OAuth 回調，302 導回 FRONTEND_URL/oauth-callback?code=&action=&email=', params: 'query: <b>code</b>',
+        warn: '未使用 state 參數（CSRF）' },
+    ],
+  },
+  {
+    name: 'Users', file: 'user/user.controller.ts', desc: '個人資料與收藏（整個 controller 皆需 JWT）',
+    endpoints: [
+      { m: 'GET', p: '/users/profile', auth: 'jwt', s: '取得個人資料' },
+      { m: 'PATCH', p: '/users/:id', auth: 'jwt', s: '修改個人資料（只能改自己）',
+        params: 'body: name?, birthday?, gender?, isSubscribed?, lineId?, googleId?, avatarUrl?, address?, identities?, oauthCode?',
+        warn: '允許直接修改 lineId / googleId，可綁定他人的第三方帳號' },
+      { m: 'DELETE', p: '/users/:id', auth: 'jwt', s: '刪除帳號（需驗證密碼，只能刪自己）', params: 'body: <b>password</b>' },
+      { m: 'POST', p: '/users/favorites', auth: 'jwt', s: '加入收藏福利', params: 'body: <b>welfareId</b>' },
+      { m: 'DELETE', p: '/users/favorites/:welfareId', auth: 'jwt', s: '移除收藏福利' },
+      { m: 'GET', p: '/users/favorites', auth: 'jwt', s: '取得我的收藏列表' },
+    ],
+  },
+  {
+    name: 'Welfares', file: 'welfare/welfare.controller.ts', desc: '福利資料查詢、比對（紅黃綠燈），以及爬蟲資料匯入',
+    endpoints: [
+      { m: 'POST', p: '/welfare', auth: 'public', s: '搜尋福利（含個人 / 家庭 / 手動身分比對、分頁）',
+        params: 'body: keywords?, cities?[], categories?[], userId?, familyId?, identities?[], page=1, limit=10',
+        warn: '未登入即可傳任意 userId / familyId，洩漏家庭成員姓名、頭像與身分比對結果；categories IN 對 simple-array 欄位比對錯誤' },
+      { m: 'GET', p: '/welfare/:id', auth: 'public', s: '查詢單筆福利（可帶 userId 套用比對）', params: 'query: userId?',
+        warn: '未登入可傳任意 userId' },
+      { m: 'POST', p: '/welfare/ingest', auth: 'key', s: '爬蟲推送福利資料（推入 BullMQ 佇列，由 LLM 分析）',
+        params: 'body: <b>sourceCity</b>, <b>sourceUrl</b>, <b>originalName</b>, <b>originalContent</b>, publishDate?',
+        warn: '若未設定 API_KEY 且請求不帶 header，undefined === undefined 會通過驗證' },
+      { m: 'POST', p: '/welfare/delete/:city', auth: 'key', s: '刪除指定縣市所有福利（DB + GCS）',
+        warn: '同上 API Key 繞過問題' },
+    ],
+  },
+  {
+    name: 'Families', file: 'family/family.controller.ts', desc: '家庭（整個 controller 皆需 JWT）',
+    endpoints: [
+      { m: 'POST', p: '/families', auth: 'jwt', s: '建立新家庭（建立者自動成為 Admin）', params: 'body: <b>name</b>' },
+      { m: 'GET', p: '/families', auth: 'jwt', s: '取得我所屬的家庭列表' },
+      { m: 'GET', p: '/families/:id', auth: 'jwt', s: '取得指定家庭詳情', warn: '未檢查是否為該家庭成員' },
+      { m: 'PATCH', p: '/families/:id', auth: 'jwt', s: '更新家庭資料', params: 'body: name?', warn: '未檢查成員 / Admin 權限，任何登入者皆可修改' },
+      { m: 'DELETE', p: '/families/:id', auth: 'jwt', s: '刪除家庭', warn: '未檢查成員 / Admin 權限，任何登入者皆可刪除' },
+    ],
+  },
+  {
+    name: 'UserFamilies', file: 'user-family/user-families.controller.ts', desc: '家庭成員管理與邀請碼（整個 controller 皆需 JWT）',
+    endpoints: [
+      { m: 'POST', p: '/user-families', auth: 'jwt', s: '直接新增家庭成員', params: 'body: <b>familyId</b>, <b>userId</b>, <b>role</b>',
+        warn: '未檢查呼叫者是否為該家庭 Admin，可把任何人加進任何家庭' },
+      { m: 'GET', p: '/user-families/family/:familyId', auth: 'jwt', s: '查詢家庭所有成員（需為成員）' },
+      { m: 'PATCH', p: '/user-families/:id', auth: 'jwt', s: '修改成員角色（需 Admin，不可移除唯一 Admin）', params: 'body: <b>role</b>' },
+      { m: 'DELETE', p: '/user-families/:id', auth: 'jwt', s: '移除家庭成員' },
+      { m: 'POST', p: '/user-families/invite-code', auth: 'jwt', s: '產生加入家庭的邀請碼', params: 'body: <b>familyId</b> → { code, expiresIn }' },
+      { m: 'POST', p: '/user-families/join', auth: 'jwt', s: '以邀請碼加入家庭', params: 'body: <b>code</b>' },
+    ],
+  },
+  {
+    name: 'Chat', file: 'chat/chat.controller.ts', desc: 'AI 對話（阿哞，RAG + NLU；整個 controller 皆需 JWT）',
+    endpoints: [
+      { m: 'POST', p: '/chat', auth: 'jwt', s: '發送訊息給 AI', params: 'body: <b>message</b>, sessionId?, familyId?, userId?, autoApplyProfile?=true, generateMarkdown?=true',
+        warn: '操作者取自 body.userId 而非 JWT；sessionId 未檢查擁有者' },
+      { m: 'GET', p: '/chat', auth: 'jwt', s: '取得當前用戶所有對話' },
+      { m: 'GET', p: '/chat/sessions/:sessionId/messages', auth: 'jwt', s: '取得指定對話的訊息', warn: '未檢查 session 擁有者，可讀他人對話' },
+      { m: 'DELETE', p: '/chat/sessions/:sessionId', auth: 'jwt', s: '刪除指定對話', warn: '未檢查 session 擁有者，可刪他人對話' },
+    ],
+  },
+  {
+    name: 'FAQ', file: 'faq/faq.controller.ts', desc: '常見問題（讀取公開，寫入需 API Key）',
+    endpoints: [
+      { m: 'POST', p: '/faq', auth: 'key', s: '新增 FAQ', params: 'body: <b>question</b>, <b>answer</b>', warn: 'API Key 繞過問題' },
+      { m: 'GET', p: '/faq', auth: 'public', s: '取得所有 FAQ' },
+      { m: 'GET', p: '/faq/:id', auth: 'public', s: '取得單筆 FAQ' },
+      { m: 'PATCH', p: '/faq/:id', auth: 'key', s: '更新 FAQ', params: 'body: question?, answer?', warn: 'API Key 繞過問題' },
+      { m: 'DELETE', p: '/faq/:id', auth: 'key', s: '刪除 FAQ', warn: 'API Key 繞過問題' },
+    ],
+  },
+  {
+    name: 'LINE', file: 'line/line.controller.ts', desc: 'LINE Messaging API Webhook',
+    endpoints: [
+      { m: 'POST', p: '/line/webhook', auth: 'public', s: '接收 LINE 事件（文字訊息 → 阿哞回覆 / 未綁定者推薦隨機福利）',
+        params: 'header: x-line-signature；body: { events: [...] }',
+        warn: '簽章驗證被註解掉，任何人都可偽造事件' },
+    ],
+  },
+];
+
+const AUTH_LABEL = { jwt: 'JWT', key: 'API Key', public: '公開' };
+const main = document.getElementById('main');
+
+function render() {
+  main.innerHTML = GROUPS.map((g, gi) => `
+    <section data-g="${gi}">
+      <h2>${g.name} <span class="count"></span></h2>
+      <p class="desc">${g.desc} · <code>${g.file}</code></p>
+      <table>
+        <thead><tr><th style="width:80px">Method</th><th>Path</th><th style="width:90px">驗證</th><th>說明 / 參數</th></tr></thead>
+        <tbody>
+          ${g.endpoints.map(e => `
+            <tr data-m="${e.m}" data-w="${e.warn ? 1 : 0}" data-text="${(e.m + ' ' + e.p + ' ' + e.s + ' ' + (e.params || '') + ' ' + (e.warn || '')).toLowerCase().replace(/<[^>]+>/g, '')}">
+              <td><span class="method ${e.m}">${e.m}</span></td>
+              <td class="path"><span class="prefix">/api/v1</span>${e.p}</td>
+              <td><span class="auth ${e.auth}">${AUTH_LABEL[e.auth]}</span></td>
+              <td>${e.s}${e.params ? `<div class="params">${e.params}</div>` : ''}${e.warn ? `<div class="warn">⚠ ${e.warn}</div>` : ''}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </section>`).join('');
+}
+
+let method = 'ALL', warnOnly = false;
+function applyFilter() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  let shown = 0, total = 0, warns = 0;
+  document.querySelectorAll('section').forEach(sec => {
+    let n = 0;
+    sec.querySelectorAll('tbody tr').forEach(tr => {
+      total++;
+      if (tr.dataset.w === '1') warns++;
+      const ok = (method === 'ALL' || tr.dataset.m === method)
+        && (!warnOnly || tr.dataset.w === '1')
+        && (!q || tr.dataset.text.includes(q));
+      tr.classList.toggle('hidden', !ok);
+      if (ok) n++;
+    });
+    sec.querySelector('.count').textContent = `${n} 個端點`;
+    sec.classList.toggle('hidden', n === 0);
+    shown += n;
+  });
+  document.getElementById('stats').textContent = `顯示 ${shown} / ${total} 個端點 · ⚠ ${warns} 個有疑慮`;
+}
+
+render();
+document.getElementById('q').addEventListener('input', applyFilter);
+document.querySelectorAll('.chip[data-m]').forEach(b => b.addEventListener('click', () => {
+  method = b.dataset.m;
+  document.querySelectorAll('.chip[data-m]').forEach(x => x.classList.toggle('active', x === b));
+  applyFilter();
+}));
+document.querySelector('.chip[data-w]').addEventListener('click', e => {
+  warnOnly = !warnOnly;
+  e.currentTarget.classList.toggle('active', warnOnly);
+  applyFilter();
+});
+applyFilter();
+</script>
+</body>
+</html>

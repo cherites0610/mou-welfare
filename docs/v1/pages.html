@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>哞福利 前端頁面總覽</title>
+<link rel="icon" href="assets/favicon.ico">
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #fff; --text: #1f2328; --muted: #6b7280; --border: #e5e7eb;
+    --brand: #92c700; --warn-bg: #fef2f2; --warn: #b91c1c; --ok: #15803d; --ok-bg: #f0fdf4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111318; --card: #1a1d24; --text: #e6e7ea; --muted: #9aa0aa; --border: #2b2f38; --warn-bg: #2a1616; --warn: #f87171; --ok-bg: #132a1b; --ok: #4ade80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", sans-serif; background: var(--bg); color: var(--text); line-height: 1.55; }
+  .topnav { background: var(--brand); }
+  .topnav-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; gap: 4px; align-items: center; height: 52px; }
+  .topnav img { width: 30px; height: 30px; border-radius: 6px; margin-right: 12px; }
+  .topnav a { color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+  .topnav a:hover { background: rgba(255,255,255,.18); }
+  .topnav a.active { background: #fff; color: #5a8700; }
+  header, main, footer { max-width: 1200px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+  header { padding-top: 28px; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  h2 { font-size: 20px; margin: 36px 0 10px; }
+  .sub { color: var(--muted); font-size: 14px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; background: var(--card); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 18px 0 4px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .stat b { display: block; font-size: 26px; }
+  .stat span { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
+  .page { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .page.broken { border-color: #fca5a5; }
+  .page-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .page-head .title { font-weight: 700; font-size: 16px; }
+  .route { font-family: ui-monospace, monospace; font-size: 13px; color: #5a8700; }
+  @media (prefers-color-scheme: dark) { .route { color: #a3e635; } }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+  .badge.auth { color: #7c3aed; border-color: #c4b5fd; }
+  .badge.layout { color: #0891b2; border-color: #a5f3fc; }
+  .badge.bad { color: var(--warn); border-color: #fca5a5; }
+  .desc { font-size: 14px; }
+  dl { margin: 0; display: grid; grid-template-columns: 64px 1fr; gap: 4px 10px; font-size: 13px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; }
+  .api { font-family: ui-monospace, monospace; font-size: 12px; }
+  .api.miss { color: var(--warn); text-decoration: underline wavy; }
+  .warn { background: var(--warn-bg); color: var(--warn); font-size: 12px; padding: 6px 10px; border-radius: 8px; }
+  .file { font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-size: 12px; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td.bad { color: var(--warn); font-weight: 600; }
+  .flow { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; font-family: ui-monospace, monospace; font-size: 13px; white-space: pre; overflow-x: auto; line-height: 1.7; }
+  footer { color: var(--muted); font-size: 12px; padding-top: 24px; padding-bottom: 40px; }
+</style>
+</head>
+<body>
+
+<nav class="topnav"><div class="topnav-inner">
+  <img src="assets/meta.png" alt="">
+  <a href="index.html">API 端點</a>
+  <a href="pages.html" class="active">前端頁面</a>
+  <a href="styles.html">樣式指南</a>
+</div></nav>
+
+<header>
+  <h1>哞福利 前端頁面總覽</h1>
+  <div class="sub">來源：<code>origin/web</code> 分支 <code>web/src/router/index.ts</code>、<code>web/src/views/**</code>（最新 commit <code>fea6111</code>）。API 對照以 <code>origin/api</code> 最新後端（commit <code>029c192</code>）為準。</div>
+  <div class="summary">
+    <div class="stat"><b>17</b><span>個實際可用的頁面</span></div>
+    <div class="stat"><b>6</b><span>個在 Layout 底下</span></div>
+    <div class="stat"><b>1</b><span>個寫了沒接路由（home）</span></div>
+    <div class="stat"><b>1</b><span>處前後端 API 對不上</span></div>
+  </div>
+</header>
+
+<main>
+  <h2>頁面清單</h2>
+  <div class="grid" id="pages"></div>
+
+  <h2>頁面流程</h2>
+  <div class="flow">一般登入   /login ──(帳密)──────────────────────────────▶ /welfares
+            │  ├─ 忘記密碼 ▶ /forgot-password ▶ /verify ▶ /reset-password ▶ /login
+            │  ├─ 創建帳號 ▶ /register ▶ /verify ▶ /register/profile ▶ /
+            │  └─ LINE / Google ▶ (後端 OAuth) ▶ /oauth-callback ┬ LOGIN    ▶ /welfares
+            │                                                    └ REGISTER ▶ /register?oauthCode=
+LINE LIFF  App.vue 偵測 LIFF ▶ liff.login() ▶ POST /auth/login-liff ┬ LOGIN    ▶ /welfares
+                                                                     └ REGISTER ▶ /register?oauthCode=&email=
+主要使用   /welfares ──點卡片──▶ /welfares/:id ──▶ 原始公告（外連）
+           /welfares ──右下 FAB（桌機）──▶ 浮動 ChatBoard        /chat（手機底部導航「阿哞」）
+           /profile ──▶ /profile/edit、/favorites、/question、/terms、/private</div>
+
+  <h2>前後端 API 對照（不一致的地方）</h2>
+  <table>
+    <thead><tr><th>功能</th><th>前端呼叫</th><th>後端實際</th><th>結果</th></tr></thead>
+    <tbody>
+      <tr><td>福利詳情</td><td><code>POST /welfare/:id</code></td><td><code>GET /welfare/:id</code></td><td class="bad">404，詳情頁打不開</td></tr>
+      <tr><td>LIFF 登入</td><td><code>POST /auth/login-liff</code> <code>{ idToken }</code></td><td>已在 029c192 對齊（路徑、idToken、回應含 email）</td><td>已修正</td></tr>
+      <tr><td>OAuth 回調</td><td>路由 <code>/oauth-callback</code></td><td>已在 029c192 改為導向 <code>/oauth-callback?code=&amp;action=&amp;email=</code></td><td>已修正</td></tr>
+      <tr><td>對話訊息 / 刪除對話</td><td><code>/chat/sessions/:id/…</code></td><td>已在 029c192 改為 <code>/chat/sessions/:id/…</code></td><td>已修正</td></tr>
+      <tr><td>解除 LINE / Google 綁定</td><td>個人設定頁有按鈕</td><td>無專用端點（只能用 <code>PATCH /users/:id</code> 改 lineId / googleId）</td><td>需確認實作方式</td></tr>
+    </tbody>
+  </table>
+
+  <h2>路由層面的問題</h2>
+  <table>
+    <thead><tr><th>問題</th><th>影響</th></tr></thead>
+    <tbody>
+      <tr><td>路由名稱 <code>Question</code> 重複（Layout 子路由與最外層各一個）</td><td>Vue Router 以後加者為準，常見問題頁沒有 Layout 外框（頁面裡又自己塞了一個 AppHeader 補救）</td></tr>
+      <tr><td><code>/favorites</code> 沒有 <code>requiresAuth</code></td><td>未登入可進入，API 回 401</td></tr>
+      <tr><td><code>&lt;keep-alive :include="['WelfareList','Chat']"&gt;</code></td><td>比對的是元件名稱而非路由名稱；<code>&lt;script setup&gt;</code> 元件沒有 <code>defineOptions({ name })</code>，所以快取完全沒生效，返回列表會重新載入、捲動位置遺失</td></tr>
+      <tr><td><code>/favorites</code>、<code>/private</code>、<code>/terms</code>、<code>/question</code> 在 Layout 外</td><td>手機底部導航與桌機頂部 Header 在這些頁面消失，各頁自己做返回列</td></tr>
+      <tr><td><code>App.vue</code> 印出 LIFF ID Token 到 console</td><td>上線前應移除</td></tr>
+    </tbody>
+  </table>
+</main>
+
+<footer>依 <code>origin/web</code> 分支程式碼靜態整理，未實際執行前端。</footer>
+
+<script>
+const API_MISS = new Set(['POST /welfare/:id']);
+const PAGES = [
+  { t: '福利搜尋（首頁）', r: '/welfares', name: 'WelfareList', layout: true, auth: false, f: 'views/welfare/index.vue',
+    d: '頂部搜尋框（手機綠底 / 桌機白底）＋收藏、FAQ 圖示；篩選列（縣市 / 福利種類 / 家庭）；無限捲動福利卡片列表。桌機右下有阿哞 FAB，點開浮動 ChatBoard（380×600）。',
+    c: 'WelfareFilterBar、WelfareCard、ChatBoard', api: ['POST /welfare', 'GET /users/favorites', 'POST /users/favorites', 'DELETE /users/favorites/:welfareId'] },
+  { t: '福利詳情', r: '/welfares/:id', name: 'WelfareDetail', layout: true, auth: false, f: 'views/welfare/Detail.vue',
+    d: '手機頂部毛玻璃返回列；主卡（縣市 pill、發布日、大標題、類別 # 標籤、身分彩色標籤、原始公告連結、收藏）；資格分析（本人＋家人紅黃綠燈卡）；AI 摘要卡（淡綠漸層）；申請條件／可獲獎勵；可展開原始公告；手機底部固定「前往申辦」按鈕。',
+    c: '—', api: ['POST /welfare/:id', 'GET /users/favorites', 'POST /users/favorites', 'DELETE /users/favorites/:welfareId'],
+    warn: '前端用 POST 打 /welfare/:id，後端是 GET，詳情頁拿不到資料' },
+  { t: 'AI 助理「阿哞」', r: '/chat', name: 'Chat', layout: true, auth: true, f: 'views/chat/index.vue → components/Chat/ChatBoard.vue',
+    d: '整頁就是 ChatBoard（isMobile）。綠色標題列＋在線狀態；空狀態有快捷問題 chip；使用者泡泡綠底、阿哞泡泡白底（Markdown）；RAG 參考來源卡（帶紅黃綠燈）；底部：新對話、家庭選擇、「套用個人資料」開關、歷史對話面板、輸入框。',
+    c: 'ChatBoard', api: ['POST /chat', 'GET /chat', 'GET /chat/sessions/:id/messages', 'DELETE /chat/sessions/:id'],
+  },
+  { t: '我的家庭', r: '/family', name: 'Family', layout: true, auth: true, f: 'views/family/index.vue',
+    d: '未完成的除錯頁，只把 familyStore 的 JSON 印在畫面上。沒有任何地方連過來，家庭功能實際做在「個人設定」頁。',
+    c: '—', api: [], warn: 'familys[0]!.id：沒有家庭時直接報錯', broken: true },
+  { t: '個人設定', r: '/profile', name: 'Profile', layout: true, auth: true, f: 'views/profile/index.vue（745 行）',
+    d: '個人卡（頭像、名稱、LINE 綁定 pill、身分別標籤、編輯）；家庭列表（建立 / 加入下拉、家庭卡、成員頭像、成員角色下拉、邀請 QR Code）；「其他」選單（常見問題、已收藏、服務條款、隱私權、登出）；「帳號管理」（解除 LINE / Google 綁定、刪除帳號）；多個 el-dialog 確認框。',
+    c: 'CreateFamilyDialog、EditFamilyDialog、JoinFamilyDialog', api: ['GET /families', 'POST /families', 'PATCH /families/:id', 'DELETE /families/:id', 'GET /user-families/family/:familyId', 'PATCH /user-families/:id', 'DELETE /user-families/:id', 'POST /user-families/invite-code', 'POST /user-families/join', 'PATCH /users/:id', 'DELETE /users/:id'] },
+  { t: '編輯個人資料', r: '/profile/edit', name: 'ProfileEdit', layout: true, auth: true, f: 'views/profile/EditProfile.vue',
+    d: '頭像上傳、姓名、生日（年 / 月 / 日三個 el-select）、性別 pill、居住城市、身分別多選 pill。',
+    c: 'AvatarUploader', api: ['PATCH /users/:id', 'POST /upload'] },
+  { t: '登入', r: '/login', name: 'Login', layout: false, auth: false, f: 'views/login/index.vue',
+    d: 'AuthCard 版型（左 42% 插畫、右表單）。Email / 密碼輸入（左側圖示）、顯示密碼、主按鈕；忘記密碼；Google / LINE 圓形按鈕；創建帳號；回首頁。',
+    c: 'AuthCard', api: ['POST /auth/login', 'GET /auth/google-login', 'GET /auth/line-login'], warn: '標題寫「Sign up」，但這是登入頁' },
+  { t: 'OAuth 登入處理中', r: '/oauth-callback', name: 'OAuthCallback', layout: false, auth: false, f: 'views/oauth-callback/index.vue',
+    d: '轉圈 loading；依 action 分流：LOGIN 換 token 進 /welfares，REGISTER 帶 oauthCode 去 /register。失敗顯示錯誤＋返回登入。',
+    c: 'AuthCard', api: ['POST /auth/login-oauth'] },
+  { t: '創建帳號', r: '/register', name: 'Register', layout: false, auth: false, f: 'views/register/index.vue',
+    d: '註冊第一步：Email / 密碼 / 確認密碼。一般註冊寄驗證碼後到 /verify；OAuth 註冊（帶 oauthCode）直接到 /register/profile。',
+    c: 'AuthCard', api: ['POST /auth/resend-verification'], warn: '標題寫「Register」（英文），其他頁都是中文' },
+  { t: '驗證信箱', r: '/verify', name: 'Verify', layout: false, auth: false, f: 'views/verify/index.vue',
+    d: '輸入 6 位數驗證碼、重寄倒數。註冊與忘記密碼共用，依來源導到 /register/profile 或 /reset-password。',
+    c: 'AuthCard', api: ['POST /auth/resend-verification', 'POST /auth/forgot-password'] },
+  { t: '填寫個人資料', r: '/register/profile', name: 'RegisterProfile', layout: false, auth: false, f: 'views/register/Profile.vue',
+    d: '註冊第二步：姓名、生日、性別、城市、身分別多選，送出即完成註冊。缺少前一步資料時退回 /register。',
+    c: 'AuthCard', api: ['POST /auth/register'] },
+  { t: '忘記密碼', r: '/forgot-password', name: 'ForgotPassword', layout: false, auth: false, f: 'views/forgot-password/index.vue',
+    d: '輸入 Email 寄送重設驗證碼，接著到 /verify。', c: 'AuthCard', api: ['POST /auth/forgot-password'] },
+  { t: '重設密碼', r: '/reset-password', name: 'ResetPassword', layout: false, auth: false, f: 'views/reset-password/index.vue',
+    d: '輸入新密碼與確認密碼，成功後回 /login。', c: 'AuthCard', api: ['POST /auth/reset-password'] },
+  { t: '常見問題', r: '/question', name: 'Question', layout: false, auth: false, f: 'views/question/index.vue',
+    d: '自帶 AppHeader（桌機）與返回列（手機）；置中標題；el-collapse 手風琴，綠色「Q.」前綴；skeleton 載入、空狀態。',
+    c: 'AppHeader', api: ['GET /faq'] },
+  { t: '我的最愛', r: '/favorites', name: 'Favorites', layout: false, auth: false, f: 'views/favorites/index.vue',
+    d: '收藏的福利列表。', c: 'WelfareCard', api: ['GET /users/favorites'], warn: '未設定 requiresAuth，未登入也能進入' },
+  { t: '隱私權政策', r: '/private', name: 'Private', layout: false, auth: false, f: 'views/private/index.vue', d: '靜態文字頁（隱私權政策 Privacy Policy）。', c: '—', api: [] },
+  { t: '服務條款', r: '/terms', name: 'Terms', layout: false, auth: false, f: 'views/terms/index.vue', d: '靜態文字頁。', c: '—', api: [] },
+  { t: '（未使用）home', r: '—', name: '—', layout: false, auth: false, f: 'views/home/index.vue',
+    d: '別的專案留下的模板（「智能排班、彈性福利、數據分析」），沒有接路由，可刪除。', c: '—', api: [], broken: true, unused: true },
+];
+
+document.getElementById('pages').innerHTML = PAGES.map(p => `
+  <div class="page ${p.broken || p.warn ? 'broken' : ''}">
+    <div class="page-head"><span class="title">${p.t}</span><span class="route">${p.r}</span></div>
+    <div class="badges">
+      ${p.unused ? '<span class="badge bad">未接路由</span>' : `<span class="badge">name: ${p.name}</span>`}
+      ${p.layout ? '<span class="badge layout">Layout</span>' : ''}
+      ${p.auth ? '<span class="badge auth">需登入</span>' : ''}
+    </div>
+    <div class="desc">${p.d}</div>
+    <dl>
+      <dt>元件</dt><dd>${p.c || '—'}</dd>
+      <dt>API</dt><dd>${p.api.length ? p.api.map(a => `<span class="api ${API_MISS.has(a) ? 'miss' : ''}">${a}</span>`).join('<br>') : '—'}</dd>
+    </dl>
+    ${p.warn ? `<div class="warn">⚠ ${p.warn}</div>` : ''}
+    <div class="file">${p.f}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>

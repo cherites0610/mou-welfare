@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>哞福利 現行前端樣式指南</title>
+<link rel="icon" href="assets/favicon.ico">
+<!-- 即時範例用：Tailwind 4 瀏覽器版 + Iconify（需連網；離線時仍可看每個範例下方的原始 class） -->
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/iconify-icon@2/dist/iconify-icon.min.js"></script>
+<style type="text/tailwindcss">
+  /* ↓ 原封不動複製自 web/src/css/main.css */
+  @theme {
+    --color-mygreen: #92c700;
+    --color-mygreen-400: #5D7A00;
+    --color-mygreen-300: #5A8700;
+    --color-mygreen-200: #73AA00;
+    --color-myorange: #FF9538;
+    --color-myblue: #3A90E0;
+    --color-mypurple: #E360DA;
+    --color-myblue-green: #00D3A9;
+    --color-myyellow: #FFEA53;
+    --color-myred: #D06262;
+    --color-mygray-100: #EDEDED;
+    --color-mygray-200: #CAD1D5;
+    --color-mygray-300: #7F8689;
+  }
+</style>
+<style>
+  /* 文件外框樣式：全部用 class 選擇器，避免蓋掉範例裡的 Tailwind utilities */
+  body { margin: 0; background: #f7f7f5; color: #1f2328; font-family: system-ui, -apple-system, "Noto Sans TC", "PingFang TC", sans-serif; line-height: 1.55; }
+  .topnav { background: #92c700; position: sticky; top: 0; z-index: 100; }
+  .topnav-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; gap: 4px; align-items: center; height: 52px; }
+  .topnav-logo { width: 30px; height: 30px; border-radius: 6px; margin-right: 12px; }
+  .topnav-link { color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+  .topnav-link:hover { background: rgba(255,255,255,.18); }
+  .topnav-link.active { background: #fff; color: #5a8700; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: 200px 1fr; gap: 32px; }
+  .toc { position: sticky; top: 72px; align-self: start; padding-top: 28px; font-size: 13px; }
+  .toc-link { display: block; color: #6b7280; text-decoration: none; padding: 4px 0 4px 10px; border-left: 2px solid #e5e7eb; }
+  .toc-link:hover { color: #5a8700; border-left-color: #92c700; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } .toc { display: none; } }
+  .doc-main { padding: 28px 0 60px; min-width: 0; }
+  .doc-h1 { font-size: 28px; font-weight: 800; margin: 0 0 6px; }
+  .doc-sub { color: #6b7280; font-size: 14px; margin: 0 0 8px; }
+  .doc-h2 { font-size: 21px; font-weight: 800; margin: 48px 0 6px; padding-top: 8px; border-top: 1px solid #e5e7eb; scroll-margin-top: 64px; }
+  .doc-h3 { font-size: 15px; font-weight: 700; margin: 24px 0 8px; }
+  .doc-p { font-size: 14px; color: #374151; margin: 6px 0; }
+  .doc-note { font-size: 13px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 10px 14px; margin: 10px 0; }
+  .doc-bad { font-size: 13px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 10px; padding: 10px 14px; margin: 10px 0; }
+  .doc-c { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: #fff; border: 1px solid #e5e7eb; padding: 1px 5px; border-radius: 4px; }
+  .doc-table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; font-size: 13px; margin: 8px 0; }
+  .doc-table th, .doc-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+  .doc-table th { color: #6b7280; font-size: 12px; font-weight: 600; background: #fafafa; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 8px 0; }
+  .sw { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; font-size: 12px; }
+  .sw-chip { height: 56px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 4px 6px; font-size: 11px; font-weight: 700; }
+  .sw-meta { padding: 6px 8px; line-height: 1.4; }
+  .sw-name { font-weight: 700; font-family: ui-monospace, monospace; font-size: 11.5px; }
+  .sw-hex { color: #6b7280; font-family: ui-monospace, monospace; }
+  .sw-use { color: #6b7280; }
+  .demo-box { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; margin: 10px 0 18px; overflow: hidden; }
+  .demo-label { font-size: 12px; font-weight: 700; color: #6b7280; padding: 8px 14px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; gap: 8px; }
+  .demo-label-src { font-weight: 400; font-family: ui-monospace, monospace; }
+  .demo { padding: 20px; }
+  .demo.gray { background: #f9fafb; }
+  .code { margin: 0; background: #1e2128; color: #d4d7dd; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; line-height: 1.6; padding: 12px 14px; overflow-x: auto; white-space: pre; max-height: 260px; }
+  .code-toggle { display: block; width: 100%; text-align: left; font-size: 12px; color: #6b7280; background: #fafafa; border: 0; border-top: 1px solid #f0f0f0; padding: 6px 14px; cursor: pointer; }
+  .assets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .asset { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; font-size: 12px; }
+  .asset-img { width: 100%; aspect-ratio: 1; object-fit: contain; background: repeating-conic-gradient(#f3f4f6 0 25%, #fff 0 50%) 50% / 16px 16px; border-radius: 6px; }
+  .asset-name { font-family: ui-monospace, monospace; font-weight: 700; margin-top: 6px; }
+  .asset-use { color: #6b7280; }
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+  .icon-cell { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; display: flex; align-items: center; gap: 8px; font-family: ui-monospace, monospace; font-size: 10.5px; color: #374151; overflow: hidden; }
+  .icon-cell iconify-icon { font-size: 20px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<nav class="topnav"><div class="topnav-inner">
+  <img class="topnav-logo" src="assets/meta.png" alt="">
+  <a class="topnav-link" href="index.html">API 端點</a>
+  <a class="topnav-link" href="pages.html">前端頁面</a>
+  <a class="topnav-link active" href="styles.html">樣式指南</a>
+</div></nav>
+
+<div class="wrap">
+<aside class="toc">
+  <a class="toc-link" href="#stack">技術棧</a>
+  <a class="toc-link" href="#brand">品牌與素材</a>
+  <a class="toc-link" href="#color">色彩</a>
+  <a class="toc-link" href="#semantic">語意色（燈號 / 身分）</a>
+  <a class="toc-link" href="#type">字體排印</a>
+  <a class="toc-link" href="#shape">圓角、陰影、邊框</a>
+  <a class="toc-link" href="#layout">版面與斷點</a>
+  <a class="toc-link" href="#buttons">按鈕</a>
+  <a class="toc-link" href="#forms">表單</a>
+  <a class="toc-link" href="#tags">標籤與 Pill</a>
+  <a class="toc-link" href="#cards">卡片</a>
+  <a class="toc-link" href="#chat">聊天介面</a>
+  <a class="toc-link" href="#nav">導航</a>
+  <a class="toc-link" href="#feedback">回饋狀態</a>
+  <a class="toc-link" href="#motion">動態效果</a>
+  <a class="toc-link" href="#icons">圖示</a>
+  <a class="toc-link" href="#redo">重做建議</a>
+</aside>
+
+<main class="doc-main">
+  <h1 class="doc-h1">哞福利 現行前端樣式指南</h1>
+  <p class="doc-sub">從 <span class="doc-c">origin/web</span>（commit <span class="doc-c">fea6111</span>）的 <span class="doc-c">web/src</span> 逐一擷取，作為重做前的樣式紀錄。範例使用原本的 Tailwind class 重現，可直接複製。</p>
+  <p class="doc-sub">範例需連網載入 Tailwind 4 與 Iconify；離線時展開每個範例下方的「原始 class」即可看到完整寫法。</p>
+
+  <!-- ───────────────────────── 技術棧 ───────────────────────── -->
+  <h2 class="doc-h2" id="stack">技術棧</h2>
+  <table class="doc-table">
+    <tr><th>類別</th><th>使用</th><th>備註</th></tr>
+    <tr><td>框架</td><td>Vue 3.5（<span class="doc-c">&lt;script setup&gt;</span> + TS）、Vite 7、vue-router 4</td><td>unplugin-auto-import 自動引入 vue / vue-router API</td></tr>
+    <tr><td>樣式</td><td>Tailwind CSS 4（<span class="doc-c">@tailwindcss/vite</span>，用 <span class="doc-c">@theme</span> 定義顏色）</td><td>沒有 tailwind.config；少量 scoped CSS（捲軸、轉場、el 元件覆寫）；有裝 sass 但幾乎沒用</td></tr>
+    <tr><td>UI 元件庫</td><td>Element Plus 2.13（unplugin-vue-components 自動引入）</td><td>只用到 select / option / dialog / dropdown / input / skeleton / switch / collapse / ElMessage / ElMessageBox；其餘都是手刻 Tailwind</td></tr>
+    <tr><td>圖示</td><td><span class="doc-c">@iconify/vue</span> 的 <span class="doc-c">&lt;Icon icon="..."&gt;</span></td><td>主力 mingcute，其餘 mdi、line-md、logos、simple-icons、uil、ph、majesticons</td></tr>
+    <tr><td>狀態</td><td>Pinia 3 + pinia-plugin-persistedstate</td><td>stores：user / family / welfare / chat</td></tr>
+    <tr><td>其他</td><td>marked + DOMPurify（AI 回覆 Markdown）、qrcode + jsqr（家庭邀請 QR）、@line/liff、axios</td><td>Google Analytics <span class="doc-c">G-EZWHKPKERC</span></td></tr>
+    <tr><td>字型</td><td>無自訂字型，使用系統預設 sans（Tailwind 預設 font stack）</td><td><span class="doc-c">lang="zh-TW"</span></td></tr>
+  </table>
+
+  <!-- ───────────────────────── 品牌 ───────────────────────── -->
+  <h2 class="doc-h2" id="brand">品牌與素材</h2>
+  <p class="doc-p">品牌角色是手繪風的乳牛「阿哞」，主色為檸檬綠。素材已另存到 <span class="doc-c">mouwelfale/assets/</span>（線上原檔在 <span class="doc-c">storage.googleapis.com/mou-welfare/web/</span> 與 <span class="doc-c">web/public/</span>）。</p>
+  <div class="assets">
+    <div class="asset"><img class="asset-img" src="assets/meta.png" alt=""><div class="asset-name">meta.png</div><div class="asset-use">桌機 Header Logo、聊天空狀態（灰階）</div></div>
+    <div class="asset"><img class="asset-img" src="assets/logo.png" alt=""><div class="asset-name">logo.png</div><div class="asset-use">阿哞聊天頭像、預設使用者頭像</div></div>
+    <div class="asset"><img class="asset-img" src="assets/fv.png" alt=""><div class="asset-name">fv.png</div><div class="asset-use">綠色牛臉：聊天 FAB、底部導航「阿哞」選中、OG image</div></div>
+    <div class="asset"><img class="asset-img" src="assets/black-fv.png" alt=""><div class="asset-name">black-fv.png</div><div class="asset-use">黑色牛臉：底部導航未選中、FAB 開啟狀態</div></div>
+    <div class="asset"><img class="asset-img" src="assets/authcard.png" alt=""><div class="asset-name">authcard.png</div><div class="asset-use">登入 / 註冊卡片左側插畫（public）</div></div>
+    <div class="asset"><img class="asset-img" style="object-fit:cover" src="assets/authcard_bg.jpg" alt=""><div class="asset-name">authcard_bg.jpg</div><div class="asset-use">登入 / 註冊全頁背景，上蓋 bg-white/60</div></div>
+  </div>
+  <div class="doc-note">⚠ logo.png（3.9 MB）、meta.png（4.9 MB）都是 2048×2048 原圖直接拿來當 32px 頭像使用，重做時應輸出小尺寸 / WebP 版本。</div>
+
+  <!-- ───────────────────────── 色彩 ───────────────────────── -->
+  <h2 class="doc-h2" id="color">色彩</h2>
+
+  <h3 class="doc-h3">1. 主題 Token（main.css <span class="doc-c">@theme</span>）</h3>
+  <div class="swatches" id="sw-theme"></div>
+
+  <h3 class="doc-h3">2. Element Plus 主色覆寫（main.css <span class="doc-c">html body</span>）</h3>
+  <div class="swatches" id="sw-el"></div>
+
+  <h3 class="doc-h3">3. 程式碼中寫死的顏色（依出現次數）</h3>
+  <div class="swatches" id="sw-hard"></div>
+
+  <div class="doc-bad">
+    <b>⚠ 主綠色有三套，實際畫面不一致：</b><br>
+    ・<span class="doc-c">#92C700</span>（mygreen）— Header、登入按鈕、福利卡、篩選列、詳情頁<br>
+    ・<span class="doc-c">#84CC16</span>（Tailwind lime-500，以 <span class="doc-c">bg-[#84cc16]</span> 寫死 55 次）— 聊天室、個人設定、編輯資料、註冊資料、家庭對話框、FAQ<br>
+    ・<span class="doc-c">#5A8700</span>（Element Plus primary）— el-select、el-dialog、el-switch 等元件的焦點 / 選中色<br>
+    Hover 色也各自不同：<span class="doc-c">#7DAB00</span>、<span class="doc-c">hover:bg-green-500</span>、<span class="doc-c">hover:bg-[#497606]</span>、<span class="doc-c">active:bg-green-700</span>。
+  </div>
+  <div class="demo-box"><div class="demo-label">三種主綠並排</div><div class="demo">
+    <div class="flex gap-3 flex-wrap">
+      <div class="px-5 py-3 rounded-full bg-mygreen text-white font-bold">#92C700 mygreen</div>
+      <div class="px-5 py-3 rounded-full bg-[#84cc16] text-white font-bold">#84CC16 寫死</div>
+      <div class="px-5 py-3 rounded-full bg-[#5a8700] text-white font-bold">#5A8700 EP primary</div>
+      <div class="px-5 py-3 rounded-full bg-[#7dab00] text-white font-bold">#7DAB00 hover</div>
+    </div>
+  </div></div>
+
+  <h3 class="doc-h3">4. 中性色用法（Tailwind gray）</h3>
+  <table class="doc-table">
+    <tr><th>用途</th><th>class</th><th>次數</th></tr>
+    <tr><td>標題 / 主要文字</td><td><span class="doc-c">text-gray-800</span>（大標偶爾 <span class="doc-c">text-gray-900</span>）</td><td>62 / 27</td></tr>
+    <tr><td>內文</td><td><span class="doc-c">text-gray-600</span>、<span class="doc-c">text-gray-700</span></td><td>49 / 30</td></tr>
+    <tr><td>次要文字 / 說明</td><td><span class="doc-c">text-gray-500</span></td><td>57</td></tr>
+    <tr><td>輔助、圖示、placeholder</td><td><span class="doc-c">text-gray-400</span>（最常用的文字色）</td><td>90</td></tr>
+    <tr><td>停用、空狀態圖示</td><td><span class="doc-c">text-gray-300</span></td><td>15</td></tr>
+    <tr><td>邊框</td><td><span class="doc-c">border-gray-100</span>（卡片）、<span class="doc-c">border-gray-200</span>（輸入框、次要按鈕）</td><td>55 / 40</td></tr>
+    <tr><td>底色</td><td><span class="doc-c">bg-white</span>（卡片）、<span class="doc-c">bg-gray-50</span>（頁面 / hover / 聊天背景）、<span class="doc-c">bg-gray-100</span></td><td>67 / 44 / 17</td></tr>
+    <tr><td>錯誤文字</td><td><span class="doc-c">text-red-500</span></td><td>30</td></tr>
+  </table>
+
+  <!-- ───────────────────────── 語意色 ───────────────────────── -->
+  <h2 class="doc-h2" id="semantic">語意色（資格燈號 / 身分標籤）</h2>
+
+  <h3 class="doc-h3">資格燈號（WelfareMatchingService 的 GREEN / YELLOW / RED）</h3>
+  <div class="doc-bad">⚠ 燈號在三個地方用了三套不同的顏色：福利卡用品牌色（mygreen / myyellow / myred），詳情頁和家人頭像用 Tailwind green / yellow / red，聊天室 RAG 來源卡又是另一組。</div>
+  <div class="demo-box"><div class="demo-label"><span>福利卡圓點</span><span class="demo-label-src">components/welfareCard.vue</span></div><div class="demo">
+    <div class="flex gap-6 items-center text-sm text-gray-600">
+      <span class="flex items-center gap-2"><span class="w-4 h-4 rounded-full shrink-0 shadow-sm bg-mygreen"></span>GREEN</span>
+      <span class="flex items-center gap-2"><span class="w-4 h-4 rounded-full shrink-0 shadow-sm bg-myyellow"></span>YELLOW</span>
+      <span class="flex items-center gap-2"><span class="w-4 h-4 rounded-full shrink-0 shadow-sm bg-myred"></span>RED</span>
+    </div>
+  </div></div>
+  <div class="demo-box"><div class="demo-label"><span>詳情頁狀態 pill（getLightInfo）</span><span class="demo-label-src">views/welfare/Detail.vue</span></div><div class="demo">
+    <div class="flex gap-3 items-center flex-wrap">
+      <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-500">符合資格</span>
+      <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-500">部分符合</span>
+      <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500">資格不符</span>
+      <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">未分析</span>
+    </div>
+  </div></div>
+  <div class="demo-box"><div class="demo-label"><span>家人頭像外框（getMemberBorderColor）</span><span class="demo-label-src">components/welfareCard.vue</span></div><div class="demo">
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-gray-400 shrink-0">家人適用：</span>
+      <div class="flex -space-x-2">
+        <img src="assets/logo.png" class="w-7 h-7 rounded-full border-2 object-cover bg-white shadow-sm border-green-500 bg-green-50">
+        <img src="assets/logo.png" class="w-7 h-7 rounded-full border-2 object-cover bg-white shadow-sm border-yellow-400 bg-yellow-50">
+        <img src="assets/logo.png" class="w-7 h-7 rounded-full border-2 object-cover bg-white shadow-sm border-red-400 bg-red-50">
+      </div>
+    </div>
+  </div></div>
+
+  <h3 class="doc-h3">身分標籤顏色（composables/useTagColor.ts）</h3>
+  <div class="demo-box"><div class="demo-label"><span>依身分分組上色，未知身分為 bg-gray-400</span><span class="demo-label-src">useTagColor.ts</span></div><div class="demo">
+    <div class="flex flex-wrap gap-2">
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myorange">20歲以下</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myorange">20歲-65歲</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myorange">65歲以上</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myblue">男性</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myblue">女性</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-mypurple">中低收入戶</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-mypurple">低收入戶</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myblue-green">榮民</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myblue-green">身心障礙者</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myblue-green">原住民</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myblue-green">外籍配偶家庭</span>
+      <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-gray-400">其他</span>
+    </div>
+  </div></div>
+  <table class="doc-table">
+    <tr><th>分組</th><th>Token</th><th>身分</th></tr>
+    <tr><td>年齡</td><td><span class="doc-c">bg-myorange #FF9538</span></td><td>20歲以下、20歲-65歲、65歲以上</td></tr>
+    <tr><td>性別</td><td><span class="doc-c">bg-myblue #3A90E0</span></td><td>男性、女性</td></tr>
+    <tr><td>經濟</td><td><span class="doc-c">bg-mypurple #E360DA</span></td><td>中低收入戶、低收入戶</td></tr>
+    <tr><td>特殊身分</td><td><span class="doc-c">bg-myblue-green #00D3A9</span></td><td>榮民、身心障礙者、原住民、外籍配偶家庭</td></tr>
+  </table>
+  <p class="doc-p">福利種類（後端白名單）：兒童及青少年福利、婦女與幼兒福利、老人福利、社會救助福利、身心障礙福利、其他福利。前端顯示為 <span class="doc-c"># 類別</span> 的灰框標籤，不另外上色。</p>
+  <div class="doc-note">白底配白字的對比度不足：myyellow、myblue-green、myorange 上的白字都低於 WCAG AA 4.5:1。</div>
+
+  <!-- ───────────────────────── 字體 ───────────────────────── -->
+  <h2 class="doc-h2" id="type">字體排印</h2>
+  <p class="doc-p">字重非常偏重：<span class="doc-c">font-bold</span> 用了 184 次，<span class="doc-c">font-medium</span> 30 次，幾乎沒有 regular 的標題。</p>
+  <div class="demo-box"><div class="demo-label">實際使用的層級（由大到小）</div><div class="demo">
+    <div class="space-y-3">
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-2xl md:text-4xl extrabold</span><h1 class="text-2xl md:text-4xl font-extrabold text-gray-800 leading-tight">福利詳情大標題</h1></div>
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-3xl bold</span><span class="text-3xl font-bold text-gray-900">頁面標題（FAQ 桌機）</span></div>
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-2xl bold</span><span class="text-2xl font-bold text-gray-800">登入卡片標題 / 個人名稱</span></div>
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-xl bold</span><span class="text-xl font-bold text-gray-800">區塊標題（家庭列表、表單頁）</span></div>
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-lg bold</span><span class="text-lg font-bold text-gray-800">卡片標題 / 手機頂列標題</span></div>
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-[15px] relaxed</span><span class="text-[15px] leading-relaxed text-gray-800">聊天泡泡內文</span></div>
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-sm（最常用 120 次）</span><span class="text-sm text-gray-600">一般內文、按鈕、輸入框</span></div>
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-xs</span><span class="text-xs text-gray-400">說明、時間、輔助文字</span></div>
+      <div class="flex items-baseline gap-4"><span class="w-44 shrink-0 text-xs text-gray-400 font-mono">text-[10px] medium</span><span class="text-[10px] font-medium text-gray-400">手機底部導航文字、狀態 pill</span></div>
+    </div>
+  </div></div>
+  <div class="doc-note">手機版 <span class="doc-c">el-input</span> 強制 <span class="doc-c">font-size: 16px !important</span>，避免 iOS 聚焦時自動放大；同時 viewport 設了 <span class="doc-c">maximum-scale=1, user-scalable=no</span>（會影響無障礙縮放）。</div>
+
+  <!-- ───────────────────────── 形狀 ───────────────────────── -->
+  <h2 class="doc-h2" id="shape">圓角、陰影、邊框</h2>
+  <table class="doc-table">
+    <tr><th>圓角</th><th>次數</th><th>用在</th></tr>
+    <tr><td><span class="doc-c">rounded-full</span></td><td>101</td><td>主要按鈕（pill）、頭像、狀態點、chip、圓形圖示按鈕</td></tr>
+    <tr><td><span class="doc-c">rounded-xl</span></td><td>42</td><td>下拉選單、對話框按鈕、RAG 來源卡、條件列</td></tr>
+    <tr><td><span class="doc-c">rounded-lg</span></td><td>26</td><td>輸入框、類別標籤、小按鈕</td></tr>
+    <tr><td><span class="doc-c">rounded-2xl</span></td><td>24</td><td>卡片（家庭卡、資格卡、選單列表）、聊天泡泡、登入卡</td></tr>
+    <tr><td><span class="doc-c">rounded-3xl</span></td><td>6</td><td>大型內容卡（詳情主卡、AI 摘要）、浮動聊天視窗</td></tr>
+    <tr><td><span class="doc-c">rounded</span></td><td>6</td><td>身分標籤</td></tr>
+  </table>
+  <div class="demo-box"><div class="demo-label">陰影</div><div class="demo gray">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-gray-500">
+      <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">shadow-sm<br>預設卡片（47 次）</div>
+      <div class="bg-white rounded-2xl p-4 shadow-md">shadow-md<br>hover 狀態</div>
+      <div class="bg-white rounded-2xl p-4 shadow-xl border border-gray-100">shadow-xl<br>下拉選單</div>
+      <div class="bg-white rounded-2xl p-4 shadow-2xl">shadow-2xl<br>登入卡、浮動聊天</div>
+      <div class="bg-white rounded-2xl p-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.05)] border border-gray-50">0_2px_12px_-4px /5%<br>詳情內容卡</div>
+      <div class="bg-white rounded-2xl p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-gray-100">0_4px_20px /3%<br>家庭卡（hover 6%）</div>
+      <div class="bg-white rounded-2xl p-4 shadow-[0_4px_20px_rgba(132,204,22,0.4)]">0_4px_20px 綠 40%<br>聊天 FAB</div>
+      <div class="bg-mygreen text-white rounded-2xl p-4 shadow-lg shadow-green-200">shadow-lg shadow-green-200<br>手機「前往申辦」</div>
+    </div>
+  </div></div>
+
+  <!-- ───────────────────────── 版面 ───────────────────────── -->
+  <h2 class="doc-h2" id="layout">版面與斷點</h2>
+  <table class="doc-table">
+    <tr><th>項目</th><th>規格</th></tr>
+    <tr><td>斷點</td><td>只用 <span class="doc-c">md</span>（768px）切換手機 / 桌機；少數 <span class="doc-c">sm</span>、<span class="doc-c">lg</span>。手機優先（LIFF 為主要入口）</td></tr>
+    <tr><td>主容器</td><td><span class="doc-c">max-w-7xl mx-auto</span>，桌機 <span class="doc-c">md:p-6</span>；手機底部預留 <span class="doc-c">pb-24</span> 給導航</td></tr>
+    <tr><td>閱讀寬度</td><td>詳情頁 <span class="doc-c">max-w-4xl</span>；FAQ <span class="doc-c">md:max-w-3xl</span>；登入卡 <span class="doc-c">max-w-3xl</span>（左 42% 插畫，手機隱藏）、最小高 480px</td></tr>
+    <tr><td>桌機 Header</td><td><span class="doc-c">bg-mygreen sticky top-0 z-50 h-16</span>，左 Logo、中間文字連結（首頁 / 常見問題 / 用戶，選中為白色底線）、右側使用者下拉或白底綠字「登入」pill</td></tr>
+    <tr><td>手機底部導航</td><td>固定底部、白底、上邊框 gray-100，高 <span class="doc-c">calc(3.8rem + safe-area)</span>；三個按鈕：阿哞（牛臉圖）、首頁、用戶；選中 <span class="doc-c">text-mygreen</span>、未選 gray-400；文字 10px</td></tr>
+    <tr><td>手機頂列</td><td>各頁自己做：<span class="doc-c">sticky top-0 h-14 bg-white border-b shadow-sm</span>，左返回、中標題、右側動作或 <span class="doc-c">w-8</span> 佔位；詳情頁用 <span class="doc-c">bg-white/80 backdrop-blur-md</span></td></tr>
+    <tr><td>首頁搜尋列</td><td>手機綠底（<span class="doc-c">bg-mygreen</span>）、桌機白底，搜尋框 + 收藏 + FAQ 圖示</td></tr>
+    <tr><td>Safe area</td><td><span class="doc-c">pb-[env(safe-area-inset-bottom)]</span>；底部導航加 <span class="doc-c">translateZ(0)</span> 修 LIFF 捲動問題</td></tr>
+    <tr><td>z-index</td><td>Header / 底部導航 50、篩選列 40、下拉 50、浮動聊天 40、FAB 50、tooltip 20、特例 60</td></tr>
+  </table>
+
+  <div class="demo-box"><div class="demo-label"><span>桌機 Header</span><span class="demo-label-src">components/AppHeader.vue</span></div><div class="demo gray" style="padding:0">
+    <header class="w-full bg-mygreen shadow-sm">
+      <div class="max-w-7xl mx-auto h-16 px-6 flex items-center justify-between">
+        <div class="flex items-center gap-2 cursor-pointer select-none"><img src="assets/meta.png" alt="Logo" class="w-8 h-8 rounded-md"></div>
+        <nav class="flex items-center gap-6">
+          <a class="flex items-center gap-2 px-4 py-2 duration-200 text-white border-b">首頁</a>
+          <a class="flex items-center gap-2 px-4 py-2 duration-200 text-white hover:bg-gray-100 hover:text-gray-900">常見問題</a>
+          <a class="flex items-center gap-2 px-4 py-2 duration-200 text-white hover:bg-gray-100 hover:text-gray-900">用戶</a>
+        </nav>
+        <button class="flex items-center gap-1.5 px-4 py-1.5 bg-white text-mygreen font-bold text-sm rounded-full hover:bg-green-50 transition-colors"><iconify-icon icon="mdi:login" class="text-base"></iconify-icon>登入</button>
+      </div>
+    </header>
+  </div></div>
+
+  <!-- ───────────────────────── 按鈕 ───────────────────────── -->
+  <h2 class="doc-h2" id="buttons">按鈕</h2>
+  <div class="demo-box"><div class="demo-label">主要 / 次要 / 危險 / 社群登入 / 連結</div><div class="demo">
+    <div class="flex flex-wrap gap-3 items-center">
+      <button class="px-8 py-3 bg-mygreen hover:bg-[#7dab00] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-full transition-colors">登入</button>
+      <button class="px-5 py-2 rounded-full bg-[#84cc16] text-white text-sm font-bold hover:bg-green-500 transition-colors shadow-sm">建立家庭</button>
+      <button class="px-5 py-2 rounded-full border border-gray-200 text-gray-500 text-sm font-bold hover:bg-gray-50 transition-colors">加入家庭</button>
+      <button class="w-40 border border-[#84cc16] text-[#84cc16] font-bold py-2 rounded-full hover:bg-[#84cc16] hover:text-white transition-colors duration-300 text-sm shadow-sm">邀請成員</button>
+      <button class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 active:scale-95"><iconify-icon icon="mdi:heart-outline" class="text-xl"></iconify-icon>收藏</button>
+    </div>
+    <div class="flex flex-wrap gap-3 items-center mt-4 max-w-sm">
+      <button class="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 font-bold hover:bg-gray-50 transition">取消</button>
+      <button class="flex-1 py-2.5 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition flex items-center justify-center gap-2">確定刪除</button>
+    </div>
+    <div class="flex flex-wrap gap-4 items-center mt-4">
+      <button class="w-10 h-10 rounded-full bg-mygreen flex items-center justify-center hover:bg-[#7dab00] transition-colors"><iconify-icon icon="logos:google-icon" class="text-lg"></iconify-icon></button>
+      <button class="w-10 h-10 rounded-full bg-mygreen flex items-center justify-center hover:bg-[#7dab00] transition-colors"><iconify-icon icon="simple-icons:line" class="text-lg text-white"></iconify-icon></button>
+      <button class="text-sm text-mygreen hover:underline">忘記密碼</button>
+      <a class="text-sm font-bold text-mygreen hover:underline flex items-center gap-1 w-fit">開啟原始公告<iconify-icon icon="mingcute:external-link-line"></iconify-icon></a>
+      <button class="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-full transition-colors"><iconify-icon icon="mingcute:left-line" class="text-2xl"></iconify-icon></button>
+    </div>
+    <div class="mt-4 max-w-sm">
+      <button class="w-full bg-mygreen text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-200 active:scale-95 transition-transform flex items-center justify-center gap-2">前往申辦<iconify-icon icon="mingcute:external-link-line"></iconify-icon></button>
+    </div>
+  </div></div>
+
+  <!-- ───────────────────────── 表單 ───────────────────────── -->
+  <h2 class="doc-h2" id="forms">表單</h2>
+  <div class="demo-box"><div class="demo-label"><span>登入輸入框（左側圖示、右側顯示密碼）</span><span class="demo-label-src">views/login/index.vue</span></div><div class="demo">
+    <div class="space-y-4 max-w-sm">
+      <div class="relative">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 flex"><iconify-icon icon="mdi:email-outline" class="text-lg"></iconify-icon></span>
+        <input type="email" placeholder="請輸入帳號" class="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-lg text-sm outline-none transition-colors focus:border-mygreen">
+      </div>
+      <div class="relative">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 flex"><iconify-icon icon="mingcute:lock-line" class="text-lg"></iconify-icon></span>
+        <input type="password" placeholder="請輸入密碼" class="w-full pl-9 pr-10 py-3 border border-gray-200 rounded-lg text-sm outline-none focus:border-mygreen transition-colors">
+        <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 flex"><iconify-icon icon="mingcute:eye-line" class="text-lg"></iconify-icon></button>
+      </div>
+      <p class="text-red-500 text-xs text-center">帳號或密碼錯誤</p>
+      <div class="flex items-center gap-2"><div class="flex-1 h-px bg-gray-200"></div><span class="text-xs text-gray-400">or</span><div class="flex-1 h-px bg-gray-200"></div></div>
+    </div>
+  </div></div>
+  <div class="demo-box"><div class="demo-label"><span>單選 / 多選 pill（性別、身分別）＋開關</span><span class="demo-label-src">views/register/Profile.vue、ChatBoard.vue</span></div><div class="demo">
+    <div class="flex gap-2 flex-wrap">
+      <button class="px-5 py-2 rounded-full text-sm font-bold border transition-all duration-150 bg-[#84cc16] border-[#84cc16] text-white">男性</button>
+      <button class="px-5 py-2 rounded-full text-sm font-bold border transition-all duration-150 bg-white border-gray-200 text-gray-500">女性</button>
+      <button class="px-5 py-2 rounded-full text-sm font-bold border transition-all duration-150 bg-white border-gray-200 text-gray-500">不透露</button>
+    </div>
+    <div class="flex gap-2 flex-wrap mt-3">
+      <button class="px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-150 bg-[#84cc16] border-[#84cc16] text-white">低收入戶</button>
+      <button class="px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-150 bg-white border-gray-200 text-gray-500">身心障礙者</button>
+      <button class="px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-150 bg-white border-gray-200 text-gray-500">原住民</button>
+    </div>
+    <div class="flex items-center gap-2 mt-4">
+      <span class="text-xs text-gray-500">是否套用個人資料</span>
+      <button type="button" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 bg-[#84cc16]"><span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 translate-x-4"></span></button>
+      <button type="button" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 bg-gray-200"><span class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 translate-x-0"></span></button>
+    </div>
+    <p class="text-xs text-gray-400 mt-3">生日用三個 <span class="font-mono">el-select size="large"</span>（年 flex-1、月 / 日 flex-[0.6]）；城市用 el-select clearable。</p>
+  </div></div>
+  <div class="demo-box"><div class="demo-label"><span>篩選下拉（自製，不用 el-select）</span><span class="demo-label-src">components/WelfareFilterBar.vue</span></div><div class="demo gray" style="min-height:330px">
+    <div class="bg-white border-b border-gray-100 relative">
+      <div class="flex items-center gap-6 px-4 py-3 text-sm text-gray-600">
+        <div class="relative">
+          <div class="flex items-center gap-1 cursor-pointer select-none text-mygreen font-bold"><span>桃園市 +1</span><iconify-icon icon="mingcute:down-line" class="rotate-180"></iconify-icon></div>
+          <div class="absolute top-full left-0 mt-2 min-w-45 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50">
+            <ul class="max-h-60 overflow-y-auto py-1">
+              <li class="px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:bg-gray-50"><iconify-icon icon="mingcute:checkbox-line" class="text-xl text-mygreen"></iconify-icon><span class="text-mygreen font-medium">桃園市</span></li>
+              <li class="px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:bg-gray-50"><iconify-icon icon="mingcute:checkbox-line" class="text-xl text-mygreen"></iconify-icon><span class="text-mygreen font-medium">基隆市</span></li>
+              <li class="px-4 py-2.5 flex items-center gap-3 cursor-pointer hover:bg-gray-50"><iconify-icon icon="mingcute:square-line" class="text-xl text-gray-300"></iconify-icon><span>臺北市</span></li>
+            </ul>
+            <div class="p-2 border-t border-gray-100"><button class="w-full py-1.5 text-sm text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors font-medium flex items-center justify-center gap-1"><iconify-icon icon="mingcute:delete-2-line"></iconify-icon>清除篩選</button></div>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 cursor-pointer select-none hover:text-gray-900"><span>福利種類</span><iconify-icon icon="mingcute:down-line"></iconify-icon></div>
+        <div class="flex items-center gap-1 cursor-pointer select-none hover:text-gray-900"><span>家庭</span><iconify-icon icon="mingcute:down-line"></iconify-icon></div>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- ───────────────────────── 標籤 ───────────────────────── -->
+  <h2 class="doc-h2" id="tags">標籤與 Pill</h2>
+  <div class="demo-box"><div class="demo-label">詳情頁標籤列</div><div class="demo">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="bg-green-50 text-mygreen px-3 py-1 rounded-full text-xs font-bold border border-green-100 flex items-center gap-1"><iconify-icon icon="mingcute:location-line"></iconify-icon>桃園市</span>
+      <span class="text-gray-400 text-xs flex items-center gap-1 font-medium"><iconify-icon icon="mingcute:time-line"></iconify-icon>2025/01/15 發布</span>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <span class="text-gray-500 border border-gray-200 bg-white px-3 py-1.5 rounded-lg text-sm font-medium"># 社會救助福利</span>
+      <span class="px-3 py-1.5 rounded-lg text-white text-sm font-bold shadow-sm flex items-center gap-1 bg-mypurple">低收入戶</span>
+      <span class="px-3 py-1.5 rounded-lg text-white text-sm font-bold shadow-sm flex items-center gap-1 bg-myorange">65歲以上</span>
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#06C755]/10 text-[#06C755]"><iconify-icon icon="mingcute:line-app-fill"></iconify-icon>LINE 已綁定</span>
+      <span class="text-xs bg-white border border-gray-200 px-3 py-1 rounded-full cursor-pointer hover:text-[#84cc16] hover:border-[#84cc16]">育兒津貼</span>
+    </div>
+  </div></div>
+
+  <!-- ───────────────────────── 卡片 ───────────────────────── -->
+  <h2 class="doc-h2" id="cards">卡片</h2>
+  <div class="demo-box"><div class="demo-label"><span>福利卡（桌機版；手機版改為右滑露出「收藏 / 分享」兩個 80px 動作鈕）</span><span class="demo-label-src">components/welfareCard.vue</span></div><div class="demo gray" style="padding:0">
+    <div class="flex w-full bg-white">
+      <div class="w-full group flex items-start md:items-center gap-4 pt-4 pb-4 px-4 transition-all duration-300 cursor-pointer hover:shadow-md">
+        <div class="w-4 h-4 rounded-full shrink-0 shadow-sm order-last md:order-first mt-5 md:mt-0 bg-mygreen"></div>
+        <div class="flex-1 flex flex-col gap-2">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="text-gray-500 text-sm tracking-wide">桃園市/老人福利 / 社會救助福利</span>
+            <div class="hidden md:flex flex-wrap gap-2">
+              <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-myorange">65歲以上</span>
+              <span class="px-2.5 py-0.5 rounded text-white text-sm font-medium tracking-wide shadow-sm bg-mypurple">中低收入戶</span>
+            </div>
+          </div>
+          <h3 class="text-lg text-gray-800 font-bold leading-relaxed group-hover:text-mygreen transition-colors">中低收入老人生活津貼</h3>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-xs text-gray-400 shrink-0">家人適用：</span>
+            <div class="flex flex-wrap -space-x-2">
+              <img src="assets/logo.png" class="w-7 h-7 rounded-full border-2 object-cover bg-white shadow-sm border-green-500 bg-green-50">
+              <img src="assets/logo.png" class="w-7 h-7 rounded-full border-2 object-cover bg-white shadow-sm border-red-400 bg-red-50">
+            </div>
+          </div>
+        </div>
+        <div class="hidden md:flex gap-3 ml-auto pl-2">
+          <iconify-icon icon="mdi:heart" class="text-2xl mt-0.5 text-red-500"></iconify-icon>
+          <iconify-icon icon="uil:share" class="text-2xl text-gray-400 hover:text-mygreen transition-colors"></iconify-icon>
+        </div>
+      </div>
+    </div>
+    <div class="flex w-full bg-white border-t border-gray-100">
+      <div class="flex-1 flex items-center gap-4 px-4 py-4"><div class="flex-1"><span class="text-gray-500 text-sm">手機版滑出狀態 →</span></div></div>
+      <div class="w-20 flex flex-col items-center justify-center border-l border-gray-50 bg-gray-100 text-gray-500 py-3"><iconify-icon icon="mdi:heart-outline" class="text-2xl mb-1"></iconify-icon><span class="text-xs">收藏</span></div>
+      <div class="w-20 bg-mygreen text-white flex flex-col items-center justify-center"><iconify-icon icon="uil:share" class="text-2xl mb-1"></iconify-icon><span class="text-xs">分享</span></div>
+    </div>
+  </div></div>
+
+  <div class="demo-box"><div class="demo-label"><span>詳情主卡（右上角綠色光暈）</span><span class="demo-label-src">views/welfare/Detail.vue</span></div><div class="demo gray">
+    <div class="bg-white rounded-3xl p-6 md:p-8 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.05)] border border-gray-50 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-64 h-64 bg-green-50 rounded-full -mr-20 -mt-20 blur-3xl opacity-50 pointer-events-none"></div>
+      <div class="relative z-10">
+        <h1 class="text-2xl md:text-4xl font-extrabold text-gray-800 leading-tight mb-6">中低收入老人生活津貼</h1>
+        <div class="h-px bg-gray-100 w-full mb-6"></div>
+        <a class="text-sm font-bold text-mygreen hover:underline flex items-center gap-1 w-fit">開啟原始公告<iconify-icon icon="mingcute:external-link-line"></iconify-icon></a>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="demo-box"><div class="demo-label"><span>資格分析卡（底部 1px 燈號色條）</span><span class="demo-label-src">views/welfare/Detail.vue</span></div><div class="demo gray">
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="relative shrink-0">
+            <img src="assets/logo.png" class="w-12 h-12 rounded-full border-2 bg-white object-cover border-green-500">
+            <div class="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-50 flex"><iconify-icon icon="mingcute:check-circle-fill" class="text-green-500 text-lg"></iconify-icon></div>
+          </div>
+          <div><h3 class="font-bold text-gray-800 text-lg leading-tight">王小明</h3><span class="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-500">符合資格</span></div>
+        </div>
+        <div class="absolute bottom-0 left-0 right-0 h-1 opacity-50 bg-green-100"></div>
+      </div>
+      <div class="group bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col">
+        <div class="flex items-center gap-4 mb-3">
+          <div class="relative shrink-0">
+            <img src="assets/logo.png" class="w-12 h-12 rounded-full border-2 bg-white object-cover border-red-500">
+            <div class="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-sm border border-gray-50 flex"><iconify-icon icon="mingcute:close-circle-fill" class="text-red-500 text-lg"></iconify-icon></div>
+          </div>
+          <div><h3 class="font-bold text-gray-800 text-lg leading-tight">王媽媽</h3><span class="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500">資格不符</span></div>
+        </div>
+        <div class="bg-red-50/60 rounded-xl p-3 border border-red-100/50">
+          <ul class="space-y-1.5">
+            <li class="text-xs text-gray-700 font-medium flex items-start gap-1.5"><iconify-icon icon="mingcute:close-line" class="text-red-500 shrink-0 mt-0.5"></iconify-icon><span>資格不符：需具備「中低收入戶」身份</span></li>
+          </ul>
+        </div>
+        <div class="absolute bottom-0 left-0 right-0 h-1 opacity-50 bg-red-100"></div>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="demo-box"><div class="demo-label"><span>AI 摘要卡 / 申請條件 / 可獲獎勵</span><span class="demo-label-src">views/welfare/Detail.vue</span></div><div class="demo gray">
+    <div class="bg-linear-to-br from-[#F0FDF4] to-white border border-green-100/50 rounded-3xl p-6 shadow-sm relative overflow-hidden mb-4">
+      <h2 class="text-lg font-bold text-mygreen mb-4 flex items-center gap-2"><iconify-icon icon="mingcute:ai-line" class="text-xl"></iconify-icon>AI 重點摘要</h2>
+      <div class="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-green-50 text-sm text-gray-700 leading-relaxed">本津貼提供設籍桃園市、年滿 65 歲之中低收入老人每月生活補助…</div>
+    </div>
+    <div class="bg-white rounded-3xl p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.05)] border border-gray-50 space-y-6">
+      <div>
+        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-3"><span class="flex items-center justify-center w-8 h-8 rounded-lg text-mygreen"><iconify-icon icon="mingcute:list-check-line"></iconify-icon></span>申請條件</h3>
+        <div class="flex gap-3 items-start group text-sm text-gray-700"><span class="mt-0.5 w-5 h-5 rounded-full border border-green-200 text-green-500 flex items-center justify-center bg-green-50 shrink-0 group-hover:bg-mygreen group-hover:text-white transition-colors"><iconify-icon icon="mingcute:check-line" class="text-xs"></iconify-icon></span>設籍本市滿一年</div>
+      </div>
+      <div>
+        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-3"><span class="flex items-center justify-center w-8 h-8 rounded-lg text-orange-500"><iconify-icon icon="mingcute:gift-2-line"></iconify-icon></span>可獲得獎勵</h3>
+        <div class="flex items-center gap-3 p-3 bg-orange-50/50 rounded-xl border border-orange-100/50 text-gray-700 text-sm"><iconify-icon icon="mingcute:star-fill" class="text-orange-400 shrink-0"></iconify-icon>每月 3,879 元</div>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="demo-box"><div class="demo-label"><span>設定選單列表 / 空狀態</span><span class="demo-label-src">views/profile/index.vue</span></div><div class="demo gray">
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+        <button class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group"><iconify-icon icon="mingcute:question-line" class="text-xl text-gray-400"></iconify-icon><span class="font-bold text-gray-800 flex-1">常見問題</span><iconify-icon icon="mingcute:right-line" class="text-gray-300"></iconify-icon></button>
+        <button class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group"><iconify-icon icon="mdi:heart-outline" class="text-xl text-gray-400"></iconify-icon><span class="font-bold text-gray-800 flex-1">已收藏之福利</span><iconify-icon icon="mingcute:right-line" class="text-gray-300"></iconify-icon></button>
+        <button class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group"><iconify-icon icon="mingcute:delete-2-line" class="text-xl text-red-400"></iconify-icon><div class="flex-1"><span class="font-bold text-red-500">刪除帳號</span><p class="text-xs text-gray-400 mt-0.5">此操作無法復原，所有資料將永久刪除</p></div></button>
+      </div>
+      <div class="flex flex-col items-center justify-center gap-4 py-12 rounded-2xl border-2 border-dashed border-gray-100 text-center bg-white">
+        <div class="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center"><iconify-icon icon="mingcute:group-line" class="text-3xl text-gray-300"></iconify-icon></div>
+        <p class="text-base font-bold text-gray-400">尚未加入任何家庭</p>
+        <p class="text-sm text-gray-300">建立或加入家庭，一起管理福利資訊</p>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="demo-box"><div class="demo-label"><span>登入卡（AuthCard）</span><span class="demo-label-src">components/auth/AuthCard.vue</span></div><div class="demo" style="padding:0">
+    <div class="relative flex items-center justify-center p-6" style="background-image:url('assets/authcard_bg.jpg');background-size:cover;background-position:center;">
+      <div class="absolute inset-0 bg-white/60"></div>
+      <div class="relative flex w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden" style="min-height:360px">
+        <div class="relative hidden md:flex w-[42%] overflow-hidden"><img src="assets/authcard.png" class="absolute inset-0 w-full h-full object-cover"></div>
+        <div class="flex-1 bg-white flex flex-col justify-center px-8 py-10">
+          <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">登入</h2>
+          <button class="w-full py-3 bg-mygreen hover:bg-[#7dab00] text-white font-bold rounded-full transition-colors">登入</button>
+        </div>
+      </div>
+    </div>
+  </div></div>
+
+  <!-- ───────────────────────── 聊天 ───────────────────────── -->
+  <h2 class="doc-h2" id="chat">聊天介面（阿哞）</h2>
+  <div class="demo-box"><div class="demo-label"><span>浮動聊天視窗（桌機 w-95 h-150 rounded-3xl）</span><span class="demo-label-src">components/Chat/ChatBoard.vue</span></div><div class="demo gray">
+    <div class="w-95 max-w-full mx-auto bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
+      <div class="bg-[#84cc16] p-4 flex items-center justify-between shadow-sm">
+        <div><h3 class="font-bold text-white text-lg">阿哞 AI 助理</h3><div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-300 animate-pulse"></span><span class="text-xs text-green-50 font-medium">在線中</span></div></div>
+        <button class="text-white/80 hover:text-white hover:bg-white/20 rounded-full p-1 transition flex"><iconify-icon icon="mingcute:down-line" class="text-2xl"></iconify-icon></button>
+      </div>
+      <div class="bg-gray-50 p-4 space-y-6">
+        <div class="flex gap-3 flex-row-reverse"><div class="max-w-[85%]"><div class="px-4 py-3 rounded-2xl rounded-tr-none text-[15px] leading-relaxed shadow-sm bg-[#84cc16] text-white">我 70 歲，有什麼補助？</div></div></div>
+        <div class="flex gap-3">
+          <div class="w-8 h-8 rounded-full bg-white border border-gray-200 p-0.5 shrink-0 self-start mt-1"><img src="assets/logo.png" class="w-full h-full object-contain"></div>
+          <div class="max-w-[85%] space-y-2">
+            <div class="px-4 py-3 rounded-2xl rounded-tl-none text-[15px] leading-relaxed shadow-sm bg-white text-gray-800 border border-gray-100">幫你找到 <b>2 項</b> 可能適合的福利：</div>
+            <div class="text-xs text-gray-400 font-bold ml-1 flex items-center gap-1"><iconify-icon icon="mingcute:book-2-line"></iconify-icon>參考資料來源：</div>
+            <button type="button" class="block w-full bg-white p-3 rounded-xl border border-green-300 hover:shadow-md transition-all group text-left">
+              <div class="flex items-center gap-1.5 mb-1"><span class="w-2 h-2 rounded-full shrink-0 bg-green-500"></span><span class="text-[10px] font-medium text-gray-400">高度符合</span></div>
+              <div class="text-xs font-bold text-[#84cc16] line-clamp-1 group-hover:underline">敬老愛心卡</div>
+              <div class="text-xs text-gray-500 mt-1 line-clamp-2">符合條件：65歲以上</div>
+            </button>
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <div class="w-8 h-8 rounded-full bg-white border border-gray-200 p-0.5 shrink-0 self-start"><img src="assets/logo.png" class="w-full h-full object-contain opacity-50"></div>
+          <div class="bg-white border border-gray-100 px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-1">
+            <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span><span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay:.1s"></span><span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay:.2s"></span>
+          </div>
+        </div>
+        <div class="text-center text-xs text-gray-400 bg-gray-100 rounded-full px-3 py-1 mx-auto w-fit">系統訊息</div>
+      </div>
+      <div class="p-3 bg-white border-t border-gray-100">
+        <div class="flex items-center justify-end gap-2 px-1 pb-2">
+          <button class="flex items-center gap-1 text-xs text-gray-400 hover:text-[#84cc16] transition-colors mr-auto"><iconify-icon icon="mingcute:add-circle-line" class="text-base"></iconify-icon>新對話</button>
+          <button class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border bg-green-50 border-green-300 text-[#84cc16]"><iconify-icon icon="mingcute:group-line" class="text-sm"></iconify-icon><span>王家</span><iconify-icon icon="mingcute:down-line" class="text-xs"></iconify-icon></button>
+        </div>
+        <div class="flex items-end gap-2 bg-gray-50 rounded-2xl px-3 py-2 border border-transparent focus-within:border-green-200 focus-within:bg-white transition-all">
+          <button type="button" class="p-1 pb-2 transition-colors text-gray-400 hover:text-[#84cc16] flex"><iconify-icon icon="mingcute:history-line" class="text-xl"></iconify-icon></button>
+          <textarea rows="1" placeholder="輸入你想查詢的福利..." class="flex-1 bg-transparent border-none outline-none text-sm resize-none max-h-20 py-2 text-gray-700 placeholder:text-gray-400"></textarea>
+          <button class="p-1.5 rounded-full transition-all mb-0.5 bg-[#84cc16] text-white shadow-md hover:bg-[#72b012] flex"><iconify-icon icon="mingcute:send-plane-fill" class="text-lg"></iconify-icon></button>
+        </div>
+      </div>
+    </div>
+  </div></div>
+  <p class="doc-p">送出鈕停用時為 <span class="doc-c">bg-gray-200 text-gray-400 cursor-not-allowed</span>。RAG 來源卡外框：GREEN <span class="doc-c">border-green-300</span>（標「高度符合」）、YELLOW <span class="doc-c">border-yellow-300</span>（「部分符合」）、其他 <span class="doc-c">border-gray-200</span>（「參考資料」）；圓點為 green-500 / yellow-400 / red-400。</p>
+
+  <div class="demo-box"><div class="demo-label"><span>聊天 FAB ＋提示泡泡（首頁桌機右下）</span><span class="demo-label-src">views/welfare/index.vue</span></div><div class="demo gray">
+    <div class="flex flex-col items-end gap-2 w-fit ml-auto">
+      <div class="bg-white px-4 py-2 rounded-xl shadow-lg border border-gray-100 mb-2 relative mr-2">
+        <p class="text-sm font-bold text-gray-700">有福利問題？問問阿哞！</p>
+        <div class="absolute -bottom-1.5 right-6 w-3 h-3 bg-white border-b border-r border-gray-100 transform rotate-45"></div>
+      </div>
+      <button class="w-16 h-16 rounded-full shadow-[0_4px_20px_rgba(132,204,22,0.4)] bg-white hover:bg-[#497606] transition-all duration-300 flex items-center justify-center group active:scale-95">
+        <img src="assets/fv.png" class="w-10 h-10 object-contain group-hover:scale-110 transition-transform">
+      </button>
+    </div>
+  </div></div>
+
+  <!-- ───────────────────────── 導航 ───────────────────────── -->
+  <h2 class="doc-h2" id="nav">導航</h2>
+  <div class="demo-box"><div class="demo-label"><span>手機底部導航 / 手機頂列</span><span class="demo-label-src">layout/index.vue、各頁</span></div><div class="demo gray">
+    <div class="max-w-sm mx-auto bg-white border border-gray-200 rounded-2xl overflow-hidden">
+      <div class="border-b border-gray-100 px-4 h-14 flex items-center justify-between shadow-sm bg-white/80 backdrop-blur-md">
+        <button class="w-8 h-8 flex items-center justify-center -ml-1 text-gray-600 hover:bg-gray-100 rounded-full transition-colors"><iconify-icon icon="mingcute:left-line" class="text-2xl"></iconify-icon></button>
+        <span class="font-bold text-lg text-gray-800">福利詳情</span>
+        <button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500"><iconify-icon icon="mdi:heart-outline" class="text-2xl"></iconify-icon></button>
+      </div>
+      <div class="h-28 bg-gray-50"></div>
+      <nav class="bg-white border-t border-gray-100 flex justify-around items-center h-[3.8rem]">
+        <button class="flex flex-col items-center justify-center w-full h-full text-gray-400"><img src="assets/black-fv.png" class="w-6 h-6 mb-1 object-contain"><span class="text-[10px] font-medium">阿哞</span></button>
+        <button class="flex flex-col items-center justify-center w-full h-full text-mygreen"><iconify-icon icon="majesticons:home" class="text-2xl mb-1"></iconify-icon><span class="text-[10px] font-medium">首頁</span></button>
+        <button class="flex flex-col items-center justify-center w-full h-full text-gray-400"><iconify-icon icon="ph:user-list" class="text-2xl mb-1"></iconify-icon><span class="text-[10px] font-medium">用戶</span></button>
+      </nav>
+    </div>
+  </div></div>
+
+  <!-- ───────────────────────── 回饋 ───────────────────────── -->
+  <h2 class="doc-h2" id="feedback">回饋狀態</h2>
+  <table class="doc-table">
+    <tr><th>情境</th><th>做法</th></tr>
+    <tr><td>Toast</td><td><span class="doc-c">ElMessage.success / error</span>（51 處）。文案例：「加入收藏成功！」「已取消收藏」「操作失敗，請稍後再試」「連結已複製到剪貼簿」</td></tr>
+    <tr><td>確認</td><td>多數用自製 <span class="doc-c">el-dialog width="90%" class="max-w-sm rounded-xl" align-center</span>（取消 + 紅色確定）；少數 <span class="doc-c">ElMessageBox.confirm</span></td></tr>
+    <tr><td>載入中</td><td>Iconify <span class="doc-c">line-md:loading-loop</span>（13 處）＋「努力載入中...」；登入頁按鈕文字改「登入中...」；OAuth 頁 <span class="doc-c">border-4 border-mygreen border-t-transparent animate-spin</span>；FAQ 用 <span class="doc-c">el-skeleton</span></td></tr>
+    <tr><td>列表結尾 / 空</td><td>「已經到底囉」、「找不到相關福利」（<span class="doc-c">mdi:package-variant-closed</span>）、「目前暫無常見問題資訊」（<span class="doc-c">mingcute:inbox-line</span>）</td></tr>
+    <tr><td>錯誤</td><td>表單下方 <span class="doc-c">text-red-500 text-xs text-center</span></td></tr>
+  </table>
+  <div class="demo-box"><div class="demo-label">載入中與空狀態</div><div class="demo">
+    <div class="grid grid-cols-3 gap-4 text-center text-gray-400 text-sm">
+      <p class="flex items-center justify-center gap-2"><iconify-icon icon="line-md:loading-loop" class="text-xl"></iconify-icon> 努力載入中...</p>
+      <div class="flex justify-center"><div class="w-10 h-10 border-4 border-mygreen border-t-transparent rounded-full animate-spin"></div></div>
+      <p><iconify-icon icon="mdi:package-variant-closed" class="text-4xl block mx-auto mb-2 text-gray-300"></iconify-icon>找不到相關福利</p>
+    </div>
+  </div></div>
+
+  <!-- ───────────────────────── 動態 ───────────────────────── -->
+  <h2 class="doc-h2" id="motion">動態效果</h2>
+  <table class="doc-table">
+    <tr><th>名稱</th><th>定義</th><th>用在</th></tr>
+    <tr><td><span class="doc-c">slide-up</span></td><td><span class="doc-c">all .3s cubic-bezier(0.34, 1.56, 0.64, 1)</span>；from <span class="doc-c">opacity:0; translateY(20px) scale(.95)</span>（帶回彈）</td><td>浮動聊天視窗、聊天內的家庭 / 歷史面板</td></tr>
+    <tr><td><span class="doc-c">fade</span></td><td><span class="doc-c">opacity .3s ease</span></td><td>FAB 提示泡泡</td></tr>
+    <tr><td><span class="doc-c">scale</span></td><td><span class="doc-c">transform .2s ease</span>，from <span class="doc-c">scale(0)</span></td><td>FAB 圖示切換</td></tr>
+    <tr><td>按壓</td><td><span class="doc-c">active:scale-95</span>（收藏心形 <span class="doc-c">active:scale-75</span>）</td><td>按鈕</td></tr>
+    <tr><td>Hover</td><td><span class="doc-c">hover:scale-110</span>、<span class="doc-c">transition-colors</span>、卡片 <span class="doc-c">hover:shadow-md</span>、標題 <span class="doc-c">group-hover:text-mygreen</span></td><td>圖示、卡片</td></tr>
+    <tr><td>下拉箭頭</td><td><span class="doc-c">transition-transform duration-300 rotate-180</span></td><td>篩選列、原文展開</td></tr>
+    <tr><td>持續動畫</td><td><span class="doc-c">animate-pulse</span>（在線綠點）、<span class="doc-c">animate-bounce</span> 三點錯開 0.1s（打字中）、<span class="doc-c">animate-spin</span></td><td>聊天、載入</td></tr>
+    <tr><td><span class="doc-c">animate-fade-in-down</span></td><td><span class="doc-c">fadeInDown .2s ease-out</span>（scoped CSS 自訂；同檔另有未使用的 slideDown）</td><td>篩選下拉</td></tr>
+  </table>
+
+  <!-- ───────────────────────── 圖示 ───────────────────────── -->
+  <h2 class="doc-h2" id="icons">圖示</h2>
+  <p class="doc-p">以 Iconify 的 <b>MingCute</b>（line 風格）為主，另混用 mdi（愛心、登入登出）、line-md（載入動畫）、logos / simple-icons（Google / LINE）、uil:share、ph / majesticons（底部導航）。以下為實際用到的圖示：</p>
+  <div class="icon-grid" id="icons-grid"></div>
+
+  <!-- ───────────────────────── 重做建議 ───────────────────────── -->
+  <h2 class="doc-h2" id="redo">重做時建議統一的地方</h2>
+  <table class="doc-table">
+    <tr><th>#</th><th>現況</th><th>建議</th></tr>
+    <tr><td>1</td><td>主綠三套（#92C700 / #84CC16 / #5A8700）＋多種 hover 色</td><td>定義一組完整色階（50–900），Tailwind 與元件庫共用同一份 token，禁止 <span class="doc-c">bg-[#hex]</span></td></tr>
+    <tr><td>2</td><td>燈號色三套（品牌色 / Tailwind 色 / RAG 卡）</td><td>建立 <span class="doc-c">success / warning / danger</span> 語意 token，燈號元件化（Dot、Pill、Avatar ring）</td></tr>
+    <tr><td>3</td><td>身分標籤白字對比不足</td><td>改淺底深字（如 <span class="doc-c">bg-orange-50 text-orange-700</span>）或加深底色</td></tr>
+    <tr><td>4</td><td>按鈕、對話框、手機頂列、空狀態在每頁重寫一次</td><td>抽成 Button / Dialog / PageHeader / EmptyState 元件</td></tr>
+    <tr><td>5</td><td>Element Plus 只用了一小部分，大多數 UI 手刻</td><td>二選一：全面用元件庫並客製主題，或拿掉 EP 改用 headless（如 Reka UI）＋自有元件</td></tr>
+    <tr><td>6</td><td>四個頁面在 Layout 外，自己補 Header</td><td>所有內頁統一進 Layout，用路由 meta 控制是否顯示導航</td></tr>
+    <tr><td>7</td><td>頭像 / Logo 用 4–5 MB 的 2048px 原圖</td><td>輸出 64 / 128 / 256px WebP</td></tr>
+    <tr><td>8</td><td>viewport 禁止縮放；篩選列、福利卡等少數可點元素用 <span class="doc-c">div @click</span>、圖示直接掛 @click</td><td>靠 16px 輸入字級避免 iOS 放大即可，移除 <span class="doc-c">user-scalable=no</span>；可點元素一律用 <span class="doc-c">&lt;button&gt;</span></td></tr>
+    <tr><td>9</td><td>標題中英混雜（Sign up / Register）</td><td>統一中文文案，登入頁標題改「登入」</td></tr>
+    <tr><td>10</td><td>沒有深色模式、沒有自訂字型</td><td>若要做，先把顏色全部 token 化；字型可考慮 Noto Sans TC / 圓體搭配手繪風品牌</td></tr>
+  </table>
+</main>
+</div>
+
+<script>
+const sw = (el, list) => document.getElementById(el).innerHTML = list.map(([name, hex, use, dark]) => `
+  <div class="sw"><div class="sw-chip" style="background:${hex};color:${dark ? '#fff' : '#111'}">${hex}</div>
+  <div class="sw-meta"><div class="sw-name">${name}</div><div class="sw-use">${use}</div></div></div>`).join('');
+
+sw('sw-theme', [
+  ['mygreen', '#92C700', '主色（Header、主按鈕、選中）', 1],
+  ['mygreen-200', '#73AA00', '幾乎未使用', 1],
+  ['mygreen-300', '#5A8700', '幾乎未使用', 1],
+  ['mygreen-400', '#5D7A00', '收藏圖示 hover', 1],
+  ['myorange', '#FF9538', '身分：年齡', 1],
+  ['myblue', '#3A90E0', '身分：性別', 1],
+  ['mypurple', '#E360DA', '身分：經濟', 1],
+  ['myblue-green', '#00D3A9', '身分：特殊身分', 1],
+  ['myyellow', '#FFEA53', '燈號：黃', 0],
+  ['myred', '#D06262', '燈號：紅', 1],
+  ['mygray-100', '#EDEDED', '已定義未使用', 0],
+  ['mygray-200', '#CAD1D5', '已定義未使用', 0],
+  ['mygray-300', '#7F8689', '已定義未使用', 1],
+]);
+sw('sw-el', [
+  ['--el-color-primary', '#5A8700', 'EP 主色', 1],
+  ['--el-color-primary-light-3', '#B3D84D', 'hover', 0],
+  ['--el-color-primary-light-5', '#C9E380', '', 0],
+  ['--el-color-primary-light-7', '#DFF0B3', '', 0],
+  ['--el-color-primary-light-8', '#E9F6CC', '', 0],
+  ['--el-color-primary-light-9', '#F4FAE6', '最淺底色', 0],
+  ['--el-color-primary-dark-2', '#759F00', 'active', 1],
+  ['--el-input-focus-border-color', '#92C700', '輸入框焦點', 1],
+]);
+sw('sw-hard', [
+  ['#84CC16 ×55', '#84CC16', '聊天、個人設定、註冊、FAQ 的主綠', 1],
+  ['#7DAB00 ×9', '#7DAB00', '主按鈕 hover', 1],
+  ['#06C755 ×3', '#06C755', 'LINE 官方綠（綁定 pill）', 1],
+  ['#F0FDF4', '#F0FDF4', 'AI 摘要卡漸層起點', 0],
+  ['#FCFCFC', '#FCFCFC', 'FAQ 桌機底色', 0],
+  ['#497606', '#497606', 'FAB hover', 1],
+  ['#10B981', '#10B981', 'LIFF 分享卡「查看詳情」按鈕', 1],
+  ['#4285F4', '#4285F4', 'Google 藍', 1],
+  ['#111827 / #374151 / #6B7280', '#374151', 'LIFF Flex 分享卡文字', 1],
+]);
+
+const ICONS = ['mingcute:search-line','mingcute:left-line','mingcute:right-line','mingcute:down-line','mingcute:arrow-left-line','mingcute:close-line','mingcute:check-line','mingcute:check-circle-fill','mingcute:close-circle-fill','mingcute:warning-fill','mingcute:delete-2-line','mingcute:edit-line','mingcute:add-circle-line','mingcute:lock-line','mingcute:mail-line','mingcute:mail-send-line','mingcute:eye-line','mingcute:eye-close-line','mingcute:home-6-line','mingcute:group-line','mingcute:group-fill','mingcute:user-3-line','mingcute:user-remove-line','mingcute:crown-line','mingcute:location-line','mingcute:time-line','mingcute:calendar-line','mingcute:birthday-2-line','mingcute:idcard-line','mingcute:tag-line','mingcute:question-line','mingcute:external-link-line','mingcute:list-check-line','mingcute:gift-2-line','mingcute:star-fill','mingcute:file-text-line','mingcute:ai-line','mingcute:book-2-line','mingcute:chat-2-line','mingcute:send-plane-fill','mingcute:history-line','mingcute:scan-line','mingcute:camera-line','mingcute:refresh-2-line','mingcute:more-2-fill','mingcute:exit-line','mingcute:inbox-line','mingcute:checkbox-line','mingcute:square-line','mingcute:line-app-fill','mingcute:google-fill','mdi:heart','mdi:heart-outline','mdi:login','mdi:logout','mdi:email-outline','mdi:package-variant-closed','mdi:chevron-down','line-md:loading-loop','logos:google-icon','simple-icons:line','uil:share','ph:user-list','ph:user-list-fill','majesticons:home-line','majesticons:home'];
+document.getElementById('icons-grid').innerHTML = ICONS.map(i => `<div class="icon-cell"><iconify-icon icon="${i}"></iconify-icon><span>${i}</span></div>`).join('');
+
+// 每個範例下方自動附上原始 HTML / class（可展開）
+document.querySelectorAll('.demo').forEach(demo => {
+  const box = demo.parentElement;
+  const btn = document.createElement('button');
+  btn.className = 'code-toggle';
+  btn.textContent = '▸ 原始 class';
+  const pre = document.createElement('pre');
+  pre.className = 'code';
+  pre.hidden = true;
+  pre.textContent = demo.innerHTML.replace(/^\s*\n/, '').replace(/\n\s*$/, '');
+  btn.onclick = () => { pre.hidden = !pre.hidden; btn.textContent = (pre.hidden ? '▸' : '▾') + ' 原始 class'; };
+  box.append(btn, pre);
+});
+</script>
+</body>
+</html>
