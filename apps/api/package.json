@@ -1,0 +1,36 @@
+{
+  "name": "@mou-welfare/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "dev:worker": "tsx watch --env-file-if-exists=.env src/worker.ts",
+    "build": "tsup",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "openapi": "tsx scripts/openapi.ts",
+    "check:openapi": "tsx scripts/openapi.ts --check"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "drizzle-kit": "^0.31.11",
+    "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.9",
+    "@hono/zod-openapi": "^1.6.3",
+    "@mou-welfare/shared": "workspace:*",
+    "better-auth": "^1.7.25",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.19",
+    "pg-boss": "^12.38.2",
+    "postgres": "^4.1.1",
+    "zod": "^4.6.7"
+  }
+}

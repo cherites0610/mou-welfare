@@ -1,0 +1,13 @@
+# 金門縣社會處（A 族，docs/scraper.md §4）
+id: kinmen
+city: 金門縣
+adapter: cms_a
+base_url: https://social.kinmen.gov.tw
+seeds:
+  - url: /Content_List.aspx?n=B709941748334ACA
+    label: 主題福利服務專區
+  - url: /Content_List.aspx?n=315869EEDF0D4401
+    label: 老人福利專區
+follow: 'Content_List\.aspx\?n=[0-9A-F]{16}'
+detail: '(cp|News_Content)\.aspx\?n=[0-9A-F]{16}(&s=[0-9A-F]{16})?'
+pagination: { param: page, max: 20 }

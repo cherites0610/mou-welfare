@@ -1,0 +1,76 @@
+# PR 檢查（docs/testing.md §9）。全部通過才能合併到 main。
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: typecheck / unit / contract / build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm --filter @mou-welfare/shared test
+      - name: 契約：ingest schema 與 Zod 一致
+        run: pnpm --filter @mou-welfare/shared check:schema
+      - name: 契約：openapi.json 與 API 一致
+        run: pnpm --filter @mou-welfare/api check:openapi
+      - run: pnpm build
+
+  api-integration:
+    name: api integration (Postgres + pgvector)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mou_welfare
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: mou_welfare_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U mou_welfare" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://mou_welfare:ci-only-password@localhost:5432/mou_welfare_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: 啟用擴充（與正式環境相同）
+        run: psql "$TEST_DATABASE_URL" -c 'create extension if not exists vector; create extension if not exists pg_trgm; create extension if not exists pgcrypto;'
+      - run: pnpm --filter @mou-welfare/api test
+
+  scraper:
+    name: scraper (ruff / mypy / pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/scraper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest
