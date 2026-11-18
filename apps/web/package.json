@@ -8,7 +8,8 @@
     "build": "nuxt build",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
-    "typecheck": "nuxt typecheck"
+    "typecheck": "nuxt typecheck",
+    "deploy": "wrangler deploy"
   },
   "dependencies": {
     "@element-plus/nuxt": "^1.1.5",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "typescript": "~5.9.3",
-    "vue-tsc": "^3.3.14"
+    "vue-tsc": "^3.3.14",
+    "wrangler": "^4.164.0"
   }
 }

@@ -1,0 +1,16 @@
+// v2 前端：Nuxt（Nitro cloudflare_module）部署到 Cloudflare Workers（docs/backend.md §10.2）
+// 部署：pnpm --filter @mou-welfare/web build && pnpm --filter @mou-welfare/web deploy
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mou-welfare-web",
+  "main": ".output/server/index.mjs",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".output/public", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  // 過渡期網域；正式切換時改為 mou-welfare.com（docs/backend.md §10.3）
+  "routes": [{ "pattern": "v2.mou-welfare.com", "custom_domain": true }],
+  "vars": {
+    "NUXT_PUBLIC_API_BASE": "https://api-v2.mou-welfare.com"
+  }
+}
