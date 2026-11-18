@@ -351,7 +351,7 @@ export interface LLM {
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
 | 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
 | HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
-| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址暫用 r2.dev；金鑰暫時沿用備份用 token 換算，見第 11 節）。完整定義見 `apps/api/src/env.ts` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`；金鑰暫時沿用備份用 token 換算，見第 11 節）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
 | 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。之後由 GitHub Actions 透過 SSH 觸發（尚未設定） |
@@ -401,9 +401,9 @@ export interface LLM {
 **需要你處理**
 - [x] ~~到 Cloudflare Dashboard 啟用 R2~~（已完成）
 - [x] ~~建立 bucket `mou-welfare-backups` 與 30 天 lifecycle 規則~~（已完成）
-- [x] ~~R2 上傳~~：2026-11-18 建立 bucket `mou-welfare-uploads`，開啟 r2.dev 公開網址，並以實際上傳、公開下載、刪除驗證通過。
+- [x] ~~R2 上傳~~：2026-11-18 建立 bucket `mou-welfare-uploads`，並以實際上傳、公開下載、刪除驗證通過。
 - [ ] **上傳金鑰改為專用 token**：目前依指示暫時沿用備份用的 token（S3 Access Key ID = token ID、Secret = sha256(token)），API 被入侵時也能動到備份。建議建立只限 `mou-welfare-uploads` 的 R2 token，更新 `api.env` 的 `R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`。
-- [ ] **公開網址改為自訂網域**（例如 `files.mou-welfare.com`）：r2.dev 有速率限制，Cloudflare 不建議用於正式環境；換網域後更新 `R2_PUBLIC_BASE_URL`（已上傳的頭像網址需一併更新）。
+- [x] ~~公開網址改為自訂網域~~：2026-11-18 綁定 `file.mou-welfare.com`（Cloudflare R2 自訂網域，TLS 1.2 以上），已實測讀取正常，並關閉 r2.dev 公開網址。
 - [ ] 在 Resend 驗證 `mou-welfare.com` 網域，`EMAIL_FROM` 改為正式寄件人
 - [ ] **作廢並重發（Roll）備份用的 API Token**：舊 token 在設定過程中外洩到對話紀錄。重發後填回 `~/.config/mou-welfare/backup.env`（`CLOUDFLARE_API_TOKEN=...`）；**若上傳仍沿用這把 token，`api.env` 的 `R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY` 也要重新換算**。
 - [x] ~~建立 R2 API Token 並填入 `backup.env`~~（已完成，但需重發，見上一項）
