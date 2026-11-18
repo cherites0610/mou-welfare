@@ -1,58 +1,62 @@
 # 後端設計文件（v2）
 
 > 狀態：設計定案，尚未實作（資料庫基礎設施已建立，見第 9 節）
-> 最後更新：2026-11-18
+> 最後更新：2026-11-18（API 部署改為自有主機）
 > 相關文件：[爬蟲設計](scraper.md)、[v1 文件](v1/)
 
 ---
 
 ## 1. 決策摘要
 
+> 2026-11-18 調整：**API 改部署在自有主機**（`postgres.cherites.org` 這台），前端 Nuxt 維持在 Cloudflare。目的是避開 Workers 的執行時間、CPU、常駐程序等限制。
+
 | 項目 | 決定 | 取代 v1 的 | 理由 |
 |---|---|---|---|
-| 部署 | **Cloudflare Workers**（Paid 方案） | 自架 Node | 不用管伺服器；台灣有 Cloudflare 機房；成本低 |
-| 前端 | **Nuxt**（SSR，Cloudflare preset） | Vue SPA | 重視 SEO，福利列表和詳情頁需要伺服器端渲染 |
-| API 框架 | **Hono** + `@hono/zod-openapi` | NestJS | 輕量，寫法就是一般函式，沒有 decorator 和 DI；Workers 原生支援 |
+| 前端 | **Nuxt**（SSR），部署在 **Cloudflare Workers** | Vue SPA（由主機上的 Caddy 提供） | 重視 SEO，伺服器端渲染在 Cloudflare 機房執行（台灣有機房），也分擔主機記憶體 |
+| API 部署 | **自有主機**（騰訊雲東京，2 vCPU / 2 GB），**pm2** 管理程序，**Caddy** 反向代理與自動 HTTPS | 同一台主機上的 pm2 + Caddy | 沒有 Workers 的 CPU 和時間限制；資料庫在同一台，延遲最低 |
+| API 框架 | **Hono** on Node（`@hono/node-server`）+ `@hono/zod-openapi` | NestJS | 輕量，寫法就是一般函式，沒有 decorator 和 DI；之後要搬到 Workers 也幾乎不用改 |
 | 驗證與型別 | **Zod**（`packages/shared`） | class-validator DTO | 前後端共用同一份 schema，路徑和參數對不上時編譯就會報錯 |
-| ORM | **Drizzle** | TypeORM | 型別嚴格、SQL 透明；避開 v1 的 `where: { x: undefined }` 撈到第一筆資料的陷阱 |
+| ORM | **Drizzle**（driver：`postgres`） | TypeORM | 型別嚴格、SQL 透明；避開 v1 的 `where: { x: undefined }` 撈到第一筆資料的陷阱 |
 | 登入 | **Better Auth** | 自己寫的 JWT 與 OAuth | 內建 Email 密碼、Google、LINE（含 ID Token 登入，可直接給 LIFF 用） |
-| 資料庫 | **自架 Postgres 16**（`postgres.cherites.org`），透過 **Hyperdrive** 連線 | 同一台主機 | 已在運作，不需額外費用；pgvector 和 pg_trgm 齊全 |
-| 快取與佇列 | **不用 Redis**：佇列改用 **Cloudflare Queues**，排程改用 **Cron Triggers**，暫存資料放 Postgres | Redis + BullMQ | 少維護一套服務；Workers 無法常駐 BullMQ worker |
-| 檔案 | **R2** | GCS | 沒有流量費，和 Workers 原生整合 |
-| LLM | **`@google/genai`**，外面包自己的 `lib/llm` 介面 | openai SDK + 自己解析 JSON | 只依賴官方 SDK；之後換模型只需新增一個實作檔 |
-| 爬蟲 | Python，部署在 **GCP asia-east1** | — | 需要台灣 IP、LibreOffice、長時間執行，Workers 做不到（見爬蟲文件） |
+| 資料庫 | **Postgres 16**，和 API 在同一台，透過 localhost 連線 | 同一台主機 | 已建立 `mou_welfare`；pgvector 和 pg_trgm 齊全 |
+| 佇列與排程 | **pg-boss**（佇列與 cron 都存在 Postgres） | Redis + BullMQ | 不需要 Redis；工作和業務資料在同一個資料庫，可以一起備份 |
+| 檔案 | **R2**（透過 S3 相容 API） | GCS | 沒有流量費；Nuxt 端也能直接取用 |
+| LLM | **`@google/genai`**，外面包自己的 `lib/llm` 介面 | openai SDK + 自己解析 JSON | 只依賴官方 SDK；之後換模型只需新增一個實作檔。主機在日本，不會遇到 Gemini 的地區限制 |
+| 爬蟲 | Python，部署在 **GCP asia-east1** | — | 需要台灣 IP（見爬蟲文件）；資料透過 API 推送，不直接連資料庫 |
 
 ---
 
 ## 2. 系統架構
 
 ```
-                     使用者（瀏覽器 / LINE LIFF）            LINE Platform
-                                │                                 │ webhook
-                                ▼                                 ▼
-┌──────────────────────────── Cloudflare ─────────────────────────────────────┐
-│                                                                              │
-│  web Worker（Nuxt SSR）── service binding ──▶ api Worker（Hono）              │
-│      mou-welfare.com                          api.mou-welfare.com            │
-│                                                  │   │   │                   │
-│                       ┌──────────────────────────┘   │   └──────────┐        │
-│                       ▼                              ▼              ▼        │
-│               Queues: welfare-structure        R2: uploads    AI Gateway ──▶ Gemini
-│                       notify                                                 │
-│                       ▼                                                      │
-│               consumer Worker（同一份程式碼的另一個入口）                      │
-│               Cron Triggers（截止日提醒、過期清理）                             │
-│                       │                                                      │
-│                       ▼                                                      │
-│                   Hyperdrive（連線池 + 查詢快取）                              │
-└───────────────────────┼──────────────────────────────────────────────────────┘
-                        ▼
-        Postgres 16 @ postgres.cherites.org（騰訊雲東京）
-        DB: mou_welfare（pgvector / pg_trgm / pgcrypto）
-                        ▲
-                        │ HTTPS（HMAC 簽章）POST /internal/ingest
-        爬蟲（Python）@ GCP asia-east1（台灣 IP）
+        使用者（瀏覽器 / LINE LIFF）                          LINE Platform
+                 │                                                 │ webhook
+                 ▼                                                 │
+┌──────── Cloudflare ────────┐                                     │
+│ web Worker（Nuxt SSR）       │                                     │
+│ mou-welfare.com             │                                     │
+│  ├─ 頁面渲染（SEO）           │                                     │
+│  └─ server 端呼叫 API ───────┼──────────┐                          │
+│ R2（使用者上傳的圖片）         │◀──┐      │                          │
+└─────────────────────────────┘   │      ▼                          ▼
+                                  │   ┌──────── 自有主機（騰訊雲東京）────────────┐
+                                  │   │ Caddy（HTTPS）api.mou-welfare.com         │
+                                  │   │   └▶ pm2: mou-welfare-v2-api（Hono）       │
+                                  └───┼──────  ├─ HTTP API / LINE webhook / SSE    │
+                                      │        └─ pm2: mou-welfare-v2-worker       │
+                                      │             （pg-boss：結構化、通知、cron） │
+                                      │                  │                         │
+                                      │   Postgres 16（localhost）DB: mou_welfare   │
+                                      │   每日備份 → 本機 + R2                      │
+                                      └──────────────────▲──────────────────────────┘
+                                                         │ HTTPS（HMAC 簽章）
+                                    爬蟲（Python）@ GCP asia-east1 ── POST /internal/ingest
+                                                                         Gemini API ◀─ worker / api
 ```
+
+**網域**
+- `mou-welfare.com`：Nuxt（Cloudflare）
+- `api.mou-welfare.com`：主機上的 Caddy，代理到 v2 API。過渡期間 v1 仍佔用這個網域，所以 v2 先用 `api-v2.mou-welfare.com`，切換方式見第 10 節。
 
 ---
 
@@ -62,16 +66,17 @@
 mou-welfare/
 ├── apps/
 │   ├── web/                    # Nuxt
-│   └── api/                    # Hono on Workers
-│       ├── wrangler.jsonc
+│   └── api/                    # Hono on Node（pm2）
+│       ├── ecosystem.config.cjs  # pm2：api 與 worker 兩個程序
 │       ├── drizzle.config.ts
 │       ├── drizzle/            # migrations
 │       └── src/
-│           ├── index.ts        # fetch handler（HTTP）+ queue handler + scheduled handler
+│           ├── server.ts       # HTTP 入口（@hono/node-server）
+│           ├── worker.ts       # 背景工作入口（pg-boss：queue consumer + cron）
 │           ├── app.ts          # 路由組裝、全域 middleware
-│           ├── env.ts          # Bindings 型別（HYPERDRIVE、R2、QUEUE、secrets）
+│           ├── env.ts          # 環境變數驗證（Zod，缺少必要值就拒絕啟動）
 │           ├── db/
-│           │   ├── client.ts   # 每個請求建立連線（Hyperdrive）
+│           │   ├── client.ts   # 連線池（postgres driver，連 localhost）
 │           │   └── schema/     # 依功能拆檔
 │           ├── features/
 │           │   ├── auth/       # Better Auth 設定、LIFF、profile
@@ -84,10 +89,11 @@ mou-welfare/
 │           │   ├── line-bot/   # webhook、回覆、Flex message
 │           │   ├── notify/
 │           │   └── ingest/     # 接收爬蟲資料 → Queue
-│           ├── jobs/           # Queue consumers、cron 工作
+│           ├── jobs/           # pg-boss 的工作處理函式與 cron 定義
 │           └── lib/
 │               ├── llm/        # 介面 + gemini.ts
 │               ├── auth.ts     # 取得 session、權限 helper
+│               ├── queue.ts    # pg-boss 封裝（send / work / schedule）
 │               ├── errors.ts
 │               └── storage.ts  # R2
 ├── packages/
@@ -104,18 +110,17 @@ mou-welfare/
 
 ---
 
-## 4. Cloudflare Workers 的限制與對策
+## 4. 部署環境的限制與對策
 
-| 限制 | 影響 | 對策 |
+| 項目 | 狀況 | 對策 |
 |---|---|---|
-| 免費方案每個請求只有 10ms CPU | Better Auth 的密碼雜湊（scrypt）一定會超過，社群有多起回報 | **使用 Workers Paid 方案**（每月 5 美元）；不要為了符合限制而降低雜湊強度 |
-| 不能有常駐程序 | 無法使用 BullMQ、pg-boss | **Cloudflare Queues** 處理非同步工作，**Cron Triggers** 處理排程 |
-| 非 Node 執行環境 | 部分 npm 套件不能用 | 開啟 `nodejs_compat`；選用的套件以支援 Workers 為準：Hono、Drizzle、`postgres`（driver）、Better Auth、`@google/genai` |
-| 每次呼叫最多 6 個同時連線 | 資料庫連線要節省 | 每個請求只開一個連線，交給 Hyperdrive 做連線池 |
-| Gemini 有地區限制 | 有社群回報從 Workers 呼叫 Gemini 出現「location error」（請求可能從不支援的地區送出，例如香港） | 所有 LLM 呼叫都經過 **Cloudflare AI Gateway**；若仍發生，固定 Worker 的執行位置。**P0 必須驗證** |
-| Better Auth 加 Hyperdrive | 有社群回報兩者搭配時連線異常 | **P0 必須驗證**。備案：Better Auth 改用直接連線（不經 Hyperdrive），或把資料庫換成 Neon，用它的 serverless driver |
-| 拿不到真實客戶端 IP（`X-Forwarded-For`） | 登入的限流規則會失準 | 改讀 `CF-Connecting-IP` header，在 Better Auth 設定中指定 |
-| 長時間的 LLM 生成 | 單一請求有時間限制 | 聊天用串流（SSE）；福利結構化一律放進 Queue 處理 |
+| 主機資源 | 2 vCPU、1.9 GB RAM、1.9 GB swap；同時跑 Postgres、v1 API、lexicon API、Caddy、Redis（v1 用）。2026-11-18 時已用約 1 GB，swap 用了 234 MB | v2 的 api 與 worker 各自用 pm2 的 `max_memory_restart: 300M` 限制；v1 下線後停掉 v1 API 和 Redis，可以釋放約 200 MB；持續觀察 swap 使用量 |
+| 單點故障 | 主機掛了，API 就停 | 每日備份本機加 R2；記錄重建步驟（見第 10 節）；Nuxt 在 Cloudflare，API 掛掉時頁面仍能顯示錯誤提示 |
+| 長時間工作 | LLM 結構化、批次通知 | 一律放進 pg-boss 由 worker 程序處理，API 程序只負責排入佇列 |
+| 聊天串流 | SSE 長連線經過 Cloudflare 和 Caddy | Caddy 的 `reverse_proxy` 對 SSE 加 `flush_interval -1`；API 網域若開啟 Cloudflare 代理，要確認串流不會被緩衝 |
+| Nuxt on Workers | 伺服器端渲染時呼叫 API 會跨區到東京 | 熱門頁面（福利列表、詳情）用 Nuxt 的路由規則做 SWR 快取；登入後的個人化資料改由瀏覽器端呼叫 |
+| 真實客戶端 IP | 經過 Cloudflare 和 Caddy，IP 會被換掉 | Caddy 設定 `trusted_proxies` 為 Cloudflare 的 IP 段；Better Auth 的限流讀 `CF-Connecting-IP` |
+| 與 v1 共存 | v1 API 在同一台主機的 5009 port | v2 用不同 port（5030）和不同的 pm2 名稱（`mou-welfare-v2-*`）；兩者使用不同資料庫 |
 
 ---
 
@@ -268,29 +273,29 @@ export interface LLM {
 }
 ```
 
-- **實作**：`gemini.ts`（`@google/genai`），全部經過 AI Gateway，可以快取、限流、看用量。
+- **實作**：`gemini.ts`（`@google/genai`）。可選擇經過 Cloudflare AI Gateway 來看用量和做快取，但不是必要。
 - **結構化輸出**：用 `z.toJSONSchema()` 把 Zod schema 轉成 Gemini 的 `responseSchema`，回傳後再用 Zod 驗證；不合格就重試一次，帶上錯誤訊息。
 - **Embedding**：用 Gemini 的 embedding 模型輸出 768 維（實作時確認模型支援自訂輸出維度）。
 
 | 用途 | 時機 | 執行位置 |
 |---|---|---|
-| 福利結構化 | 爬蟲送來新增或更新的資料 | Queue consumer |
-| Embedding | 結構化完成後 | 同一個 consumer |
-| 阿哞聊天（RAG） | 使用者發問 → 向量搜尋取前 k 筆，加上資格比對 → 串流回答 | api Worker（SSE） |
+| 福利結構化 | 爬蟲送來新增或更新的資料 | worker（pg-boss） |
+| Embedding | 結構化完成後 | 同一個 worker 工作 |
+| 阿哞聊天（RAG） | 使用者發問 → 向量搜尋取前 k 筆，加上資格比對 → 串流回答 | api 程序（SSE） |
 
 ### 8.4 背景工作
 
 | 名稱 | 類型 | 內容 |
 |---|---|---|
-| `welfare-structure` | Queue | 結構化、embedding、寫回資料庫；失敗重試 3 次後進入 dead letter queue |
-| `notify` | Queue | Email（Resend）、LINE push |
-| `deadline-reminder` | Cron（每日） | 通知收藏的福利即將截止 |
-| `expire` | Cron（每日） | 把超過截止日的福利標為 `expired` |
-| `cleanup` | Cron（每週） | 清除過期的邀請碼、session、verification |
+| `welfare-structure` | pg-boss 佇列 | 結構化、embedding、寫回資料庫；失敗重試 3 次（指數退避），之後進入 dead letter |
+| `notify` | pg-boss 佇列 | Email（Resend）、LINE push |
+| `deadline-reminder` | pg-boss cron（每日） | 通知收藏的福利即將截止 |
+| `expire` | pg-boss cron（每日） | 把超過截止日的福利標為 `expired` |
+| `cleanup` | pg-boss cron（每週） | 清除過期的邀請碼、session、verification |
 
 ### 8.5 LINE Bot
 
-- **驗證**：webhook 收到後先驗證簽章，再用 `ctx.waitUntil()` 非同步處理，立即回應 200。
+- **驗證**：webhook 收到後先驗證簽章，把事件排入 pg-boss 佇列後立即回應 200，回覆由 worker 處理：優先用 reply token 回覆（有時效限制），來不及時改用 push API。
 - **已綁定的使用者**：交給聊天服務回答，回覆文字加上福利 Flex carousel。
 - **未綁定的使用者**：引導到 LIFF 登入，並推薦福利。
 
@@ -316,22 +321,50 @@ export interface LLM {
 
 **已知限制**
 - `mou_welfare` 帳號可以連線到同一台主機上的 `pet-erp`、`lexicon`、`mou-welfare`，因為這些資料庫保留了預設的 PUBLIC CONNECT 權限。實測**任何資料表都不可讀，也無法建立物件**。若要完全拒絕連線，需要在 `pg_hba.conf` 加一條 `reject` 規則（尚未執行，見第 11 節）。
-- 5432 port 目前對外開放（`pg_hba` 允許 `0.0.0.0/0` 用密碼連線，`ufw` 未啟用）。依目前決定**暫不變更**，之後改用 Cloudflare Tunnel 加 Hyperdrive，就能關閉對外開放。
+- 5432 port 目前對外開放（`pg_hba` 允許 `0.0.0.0/0` 用密碼連線，`ufw` 未啟用）。依目前決定**暫不變更**。API 改部署在同一台主機後，v2 不再需要從外部連資料庫，之後可以關閉對外開放（見第 11 節）。
 
 ---
 
 ## 10. 部署
 
-| 元件 | 方式 |
-|---|---|
-| web / api / consumer | `wrangler deploy`，分 `dev`、`prod` 兩個環境；由 GitHub Actions 在合併到 `main` 時部署 |
-| Secrets | `wrangler secret put`：`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`RESEND_API_KEY`、`INGEST_HMAC_KEY` |
-| 資料庫連線 | Hyperdrive 設定指向 `postgres.cherites.org:5432/mou_welfare`（`sslmode=require`）；之後改成 Tunnel 時只需改 Hyperdrive 設定 |
-| Migration | CI 中執行 `drizzle-kit migrate`（直接連資料庫，不經過 Hyperdrive） |
-| 網域 | `mou-welfare.com` 指向 web；`api.mou-welfare.com` 指向 api |
-| 監控 | Workers Logs 和 Analytics；錯誤追蹤可選 Sentry（有 Cloudflare 的整合套件） |
+### 10.1 API（自有主機）
 
-**預估月費（初期）**：Workers Paid 5 美元；R2、Queues、Hyperdrive 在免費額度內；資料庫用現有主機不另計；Gemini 依用量計費。
+| 項目 | 做法 |
+|---|---|
+| 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
+| 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1）、`mou-welfare-v2-worker`；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
+| HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`RESEND_API_KEY`、`INGEST_HMAC_KEY`、`R2_*` |
+| 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
+| Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
+| 部署流程 | GitHub Actions 在 `main` 更新時，透過 SSH 執行 `deploy.sh`：`git pull` → `pnpm install --frozen-lockfile` → build → migrate → `pm2 reload`（不中斷服務）。失敗時保留舊版本 |
+| 日誌 | pm2 日誌加上 pm2-logrotate（主機上已安裝） |
+| 監控 | 外部定時檢查 `/health`（例如 UptimeRobot 或 Cloudflare Health Checks）；錯誤追蹤可選 Sentry |
+
+### 10.2 前端（Cloudflare）
+
+| 項目 | 做法 |
+|---|---|
+| 部署 | `wrangler deploy`（Nitro 的 Cloudflare preset），由 GitHub Actions 在 `main` 更新時執行 |
+| 呼叫 API | 伺服器端渲染時呼叫 `https://api.mou-welfare.com`（環境變數 `NUXT_API_BASE`）；瀏覽器端也呼叫同一個網域，靠 Better Auth 的 cookie 帶登入狀態（cookie 網域設為 `.mou-welfare.com`） |
+| 網域 | `mou-welfare.com` 從 Caddy 改指向 Cloudflare Workers（切換時才改） |
+
+### 10.3 從 v1 切換到 v2
+
+1. v2 在 `api-v2.mou-welfare.com` 和 Workers 的預覽網址上完成測試。
+2. 搬移 v1 資料（範圍見第 11 節）。
+3. 切換網域：`mou-welfare.com` 指向 Workers；Caddy 的 `api.mou-welfare.com` 改代理到 5030。
+4. 觀察一週，沒有問題就停掉 v1：pm2 刪除 `mou-welfare-api`，停用 Redis，刪除 v1 的兩個 worktree，Caddyfile 移除 v1 設定。
+
+### 10.4 v1 正式環境現況（2026-11-18 修復後）
+
+| 元件 | 位置 |
+|---|---|
+| API | pm2 `mou-welfare-api`，執行 `~/Project/mou-welfare-v1/api/dist/main.js`（git worktree，`c1ba047` 加上綁定 HOST 的修改），port 5009 |
+| 前端 | Caddy 提供 `~/Project/mou-welfare-v1-web/web/dist`（git worktree，`v1-web`），build 時沒有 `VITE_LIFF_ID` |
+| 注意 | v1 的 `.env` 設定了 `DB_SYNC=true`，**不要在 v1 上部署其他版本**，否則 TypeORM 會自動修改資料表結構 |
+
+**預估月費**：前端用 Cloudflare Workers（先用免費方案，SSR 若超出 CPU 限制再升級 Paid，每月 5 美元）；R2 在免費額度內；主機為現有資源；Gemini 依用量計費。
 
 ---
 
@@ -346,14 +379,16 @@ export interface LLM {
 
 **之後再決定**
 - [ ] `pg_hba.conf` 加入規則，限制 `mou_welfare` 只能連自己的資料庫。
-- [ ] 改用 Cloudflare Tunnel 加 Hyperdrive，關閉 5432 對外開放。
+- [ ] 關閉 5432 對外開放：API 和資料庫在同一台，爬蟲也透過 API 推資料，所以資料庫只需要聽 localhost（另外兩個專案若需要遠端連線，可改用 Tailscale，主機上已有）。
 - [ ] pgvector 要不要升級：改用 PostgreSQL 官方的 PGDG 套件庫，可以裝到較新的版本（目前 0.6.0 已夠用）。
 - [ ] 從 v1 資料庫 `mou-welfare` 搬資料（使用者、家庭、收藏）的範圍和方式。
+- [ ] v1 前端的 `VITE_LIFF_ID`（知道的話可以重新 build v1，讓 LINE 內自動登入恢復）。
 
 **P0 原型必須驗證**
-- [ ] Better Auth 加 Hyperdrive 加 Drizzle 在 Workers 上能正常運作（註冊、登入、LINE ID Token 登入）。
-- [ ] 從 Workers 經 AI Gateway 呼叫 Gemini，沒有地區錯誤。
-- [ ] 東京資料庫加 Hyperdrive 的 API 延遲（目標 p95 < 300ms）。
+- [ ] Nuxt 在 Workers 上做伺服器端渲染並呼叫東京的 API，熱門頁面的 TTFB（目標 p95 < 500ms，有快取時 < 100ms）。
+- [ ] Better Auth 的 cookie 在 `mou-welfare.com`（Workers）和 `api.mou-welfare.com`（主機）之間能正常共用，包括 LIFF 的 ID Token 登入。
+- [ ] SSE 串流經過 Cloudflare 和 Caddy 不會被緩衝。
+- [ ] v2 api 加 worker 的記憶體用量（目標合計 < 300 MB）。
 
 ---
 
@@ -361,17 +396,16 @@ export interface LLM {
 
 | 階段 | 內容 | 完成標準 |
 |---|---|---|
-| **P0 骨架與驗證** | monorepo（pnpm）、`packages/shared`、api Worker（Hono + Drizzle + Better Auth + Hyperdrive）、Gemini 經 AI Gateway 呼叫測試 | 第 11 節三項驗證全部通過，或確定改走備案 |
+| **P0 骨架與驗證** | monorepo（pnpm）、`packages/shared`、API（Hono + Drizzle + Better Auth + pg-boss）部署到 `api-v2.mou-welfare.com`、Nuxt 骨架部署到 Workers | 第 11 節四項驗證全部通過 |
 | **P1 核心 API** | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出 |
-| **P2 資料流** | `/internal/ingest`、Queue 結構化、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到 |
+| **P2 資料流** | `/internal/ingest`、pg-boss 結構化、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到 |
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | — |
-| **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、Cron 工作 | — |
-| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、正式部署 | — |
+| **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | — |
+| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用 |
 
 ---
 
 ## 參考來源
 
 - [Better Auth – LINE](https://better-auth.com/docs/authentication/line)、[Better Auth – Cloudflare Guide](https://better-auth.com/docs/guides/cloudflare.md)、[Hono – Better Auth on Cloudflare](https://hono.dev/examples/better-auth-on-cloudflare)
-- [Cloudflare AI Gateway – Google AI Studio](https://developers.cloudflare.com/ai-gateway/usage/providers/google-ai-studio)
-- 社群回報：[Workers CPU exceeded（Better Auth）](https://answeroverflow.com/m/1344293536778031144)、[Better Auth + Hyperdrive](https://www.answeroverflow.com/m/1357795265108512808)、[Gemini location error from Workers](https://discuss.ai.google.dev/t/gemini-api-location-error-400-when-called-from-cloudflare-workers/188368)
+- 先前評估 API 部署在 Workers 時的參考（已改為自有主機）：[Workers CPU exceeded（Better Auth）](https://answeroverflow.com/m/1344293536778031144)、[Better Auth + Hyperdrive](https://www.answeroverflow.com/m/1357795265108512808)、[Gemini location error from Workers](https://discuss.ai.google.dev/t/gemini-api-location-error-400-when-called-from-cloudflare-workers/188368)、[Cloudflare AI Gateway – Google AI Studio](https://developers.cloudflare.com/ai-gateway/usage/providers/google-ai-studio)
