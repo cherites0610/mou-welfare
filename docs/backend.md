@@ -354,7 +354,7 @@ export interface LLM {
 | 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`；金鑰暫時沿用備份用 token 換算，見第 11 節）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
-| 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。之後由 GitHub Actions 透過 SSH 觸發（尚未設定） |
+| 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。GitHub Actions（`deploy.yml`）在 CI 通過後透過 SSH 傳入 commit SHA 觸發，設定見 `docs/deploy-setup.md` |
 | 日誌 | pm2 日誌加上 pm2-logrotate（主機上已安裝） |
 | 監控 | 外部定時檢查 `/health`（例如 UptimeRobot 或 Cloudflare Health Checks）；錯誤追蹤可選 Sentry |
 
@@ -367,13 +367,13 @@ export interface LLM {
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 170 MB），已 `pm2 save` |
 | Caddy | ✅ 已加入 `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied）；Caddy 已取得憑證，外部測試 `/health` 為 ok（2026-11-18）。DNS 以 telegram-bot 專案的 Cloudflare token 建立（經使用者同意） |
-| 自動部署 | ⏸ GitHub Actions 透過 SSH 部署尚未設定 |
+| 自動部署 | ⏸ `deploy.yml` 已加入；需依 `docs/deploy-setup.md` 設定 SSH 金鑰與 secrets |
 
 ### 10.2 前端（Cloudflare）
 
 | 項目 | 做法 |
 |---|---|
-| 部署 | `pnpm --filter @mou-welfare/web build && pnpm --filter @mou-welfare/web deploy`（`apps/web/wrangler.jsonc`，Worker 名稱 `mou-welfare-web`）。之後由 GitHub Actions 在 `main` 更新時執行（尚未設定） |
+| 部署 | `pnpm --filter @mou-welfare/web build && pnpm --filter @mou-welfare/web deploy`（`apps/web/wrangler.jsonc`，Worker 名稱 `mou-welfare-web`）。GitHub Actions（`deploy.yml`）在 CI 通過後自動部署，設定見 `docs/deploy-setup.md` |
 | 呼叫 API | 環境變數 `NUXT_PUBLIC_API_BASE`（目前為 `https://api-v2.mou-welfare.com`）。瀏覽器以 `credentials: 'include'` 呼叫，API 以 CORS 只允許 `TRUSTED_ORIGINS` 帶 cookie。session cookie 屬於 API 網域，所以登入相關與個人頁面設為只在瀏覽器渲染（`routeRules` 的 `ssr: false`）；公開頁面（福利列表、詳情）維持 SSR |
 | 網域 | 過渡期為 `v2.mou-welfare.com`（Workers 自訂網域）；正式切換時改為 `mou-welfare.com`（目前仍由 Caddy 提供 v1） |
 | 目前狀態 | ✅ 2026-11-19 部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 已加入 `https://v2.mou-welfare.com` |

@@ -236,7 +236,8 @@ API 執行 `pm2 reload` 之後：
 - [x] ~~在主機的 Postgres 建立 `mou_welfare_test`~~（2026-11-18 完成：擁有者為 `mou_welfare`，已啟用 `vector 0.6.0`、`pg_trgm 1.6`、`pgcrypto 1.3`；帳密已加入 `~/.pgpass`）
 - [x] ~~主機安裝 `uv`~~（2026-11-18 完成：`uv 0.13.9`，安裝在 `~/.local/bin`，並在 `~/.zshenv` 加入 PATH；已實測 `uv run pytest`）
 - [x] ~~建立 `.github/workflows/ci.yml`（PR）~~（P0 骨架已加入：typecheck、單元、契約、API 整合（pgvector 容器）、爬蟲 ruff / mypy / pytest、build）
-- [ ] `deploy.yml`（main）、`nightly.yml`（部署與 E2E 建立後再加）
+- [x] ~~`deploy.yml`~~：CI 通過後自動部署 API（SSH forced command）與前端（Workers），並做正式環境煙霧測試；secrets 設定見 `docs/deploy-setup.md`
+- [ ] `nightly.yml`（E2E 需要 staging 環境與測試信箱後再加）
 - [ ] GitHub 上 `main` 分支的保護規則。
 - [ ] 建立 staging 用的 LINE 和 Google OAuth 測試應用程式。
 

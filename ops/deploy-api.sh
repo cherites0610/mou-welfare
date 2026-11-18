@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 部署 v2 API 到自有主機（docs/backend.md §10.1）。
 # 在主機上執行：~/apps/mou-welfare-v2/ops/deploy-api.sh [git-ref，預設 origin/main]
+# GitHub Actions 透過 SSH（authorized_keys 的 command= 限定只能執行本腳本）傳入要部署的 commit SHA。
 #
 # 流程：拉取 → 安裝 → build → migration → pm2 reload → 煙霧測試（docs/testing.md §9.2）
 # 煙霧測試失敗時退回上一個版本並重新 reload。注意：migration 不會自動回復，
@@ -9,7 +10,17 @@ set -euo pipefail
 
 DEPLOY_DIR="${DEPLOY_DIR:-$HOME/apps/mou-welfare-v2}"
 ENV_FILE="${ENV_FILE:-$HOME/.config/mou-welfare/api.env}"
+# 部署目標：參數 > SSH forced command 傳入的 commit SHA（GitHub Actions）> origin/main
 REF="${1:-origin/main}"
+if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
+  # 透過 authorized_keys 的 command= 執行時，只接受完整的 40 碼 SHA，其他內容一律拒絕
+  if [[ "$SSH_ORIGINAL_COMMAND" =~ ^[0-9a-f]{40}$ ]]; then
+    REF="$SSH_ORIGINAL_COMMAND"
+  else
+    echo "rejected: expected a 40-char commit SHA" >&2
+    exit 2
+  fi
+fi
 APP=mou-welfare-v2-api
 PORT="$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2)"
 BASE="http://127.0.0.1:${PORT:-5030}"
@@ -44,6 +55,7 @@ smoke() {
 cd "$DEPLOY_DIR"
 PREV="$(git rev-parse HEAD)"
 git fetch --quiet origin
+git cat-file -e "$REF^{commit}" 2>/dev/null || { log "unknown ref: $REF"; exit 2; }
 git reset --quiet --hard "$REF"
 NEXT="$(git rev-parse HEAD)"
 log "deploying ${PREV:0:7} -> ${NEXT:0:7}"
