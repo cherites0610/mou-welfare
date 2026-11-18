@@ -14,6 +14,8 @@ const EnvSchema = z.object({
     .default('')
     .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean)),
   INGEST_HMAC_KEY: z.string().min(32, '至少 32 字元'),
+  /** 背景工作的執行方式：inline＝在 API 程序內；separate＝由 src/worker.ts 獨立程序；off＝不執行（測試用） */
+  WORKER_MODE: z.enum(['inline', 'separate', 'off']).default('inline'),
 })
 
 export type Env = z.infer<typeof EnvSchema>

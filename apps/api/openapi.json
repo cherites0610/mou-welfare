@@ -119,9 +119,17 @@
                         "null"
                       ]
                     },
-                    "worker": {
+                    "jobs": {
                       "type": "object",
                       "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "inline",
+                            "separate",
+                            "off"
+                          ]
+                        },
                         "lastBeatSecondsAgo": {
                           "type": [
                             "number",
@@ -130,6 +138,7 @@
                         }
                       },
                       "required": [
+                        "mode",
                         "lastBeatSecondsAgo"
                       ]
                     }
@@ -138,7 +147,7 @@
                     "status",
                     "db",
                     "migration",
-                    "worker"
+                    "jobs"
                   ]
                 }
               }
@@ -172,9 +181,17 @@
                         "null"
                       ]
                     },
-                    "worker": {
+                    "jobs": {
                       "type": "object",
                       "properties": {
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "inline",
+                            "separate",
+                            "off"
+                          ]
+                        },
                         "lastBeatSecondsAgo": {
                           "type": [
                             "number",
@@ -183,6 +200,7 @@
                         }
                       },
                       "required": [
+                        "mode",
                         "lastBeatSecondsAgo"
                       ]
                     }
@@ -191,7 +209,7 @@
                     "status",
                     "db",
                     "migration",
-                    "worker"
+                    "jobs"
                   ]
                 }
               }

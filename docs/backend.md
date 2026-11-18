@@ -43,15 +43,15 @@
                                   │   │ Caddy（HTTPS）api.mou-welfare.com         │
                                   │   │   └▶ pm2: mou-welfare-v2-api（Hono）       │
                                   └───┼──────  ├─ HTTP API / LINE webhook / SSE    │
-                                      │        └─ pm2: mou-welfare-v2-worker       │
-                                      │             （pg-boss：結構化、通知、cron） │
+                                      │        └─ 背景工作（同一程序，pg-boss：     │
+                                      │           結構化、通知、cron）             │
                                       │                  │                         │
                                       │   Postgres 16（localhost）DB: mou_welfare   │
                                       │   每日備份 → 本機 + R2                      │
                                       └──────────────────▲──────────────────────────┘
                                                          │ HTTPS（HMAC 簽章）
                                     爬蟲（Python）@ GCP asia-east1 ── POST /internal/ingest
-                                                                         Gemini API ◀─ worker / api
+                                                                         Gemini API ◀─ api 程序
 ```
 
 **網域**
@@ -67,12 +67,12 @@ mou-welfare/
 ├── apps/
 │   ├── web/                    # Nuxt
 │   └── api/                    # Hono on Node（pm2）
-│       ├── ecosystem.config.cjs  # pm2：api 與 worker 兩個程序
+│       ├── ecosystem.config.cjs  # pm2：預設只有 api 一個程序
 │       ├── drizzle.config.ts
 │       ├── drizzle/            # migrations
 │       └── src/
 │           ├── server.ts       # HTTP 入口（@hono/node-server）
-│           ├── worker.ts       # 背景工作入口（pg-boss：queue consumer + cron）
+│           ├── worker.ts       # 獨立背景工作入口，只在 WORKER_MODE=separate 時使用
 │           ├── app.ts          # 路由組裝、全域 middleware
 │           ├── env.ts          # 環境變數驗證（Zod，缺少必要值就拒絕啟動）
 │           ├── db/
@@ -89,7 +89,7 @@ mou-welfare/
 │           │   ├── line-bot/   # webhook、回覆、Flex message
 │           │   ├── notify/
 │           │   └── ingest/     # 接收爬蟲資料 → Queue
-│           ├── jobs/           # pg-boss 的工作處理函式與 cron 定義
+│           ├── jobs/           # pg-boss 的工作處理函式與 cron 定義；startJobs() 由 server.ts 或 worker.ts 呼叫
 │           └── lib/
 │               ├── llm/        # 介面 + gemini.ts
 │               ├── auth.ts     # 取得 session、權限 helper
@@ -114,12 +114,13 @@ mou-welfare/
 
 | 項目 | 狀況 | 對策 |
 |---|---|---|
-| 主機資源 | 2 vCPU、1.9 GB RAM、1.9 GB swap；同時跑 Postgres、v1 API、lexicon API、Caddy、Redis（v1 用）。2026-11-18 時已用約 1 GB，swap 用了 234 MB | v2 的 api 與 worker 各自用 pm2 的 `max_memory_restart: 300M` 限制；v1 下線後停掉 v1 API 和 Redis，可以釋放約 200 MB；持續觀察 swap 使用量 |
+| 主機資源 | 2 vCPU、1.9 GB RAM、1.9 GB swap；同時跑 Postgres、v1 API、lexicon API、Caddy、Redis（v1 用）。2026-11-18 時已用約 1 GB，swap 用了 234 MB | v2 預設只跑一個程序（背景工作在 API 程序內，實測 150 MB），以 pm2 `max_memory_restart: 300M` 限制；v1 下線後停掉 v1 API 和 Redis，可以釋放約 200 MB；持續觀察 swap 使用量 |
 | 單點故障 | 主機掛了，API 就停 | 每日備份本機加 R2；記錄重建步驟（見第 10 節）；Nuxt 在 Cloudflare，API 掛掉時頁面仍能顯示錯誤提示 |
-| 長時間工作 | LLM 結構化、批次通知 | 一律放進 pg-boss 由 worker 程序處理，API 程序只負責排入佇列 |
+| 長時間工作 | LLM 結構化、批次通知 | 一律放進 pg-boss 佇列，由同一程序內的背景工作處理；結構化的同時處理數設為 1–2，避免影響 API 回應。工作量變大時改 `WORKER_MODE=separate` 拆成獨立程序（不需改程式） |
 | 聊天串流 | SSE 長連線經過 Cloudflare 和 Caddy | Caddy 的 `reverse_proxy` 對 SSE 加 `flush_interval -1`；API 網域若開啟 Cloudflare 代理，要確認串流不會被緩衝 |
 | Nuxt on Workers | 伺服器端渲染時呼叫 API 會跨區到東京 | 熱門頁面（福利列表、詳情）用 Nuxt 的路由規則做 SWR 快取；登入後的個人化資料改由瀏覽器端呼叫 |
 | 真實客戶端 IP | 經過 Cloudflare 和 Caddy，IP 會被換掉 | Caddy 設定 `trusted_proxies` 為 Cloudflare 的 IP 段；Better Auth 的限流讀 `CF-Connecting-IP` |
+| 背景工作模式 | 預設 `WORKER_MODE=inline`：pg-boss 在 API 程序內處理佇列與 cron，省下一個程序（約 120 MB）；代價是 API 重啟時進行中的工作會中斷 | pg-boss 自動重試，工作設計為冪等（重複執行結果不變）；`/health` 回報 `jobs.mode` 與心跳 |
 | 與 v1 共存 | v1 API 在同一台主機的 5009 port | v2 用不同 port（5030）和不同的 pm2 名稱（`mou-welfare-v2-*`）；兩者使用不同資料庫 |
 
 ---
@@ -279,8 +280,8 @@ export interface LLM {
 
 | 用途 | 時機 | 執行位置 |
 |---|---|---|
-| 福利結構化 | 爬蟲送來新增或更新的資料 | worker（pg-boss） |
-| Embedding | 結構化完成後 | 同一個 worker 工作 |
+| 福利結構化 | 爬蟲送來新增或更新的資料 | 背景工作（pg-boss） |
+| Embedding | 結構化完成後 | 同一個背景工作 |
 | 阿哞聊天（RAG） | 使用者發問 → 向量搜尋取前 k 筆，加上資格比對 → 串流回答 | api 程序（SSE） |
 
 ### 8.4 背景工作
@@ -295,7 +296,7 @@ export interface LLM {
 
 ### 8.5 LINE Bot
 
-- **驗證**：webhook 收到後先驗證簽章，把事件排入 pg-boss 佇列後立即回應 200，回覆由 worker 處理：優先用 reply token 回覆（有時效限制），來不及時改用 push API。
+- **驗證**：webhook 收到後先驗證簽章，把事件排入 pg-boss 佇列後立即回應 200，回覆由背景工作處理：優先用 reply token 回覆（有時效限制），來不及時改用 push API。
 - **已綁定的使用者**：交給聊天服務回答，回覆文字加上福利 Flex carousel。
 - **未綁定的使用者**：引導到 LIFF 登入，並推薦福利。
 
@@ -332,7 +333,7 @@ export interface LLM {
 | 項目 | 做法 |
 |---|---|
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
-| 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1）、`mou-welfare-v2-worker`；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
+| 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
 | HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
 | 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`RESEND_API_KEY`、`INGEST_HMAC_KEY`、`R2_*` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
@@ -388,7 +389,7 @@ export interface LLM {
 - [ ] Nuxt 在 Workers 上做伺服器端渲染並呼叫東京的 API，熱門頁面的 TTFB（目標 p95 < 500ms，有快取時 < 100ms）。
 - [ ] Better Auth 的 cookie 在 `mou-welfare.com`（Workers）和 `api.mou-welfare.com`（主機）之間能正常共用，包括 LIFF 的 ID Token 登入。
 - [ ] SSE 串流經過 Cloudflare 和 Caddy 不會被緩衝。
-- [ ] v2 api 加 worker 的記憶體用量（目標合計 < 300 MB）。
+- [x] ~~v2 的記憶體用量~~：2026-11-18 實測，合併為單一程序後為 150 MB（原本 api 加 worker 兩個程序合計 272 MB）。
 
 ---
 

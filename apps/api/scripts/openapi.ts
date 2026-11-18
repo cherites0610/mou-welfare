@@ -11,6 +11,7 @@ const env = loadEnv({
   BETTER_AUTH_SECRET: 'openapi-generation-only-not-a-real-secret-7f3a9c',
   BETTER_AUTH_URL: 'http://localhost:5030',
   INGEST_HMAC_KEY: 'openapi-generation-only-not-a-real-key-1b8e4d',
+  WORKER_MODE: 'off',
 })
 const { db, sql } = createDb(env.DATABASE_URL, { max: 1 })
 const app = createApp({ db, auth: createAuth(db, env), env })

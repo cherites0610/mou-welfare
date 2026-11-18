@@ -1,32 +1,21 @@
-// 背景工作程序：pg-boss consumer + cron，並每 15 秒寫入心跳供 /health 檢查。
-import { sql as dsql } from 'drizzle-orm'
+// 獨立的背景工作程序，只在 WORKER_MODE=separate 時使用（預設 inline 由 API 程序執行）。
 import { createDb } from './db/client.ts'
-import { workerHeartbeat } from './db/schema/index.ts'
 import { loadEnv } from './env.ts'
-import { createBoss } from './lib/queue.ts'
-
-export const HEARTBEAT_NAME = 'worker'
-export const HEARTBEAT_MS = 15_000
+import { startJobs } from './jobs/index.ts'
 
 const env = loadEnv()
-const { db, sql } = createDb(env.DATABASE_URL, { max: 3 })
-const boss = await createBoss(env.DATABASE_URL)
-
-// TODO(P2)：welfare-structure、notify 的處理函式；TODO(P4)：deadline-reminder 等 cron
-async function beat() {
-  await db
-    .insert(workerHeartbeat)
-    .values({ name: HEARTBEAT_NAME })
-    .onConflictDoUpdate({ target: workerHeartbeat.name, set: { beatAt: dsql`now()` } })
+if (env.WORKER_MODE !== 'separate') {
+  console.error(`WORKER_MODE=${env.WORKER_MODE}：背景工作由 API 程序執行，不需要啟動 worker`)
+  process.exit(1)
 }
-await beat()
-const timer = setInterval(() => beat().catch((e) => console.error('[heartbeat]', e)), HEARTBEAT_MS)
+
+const { db, sql } = createDb(env.DATABASE_URL, { max: 3 })
+const jobs = await startJobs({ db, databaseUrl: env.DATABASE_URL })
 console.log('worker started')
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, async () => {
-    clearInterval(timer)
-    await boss.stop({ graceful: true })
+    await jobs.stop()
     await sql.end({ timeout: 5 })
     process.exit(0)
   })

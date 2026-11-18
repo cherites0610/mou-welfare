@@ -17,18 +17,25 @@ afterAll(() => t.close())
 beforeEach(() => resetDb(t.db))
 
 describe('GET /health', () => {
-  it('資料庫正常、已套用 migration；沒有 worker 心跳時為 degraded', async () => {
+  it('資料庫正常、已套用 migration；沒有背景工作心跳時為 degraded', async () => {
     const res = await t.app.request('/health')
     expect(res.status).toBe(200)
     const body = await json(res)
-    expect(body).toMatchObject({ status: 'degraded', db: 'ok', worker: { lastBeatSecondsAgo: null } })
+    expect(body).toMatchObject({ status: 'degraded', db: 'ok', jobs: { mode: 'inline', lastBeatSecondsAgo: null } })
     expect(body.migration).toBeTruthy()
   })
 
-  it('有新的 worker 心跳時為 ok', async () => {
-    await t.db.insert(workerHeartbeat).values({ name: 'worker' })
+  it('有新的背景工作心跳時為 ok', async () => {
+    await t.db.insert(workerHeartbeat).values({ name: 'jobs' })
     const body = await json(await t.app.request('/health'))
     expect(body.status).toBe('ok')
+  })
+
+  it('WORKER_MODE=off 時不檢查心跳', async () => {
+    const off = setupApp({ WORKER_MODE: 'off' })
+    const body = await json(await off.app.request('/health'))
+    expect(body).toMatchObject({ status: 'ok', jobs: { mode: 'off' } })
+    await off.close()
   })
 
   it('資料庫無法連線時回傳 503', async () => {
