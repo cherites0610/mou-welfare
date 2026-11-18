@@ -309,7 +309,7 @@ export interface LLM {
 | 帳號 | ✅ `mou_welfare`（LOGIN，非 superuser，連線上限 30），只有自己的資料庫有 CONNECT 權限 |
 | 連線字串 | 存在主機上的 `~/.config/mou-welfare/db.env`（權限 600）和 `~/.pgpass`，**不進版控** |
 | 每日備份 | ✅ `~/.local/bin/mou-welfare-backup.sh`，crontab 每天 03:17（主機時區 UTC+8）執行；`pg_dump -Fc` 存到 `~/backups/mou-welfare/`，保留 30 天；日誌在 `~/.local/state/mou-welfare-backup.log` |
-| R2 異地備份 | ⏸ 腳本已支援，API Token 已寫入 `backup.env`；**帳號仍未啟用 R2**（2026-11-18 測試仍回傳 code 10042），上傳失敗時本機備份照常保留、腳本以錯誤碼結束並寫入日誌 |
+| R2 異地備份 | ✅ bucket `mou-welfare-backups`，lifecycle 規則 `expire-daily-30d`（`daily/` 前綴 30 天後刪除）；2026-11-18 測試上傳並下載比對，內容一致 |
 | 連線測試 | ✅ 透過 `postgres.cherites.org` 以 `sslmode=require` 連線成功（TLSv1.3） |
 
 > 舊版資料庫 `mou-welfare`（連字號，擁有者為 `cherites`）保留不動，作為 v1 資料參考。
@@ -338,8 +338,8 @@ export interface LLM {
 ## 11. 待辦與待確認
 
 **需要你處理**
-- [ ] **到 Cloudflare Dashboard 的 R2 頁面啟用 R2 服務**（帳號層級；目前所有 token 都回傳 code 10042）。
-- [ ] 啟用後建立 bucket `mou-welfare-backups`，並設定 lifecycle 規則：`daily/` 前綴的檔案 30 天後刪除（可交給 Claude 執行）。
+- [x] ~~到 Cloudflare Dashboard 啟用 R2~~（已完成）
+- [x] ~~建立 bucket `mou-welfare-backups` 與 30 天 lifecycle 規則~~（已完成）
 - [ ] **作廢並重發（Roll）備份用的 API Token**：舊 token 在設定過程中外洩到對話紀錄。重發後填回 `~/.config/mou-welfare/backup.env`，格式為 `CLOUDFLARE_API_TOKEN=...`。
 - [x] ~~建立 R2 API Token 並填入 `backup.env`~~（已完成，但需重發，見上一項）
 - [x] ~~確認騰訊雲安全群組對 5432 port 的規則~~（已確認沒問題）
