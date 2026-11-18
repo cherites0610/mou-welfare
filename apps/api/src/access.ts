@@ -6,6 +6,7 @@ import { apiError } from './lib/errors.ts'
 
 export type Access =
   | 'public' // 不需登入
+  | 'optional' // 不需登入；有登入時提供使用者（例如附上資格比對）
   | 'user' // 需登入
   | 'hmac' // 爬蟲：HMAC 簽章（P2 實作）
   | 'line' // LINE webhook：x-line-signature（P4 實作）
@@ -17,6 +18,13 @@ export const ROUTE_ACCESS = {
   '* /v1/auth/*': 'public', // Better Auth 自行處理
   'GET /v1/faq': 'public',
   'GET /v1/me': 'user',
+  'PATCH /v1/me': 'user',
+  'GET /v1/me/favorites': 'user',
+  'PUT /v1/me/favorites/:programId': 'user',
+  'DELETE /v1/me/favorites/:programId': 'user',
+  'GET /v1/welfare': 'optional',
+  'GET /v1/welfare/:id': 'optional',
+  'POST /v1/welfare/simulate': 'public',
 } as const satisfies Record<string, Access>
 
 type Compiled = { method: string; re: RegExp; access: Access; key: string }
@@ -41,11 +49,19 @@ export function accessFor(method: string, path: string): Access {
 
 export type AppVariables = { user: SessionUser | null }
 
-export function accessControl(auth: Auth): MiddlewareHandler<{ Variables: AppVariables }> {
+export function accessControl(
+  auth: Auth,
+  resolve: (method: string, path: string) => Access = accessFor,
+): MiddlewareHandler<{ Variables: AppVariables }> {
   return async (c, next) => {
-    const access = accessFor(c.req.method, c.req.path)
+    const access = resolve(c.req.method, c.req.path)
     if (access === 'public') {
       c.set('user', null)
+      return next()
+    }
+    if (access === 'optional') {
+      const session = await auth.api.getSession({ headers: c.req.raw.headers })
+      c.set('user', session?.user ?? null)
       return next()
     }
     if (access === 'hmac' || access === 'line') {

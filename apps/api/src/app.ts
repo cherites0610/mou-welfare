@@ -3,8 +3,10 @@ import { accessControl, type AppVariables } from './access.ts'
 import type { Db } from './db/client.ts'
 import type { Env } from './env.ts'
 import { faqRoutes } from './features/faq/routes.ts'
+import { favoriteRoutes } from './features/favorite/routes.ts'
 import { healthRoutes } from './features/health/routes.ts'
 import { meRoutes } from './features/me/routes.ts'
+import { welfareRoutes } from './features/welfare/routes.ts'
 import { AUTH_BASE_PATH, type Auth } from './lib/auth.ts'
 import { apiError } from './lib/errors.ts'
 
@@ -31,6 +33,8 @@ export function createApp(deps: Deps) {
   app.route('/', healthRoutes)
   app.route('/', faqRoutes)
   app.route('/', meRoutes)
+  app.route('/', favoriteRoutes)
+  app.route('/', welfareRoutes)
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

@@ -80,6 +80,310 @@
           "city",
           "identities"
         ]
+      },
+      "UpdateMe": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "birthday": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "男性",
+              "女性",
+              null
+            ]
+          },
+          "city": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "臺北市",
+              "新北市",
+              "桃園市",
+              "臺中市",
+              "臺南市",
+              "高雄市",
+              "基隆市",
+              "新竹市",
+              "嘉義市",
+              "新竹縣",
+              "苗栗縣",
+              "彰化縣",
+              "南投縣",
+              "雲林縣",
+              "嘉義縣",
+              "屏東縣",
+              "宜蘭縣",
+              "花蓮縣",
+              "臺東縣",
+              "澎湖縣",
+              "金門縣",
+              "連江縣",
+              null
+            ]
+          },
+          "identities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "中低收入戶",
+                "低收入戶",
+                "榮民",
+                "身心障礙者",
+                "原住民",
+                "外籍配偶家庭"
+              ]
+            },
+            "maxItems": 6,
+            "description": "只接受特殊身分；年齡與性別由生日、性別欄位推得"
+          }
+        },
+        "additionalProperties": false
+      },
+      "WelfareSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "identities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deadline": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "match": {
+            "$ref": "#/components/schemas/MatchResult"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "city",
+          "categories",
+          "identities",
+          "summary",
+          "publishedAt",
+          "deadline",
+          "match"
+        ]
+      },
+      "MatchResult": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "light": {
+            "type": "string",
+            "enum": [
+              "GREEN",
+              "YELLOW",
+              "RED"
+            ]
+          },
+          "score": {
+            "type": "number"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "light",
+          "score",
+          "reasons"
+        ],
+        "description": "登入或試算時才有"
+      },
+      "WelfareDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/WelfareSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "requirements": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "rewards": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "contentMd": {
+                "type": "string"
+              },
+              "sourceUrl": {
+                "type": "string"
+              },
+              "expired": {
+                "type": "boolean"
+              },
+              "attachments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "url"
+                  ]
+                }
+              },
+              "isFavorite": {
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "description": "未登入時為 null"
+              }
+            },
+            "required": [
+              "requirements",
+              "rewards",
+              "contentMd",
+              "sourceUrl",
+              "expired",
+              "attachments",
+              "isFavorite"
+            ]
+          }
+        ]
+      },
+      "SimulateBody": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "city": {
+            "type": "string",
+            "description": "逗號分隔，可選值：臺北市、新北市、桃園市、臺中市、臺南市、高雄市、基隆市、新竹市、嘉義市、新竹縣、苗栗縣、彰化縣、南投縣、雲林縣、嘉義縣、屏東縣、宜蘭縣、花蓮縣、臺東縣、澎湖縣、金門縣、連江縣"
+          },
+          "category": {
+            "type": "string",
+            "description": "逗號分隔，可選值：兒童及青少年福利、婦女與幼兒福利、老人福利、社會救助福利、身心障礙福利、其他福利"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ProfileInput"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 20
+          }
+        },
+        "required": [
+          "profile"
+        ]
+      },
+      "ProfileInput": {
+        "type": "object",
+        "properties": {
+          "birthday": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "男性",
+              "女性",
+              null
+            ]
+          },
+          "identities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "中低收入戶",
+                "低收入戶",
+                "榮民",
+                "身心障礙者",
+                "原住民",
+                "外籍配偶家庭"
+              ]
+            },
+            "maxItems": 6
+          }
+        }
       }
     },
     "parameters": {}
@@ -272,6 +576,389 @@
                   },
                   "required": [
                     "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "me"
+        ],
+        "summary": "更新個人資料（用於資格比對）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMe"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "目前登入的使用者",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/Me"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/favorites": {
+      "get": {
+        "tags": [
+          "favorite"
+        ],
+        "summary": "我的收藏（新到舊）",
+        "responses": {
+          "200": {
+            "description": "收藏列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WelfareSummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/favorites/{programId}": {
+      "put": {
+        "tags": [
+          "favorite"
+        ],
+        "summary": "加入收藏（重複加入不會出錯）",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "programId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "已收藏"
+          },
+          "404": {
+            "description": "福利不存在或已下架",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "favorite"
+        ],
+        "summary": "取消收藏（未收藏也不會出錯）",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "programId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "已取消"
+          }
+        }
+      }
+    },
+    "/v1/welfare": {
+      "get": {
+        "tags": [
+          "welfare"
+        ],
+        "summary": "搜尋福利（登入時附上資格比對）",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 50
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "逗號分隔，可選值：臺北市、新北市、桃園市、臺中市、臺南市、高雄市、基隆市、新竹市、嘉義市、新竹縣、苗栗縣、彰化縣、南投縣、雲林縣、嘉義縣、屏東縣、宜蘭縣、花蓮縣、臺東縣、澎湖縣、金門縣、連江縣"
+            },
+            "required": false,
+            "description": "逗號分隔，可選值：臺北市、新北市、桃園市、臺中市、臺南市、高雄市、基隆市、新竹市、嘉義市、新竹縣、苗栗縣、彰化縣、南投縣、雲林縣、嘉義縣、屏東縣、宜蘭縣、花蓮縣、臺東縣、澎湖縣、金門縣、連江縣",
+            "name": "city",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "逗號分隔，可選值：兒童及青少年福利、婦女與幼兒福利、老人福利、社會救助福利、身心障礙福利、其他福利"
+            },
+            "required": false,
+            "description": "逗號分隔，可選值：兒童及青少年福利、婦女與幼兒福利、老人福利、社會救助福利、身心障礙福利、其他福利",
+            "name": "category",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 1
+            },
+            "required": false,
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "福利列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WelfareSummary"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "number"
+                        },
+                        "limit": {
+                          "type": "number"
+                        },
+                        "total": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "limit",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/welfare/{id}": {
+      "get": {
+        "tags": [
+          "welfare"
+        ],
+        "summary": "福利詳情（登入時附上資格比對與收藏狀態）",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "福利詳情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/WelfareDetail"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在或已下架",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/welfare/simulate": {
+      "post": {
+        "tags": [
+          "welfare"
+        ],
+        "summary": "以手動輸入的身分試算（不需登入，不會儲存）",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "附上試算結果的福利列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/WelfareSummary"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "number"
+                        },
+                        "limit": {
+                          "type": "number"
+                        },
+                        "total": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "limit",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
                   ]
                 }
               }

@@ -10,9 +10,13 @@ export function ageOn(birthday: Date, today: Date): number {
   return age
 }
 
-/** 與 v1 規則一致：未滿 20 → 20歲以下；20–65（含 65）→ 20歲-65歲；超過 65 → 65歲以上。 */
+/**
+ * 未滿 20 → 20歲以下；20–64 → 20歲-65歲；年滿 65 → 65歲以上。
+ * v1 把剛好 65 歲歸在 20歲-65歲，導致年滿 65 歲的第一年所有老人福利都被判為「年齡不符」
+ * （老人福利法以年滿 65 歲為準）。
+ */
 export function ageGroupOf(age: number): AgeGroup {
   if (age < 20) return '20歲以下'
-  if (age <= 65) return '20歲-65歲'
+  if (age < 65) return '20歲-65歲'
   return '65歲以上'
 }

@@ -13,7 +13,7 @@ export function setupApp(overrides: Partial<Record<string, string>> = {}) {
 }
 
 export async function resetDb(db: ReturnType<typeof setupApp>['db']) {
-  await db.execute(sql`truncate table "user", session, account, verification, faqs, worker_heartbeat cascade`)
+  await db.execute(sql`truncate table "user", session, account, verification, faqs, worker_heartbeat, welfare_programs, welfare_attachments, favorites cascade`)
 }
 
 /** 透過 Better Auth 註冊並回傳 session cookie */

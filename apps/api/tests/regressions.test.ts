@@ -1,4 +1,5 @@
 // v1 回歸測試（docs/testing.md §4.3）。尚未實作的功能以 todo 標記，實作時必須補上。
+// R3、R4 在 welfare.test.ts；R5 在 packages/shared（age.test.ts、matching.test.ts）。
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { user } from '../src/db/schema/index.ts'
@@ -43,8 +44,6 @@ describe('R10 不能透過註冊端點寫入身分、角色等欄位', () => {
 })
 
 describe.todo('R1 沒有 email 的 LINE 帳號登入不能取得既有使用者的 session（P4：LINE / LIFF）')
-describe.todo('R3 多類別福利以任一類別篩選都找得到（P1：福利搜尋）')
-describe.todo('R4 有身分限制的福利排在前面（P1：福利搜尋）')
 describe.todo('R6 帶非所屬家庭的 familyId 回傳 403（P1 / P3）')
 describe.todo('R7 讀取、刪除、續聊他人的聊天 session 回傳 404（P3）')
 describe.todo('R9 只能透過有效邀請碼加入家庭（P3）')

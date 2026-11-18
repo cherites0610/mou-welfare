@@ -1,4 +1,6 @@
 export * from './identities.ts'
 export * from './categories.ts'
+export * from './cities.ts'
 export * from './age.ts'
+export * from './matching.ts'
 export * from './ingest.ts'
