@@ -1,28 +1,52 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { createApp } from '../src/app.ts'
 import { createDb } from '../src/db/client.ts'
+import { user } from '../src/db/schema/index.ts'
 import { createAuth } from '../src/lib/auth.ts'
+import { MemoryMailer } from '../src/lib/mail/index.ts'
+import { MemoryStorage, type Storage } from '../src/lib/storage.ts'
 import { testEnv } from './test-env.ts'
 
-export function setupApp(overrides: Partial<Record<string, string>> = {}) {
+export const ORIGIN = 'http://localhost:3000'
+
+export function setupApp(overrides: Partial<Record<string, string>> = {}, opts: { storage?: Storage | null } = {}) {
   const env = testEnv(overrides)
   const { db, sql: client } = createDb(env.DATABASE_URL, { max: 2 })
-  const auth = createAuth(db, env)
-  const app = createApp({ db, auth, env })
-  return { app, db, env, close: () => client.end() }
+  const mailer = new MemoryMailer()
+  const storage = opts.storage === undefined ? new MemoryStorage() : opts.storage
+  const auth = createAuth(db, env, mailer)
+  const app = createApp({ db, auth, env, mailer, storage })
+  return { app, db, env, mailer, storage, close: () => client.end() }
 }
 
-export async function resetDb(db: ReturnType<typeof setupApp>['db']) {
-  await db.execute(sql`truncate table "user", session, account, verification, faqs, worker_heartbeat, welfare_programs, welfare_attachments, favorites cascade`)
+type T = ReturnType<typeof setupApp>
+
+export async function resetDb(db: T['db']) {
+  await db.execute(
+    sql`truncate table "user", session, account, verification, faqs, worker_heartbeat, welfare_programs, welfare_attachments, favorites cascade`,
+  )
 }
 
-/** 透過 Better Auth 註冊並回傳 session cookie */
-export async function signUp(app: ReturnType<typeof setupApp>['app'], email = 'user@example.com', extra: object = {}) {
-  const res = await app.request('/v1/auth/sign-up/email', {
+export const PASSWORD = 'correct-horse-battery'
+
+export function authPost(app: T['app'], path: string, body: object, headers: Record<string, string> = {}) {
+  return app.request(`/v1/auth${path}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', origin: 'http://localhost:3000' },
-    body: JSON.stringify({ email, password: 'correct-horse-battery', name: '測試使用者', ...extra }),
+    headers: { 'content-type': 'application/json', origin: ORIGIN, ...headers },
+    body: JSON.stringify(body),
   })
-  const cookie = res.headers.get('set-cookie')?.split(';')[0] ?? ''
-  return { res, cookie }
+}
+
+/** 只註冊（會寄出驗證信，尚未驗證） */
+export function signUpOnly(app: T['app'], email: string, extra: object = {}) {
+  return authPost(app, '/sign-up/email', { email, password: PASSWORD, name: '測試使用者', ...extra })
+}
+
+/** 註冊 → 直接標記為已驗證 → 登入，回傳 session cookie */
+export async function signUp(t: Pick<T, 'app' | 'db'>, email = 'user@example.com', extra: object = {}) {
+  const res = await signUpOnly(t.app, email, extra)
+  await t.db.update(user).set({ emailVerified: true }).where(eq(user.email, email))
+  const login = await authPost(t.app, '/sign-in/email', { email, password: PASSWORD })
+  const cookie = login.headers.get('set-cookie')?.split(';')[0] ?? ''
+  return { res, login, cookie }
 }

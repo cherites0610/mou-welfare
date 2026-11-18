@@ -4,11 +4,15 @@ import { createDb } from './db/client.ts'
 import { loadEnv } from './env.ts'
 import { type Jobs, startJobs } from './jobs/index.ts'
 import { createAuth } from './lib/auth.ts'
+import { LogMailer, ResendMailer } from './lib/mail/index.ts'
+import { createStorage } from './lib/storage.ts'
 
 const env = loadEnv()
 const { db, sql } = createDb(env.DATABASE_URL)
-const auth = createAuth(db, env)
-const app = createApp({ db, auth, env })
+const mailer = env.MAIL_DRIVER === 'resend' ? new ResendMailer(env.RESEND_API_KEY!, env.EMAIL_FROM) : new LogMailer()
+const storage = createStorage(env)
+const auth = createAuth(db, env, mailer)
+const app = createApp({ db, auth, env, mailer, storage })
 
 const jobs: Jobs | null = env.WORKER_MODE === 'inline' ? await startJobs({ db, databaseUrl: env.DATABASE_URL }) : null
 

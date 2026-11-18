@@ -212,7 +212,7 @@ ingest_log(id, program_key, action, content_hash, received_at, processed_at, err
 | 邀請 | `POST /v1/families/:id/invites`、`POST /v1/invites/:code/accept` | admin / 登入 |
 | 聊天 | `GET/POST /v1/chat/sessions`、`GET/DELETE /v1/chat/sessions/:id`、`POST /v1/chat/sessions/:id/messages`（SSE 串流） | 登入，且需為 session 擁有者 |
 | FAQ | `GET /v1/faq`；`POST/PATCH/DELETE /v1/admin/faq/*` | 公開 / admin |
-| 上傳 | `POST /v1/uploads`（回傳 R2 的上傳 URL 或直接代傳，限制圖片格式與大小） | 登入 |
+| 上傳 | `POST /v1/uploads/avatar`（multipart；以內容判斷格式，只收 JPEG/PNG/WebP/GIF，上限 5 MB；壓縮為 512×512 WebP 並移除 EXIF 後存到 R2） | 登入 |
 | LINE | `POST /v1/line/webhook` | **驗證 `x-line-signature`**（HMAC-SHA256，用原始 body 計算） |
 | 爬蟲 | `POST /internal/ingest`、`POST /internal/remove` | **HMAC 簽章加時間戳**，金鑰未設定時一律拒絕 |
 | 管理 | `/v1/admin/*`（福利人工修正、重新結構化、查看隔離區） | admin |
@@ -296,7 +296,21 @@ export interface LLM {
 | `expire` | pg-boss cron（每日） | 把超過截止日的福利標為 `expired` |
 | `cleanup` | pg-boss cron（每週） | 清除過期的邀請碼、session、verification |
 
-### 8.5 LINE Bot
+### 8.5 帳號信件與限流
+
+- 註冊後寄出驗證信，**未驗證不能登入**；點擊連結後自動登入（Better Auth `emailVerification`）。
+- 重設密碼信 1 小時內有效；重設後登出所有既有 session。對不存在的 email 回應完全相同、但不寄信（R14）。
+- 信件為繁體中文 HTML 加純文字版本，使用者名稱一律跳脫（`apps/api/src/lib/mail/templates.ts`）。
+- 寄件人：Resend 網域驗證前使用 `onboarding@resend.dev`，此時**只能寄給 Resend 帳號本人**；正式上線前要在 Resend 驗證 `mou-welfare.com` 並改 `EMAIL_FROM`。
+- 限流（R15，以 `CF-Connecting-IP` 計算）：登入、註冊每 IP 每分鐘 5 次；重設密碼、重寄驗證信每 IP 每 5 分鐘 3 次。目前存在記憶體（單一程序足夠），改為多程序時要換成資料庫儲存。
+
+### 8.6 圖片上傳
+
+- 以 sharp 處理：依 EXIF 轉正 → 512×512 裁切（依顯著區域） → WebP 品質 80 → 移除全部中繼資料（含 GPS）。
+- 以實際內容判斷格式，不相信 Content-Type 與副檔名；拒絕 SVG（可能含腳本）；`limitInputPixels` 防止解壓縮炸彈。
+- 儲存路徑 `avatars/{userId}/{uuid}.webp`，上傳後更新 `user.image`。
+
+### 8.7 LINE Bot
 
 - **驗證**：webhook 收到後先驗證簽章，把事件排入 pg-boss 佇列後立即回應 200，回覆由背景工作處理：優先用 reply token 回覆（有時效限制），來不及時改用 push API。
 - **已綁定的使用者**：交給聊天服務回答，回覆文字加上福利 Flex carousel。
@@ -337,7 +351,7 @@ export interface LLM {
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
 | 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
 | HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
-| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`RESEND_API_KEY`、`INGEST_HMAC_KEY`、`R2_*` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（尚未提供，未設定時上傳回傳 503）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
 | 部署流程 | GitHub Actions 在 `main` 更新時，透過 SSH 執行 `deploy.sh`：`git pull` → `pnpm install --frozen-lockfile` → build → migrate → `pm2 reload`（不中斷服務）。失敗時保留舊版本 |
@@ -376,6 +390,8 @@ export interface LLM {
 **需要你處理**
 - [x] ~~到 Cloudflare Dashboard 啟用 R2~~（已完成）
 - [x] ~~建立 bucket `mou-welfare-backups` 與 30 天 lifecycle 規則~~（已完成）
+- [ ] 提供 R2 的 S3 相容金鑰（上傳頭像用），並建立 `mou-welfare-uploads` bucket 與公開網域
+- [ ] 在 Resend 驗證 `mou-welfare.com` 網域，`EMAIL_FROM` 改為正式寄件人
 - [ ] **作廢並重發（Roll）備份用的 API Token**：舊 token 在設定過程中外洩到對話紀錄。重發後填回 `~/.config/mou-welfare/backup.env`，格式為 `CLOUDFLARE_API_TOKEN=...`。
 - [x] ~~建立 R2 API Token 並填入 `backup.env`~~（已完成，但需重發，見上一項）
 - [x] ~~確認騰訊雲安全群組對 5432 port 的規則~~（已確認沒問題）

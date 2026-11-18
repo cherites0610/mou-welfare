@@ -25,6 +25,7 @@ export const ROUTE_ACCESS = {
   'GET /v1/welfare': 'optional',
   'GET /v1/welfare/:id': 'optional',
   'POST /v1/welfare/simulate': 'public',
+  'POST /v1/uploads/avatar': 'user',
 } as const satisfies Record<string, Access>
 
 type Compiled = { method: string; re: RegExp; access: Access; key: string }

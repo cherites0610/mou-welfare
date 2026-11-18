@@ -3,6 +3,7 @@ import { createApp } from '../src/app.ts'
 import { createDb } from '../src/db/client.ts'
 import { faqs, workerHeartbeat } from '../src/db/schema/index.ts'
 import { createAuth } from '../src/lib/auth.ts'
+import { MemoryMailer } from '../src/lib/mail/index.ts'
 import { FakeLLM } from '../src/lib/llm/index.ts'
 import { z } from 'zod'
 import { resetDb, setupApp, signUp } from './helpers.ts'
@@ -41,7 +42,8 @@ describe('GET /health', () => {
   it('資料庫無法連線時回傳 503', async () => {
     const env = testEnv({ DATABASE_URL: 'postgresql://nobody:x@127.0.0.1:1/none' })
     const { db, sql } = createDb(env.DATABASE_URL, { max: 1 })
-    const app = createApp({ db, auth: createAuth(db, env), env })
+    const mailer = new MemoryMailer()
+    const app = createApp({ db, auth: createAuth(db, env, mailer), env, mailer, storage: null })
     const res = await app.request('/health')
     expect(res.status).toBe(503)
     await sql.end()
@@ -62,7 +64,7 @@ describe('GET /v1/faq', () => {
 
 describe('GET /v1/me', () => {
   it('回傳登入使用者，身分預設為空陣列', async () => {
-    const { cookie } = await signUp(t.app, 'me@example.com')
+    const { cookie } = await signUp(t, 'me@example.com')
     const body = await json(await t.app.request('/v1/me', { headers: { cookie } }))
     expect(body.data).toMatchObject({ email: 'me@example.com', name: '測試使用者', identities: [], birthday: null })
   })
@@ -70,7 +72,7 @@ describe('GET /v1/me', () => {
 
 describe('錯誤格式', () => {
   it('404 為統一格式', async () => {
-    const { cookie } = await signUp(t.app)
+    const { cookie } = await signUp(t)
     const res = await t.app.request('/v1/nope', { headers: { cookie } })
     expect(await res.json()).toEqual({ error: { code: 'not_found', message: '找不到資源' } })
   })

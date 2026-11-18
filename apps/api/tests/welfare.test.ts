@@ -13,7 +13,7 @@ const get = (path: string, cookie?: string) => t.app.request(path, cookie ? { he
 const names = (body: Json) => body.data.map((x: { name: string }) => x.name)
 
 async function signUpWithProfile(profile: object) {
-  const { cookie } = await signUp(t.app, `u${Math.random()}@example.com`)
+  const { cookie } = await signUp(t, `u${Math.random()}@example.com`)
   const res = await t.app.request('/v1/me', {
     method: 'PATCH',
     headers: { cookie, 'content-type': 'application/json' },
@@ -144,7 +144,7 @@ describe('POST /v1/welfare/simulate', () => {
 describe('收藏', () => {
   it('加入、重複加入、列出、取消', async () => {
     const p = await createProgram(t.db, { name: '收藏測試' })
-    const { cookie } = await signUp(t.app)
+    const { cookie } = await signUp(t)
     const put = () => t.app.request(`/v1/me/favorites/${p.id}`, { method: 'PUT', headers: { cookie } })
     expect((await put()).status).toBe(204)
     expect((await put()).status).toBe(204)
@@ -156,7 +156,7 @@ describe('收藏', () => {
 
   it('收藏不存在或已下架的福利回傳 404', async () => {
     const removed = await createProgram(t.db, { status: 'removed' })
-    const { cookie } = await signUp(t.app)
+    const { cookie } = await signUp(t)
     const put = (id: string) => t.app.request(`/v1/me/favorites/${id}`, { method: 'PUT', headers: { cookie } })
     expect((await put(removed.id)).status).toBe(404)
     expect((await put('00000000-0000-4000-8000-000000000000')).status).toBe(404)
@@ -164,8 +164,8 @@ describe('收藏', () => {
 
   it('收藏只屬於自己', async () => {
     const p = await createProgram(t.db)
-    const a = await signUp(t.app, 'a@example.com')
-    const b = await signUp(t.app, 'b@example.com')
+    const a = await signUp(t, 'a@example.com')
+    const b = await signUp(t, 'b@example.com')
     await t.app.request(`/v1/me/favorites/${p.id}`, { method: 'PUT', headers: { cookie: a.cookie } })
     expect((await json(await get('/v1/me/favorites', b.cookie))).data).toEqual([])
   })
@@ -183,7 +183,7 @@ describe('PATCH /v1/me', () => {
   })
 
   it('空的更新不會出錯', async () => {
-    const { cookie } = await signUp(t.app)
+    const { cookie } = await signUp(t)
     const res = await t.app.request('/v1/me', { method: 'PATCH', headers: { cookie, 'content-type': 'application/json' }, body: '{}' })
     expect(res.status).toBe(200)
   })
@@ -196,7 +196,7 @@ describe('PATCH /v1/me', () => {
     ['R10 不能改 role', { role: 'admin' }],
     ['R10 不能改 email', { email: 'x@example.com' }],
   ])('拒絕：%s', async (_n, body) => {
-    const { cookie } = await signUp(t.app)
+    const { cookie } = await signUp(t)
     const res = await t.app.request('/v1/me', {
       method: 'PATCH',
       headers: { cookie, 'content-type': 'application/json' },

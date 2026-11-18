@@ -6,11 +6,14 @@ import { faqRoutes } from './features/faq/routes.ts'
 import { favoriteRoutes } from './features/favorite/routes.ts'
 import { healthRoutes } from './features/health/routes.ts'
 import { meRoutes } from './features/me/routes.ts'
+import { uploadRoutes } from './features/upload/routes.ts'
 import { welfareRoutes } from './features/welfare/routes.ts'
 import { AUTH_BASE_PATH, type Auth } from './lib/auth.ts'
+import type { Mailer } from './lib/mail/index.ts'
+import type { Storage } from './lib/storage.ts'
 import { apiError } from './lib/errors.ts'
 
-export type Deps = { db: Db; auth: Auth; env: Env }
+export type Deps = { db: Db; auth: Auth; env: Env; mailer: Mailer; storage: Storage | null }
 export type AppEnv = { Variables: AppVariables & { deps: Deps } }
 
 export function createApp(deps: Deps) {
@@ -35,6 +38,7 @@ export function createApp(deps: Deps) {
   app.route('/', meRoutes)
   app.route('/', favoriteRoutes)
   app.route('/', welfareRoutes)
+  app.route('/', uploadRoutes)
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

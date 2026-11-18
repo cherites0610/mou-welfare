@@ -22,6 +22,7 @@ export function testEnv(overrides: Partial<Record<string, string>> = {}): Env {
     BETTER_AUTH_URL: 'http://localhost:5030',
     TRUSTED_ORIGINS: 'http://localhost:3000',
     INGEST_HMAC_KEY: 'test-hmac-key-test-hmac-key-test-hmac',
+    RATE_LIMIT: 'off', // R15 的測試會個別開啟
     ...overrides,
   })
 }

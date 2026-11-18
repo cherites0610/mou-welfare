@@ -57,13 +57,14 @@ describe('權限矩陣', () => {
     ['PUT', '/v1/me/favorites/00000000-0000-4000-8000-000000000000', 401, 404],
     ['DELETE', '/v1/me/favorites/00000000-0000-4000-8000-000000000000', 401, 204],
     ['GET', '/v1/welfare', 200, 200],
+    ['POST', '/v1/uploads/avatar', 401, 400], // 登入後沒帶檔案 → 400
     ['GET', '/v1/welfare/00000000-0000-4000-8000-000000000000', 404, 404],
     ['GET', '/v1/not-registered', 401, 404], // 未登記：匿名 401，登入後才看到 404
   ] as const
 
   it.each(matrix)('%s %s：匿名 %i / 登入 %i', async (method, path, anon, user) => {
     expect((await t.app.request(path, { method })).status).toBe(anon)
-    const { cookie } = await signUp(t.app)
+    const { cookie } = await signUp(t)
     expect((await t.app.request(path, { method, headers: { cookie } })).status).toBe(user)
   })
 })
