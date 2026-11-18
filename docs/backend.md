@@ -354,9 +354,20 @@ export interface LLM {
 | 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址暫用 r2.dev；金鑰暫時沿用備份用 token 換算，見第 11 節）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
-| 部署流程 | GitHub Actions 在 `main` 更新時，透過 SSH 執行 `deploy.sh`：`git pull` → `pnpm install --frozen-lockfile` → build → migrate → `pm2 reload`（不中斷服務）。失敗時保留舊版本 |
+| 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。之後由 GitHub Actions 透過 SSH 觸發（尚未設定） |
 | 日誌 | pm2 日誌加上 pm2-logrotate（主機上已安裝） |
 | 監控 | 外部定時檢查 `/health`（例如 UptimeRobot 或 Cloudflare Health Checks）；錯誤追蹤可選 Sentry |
+
+**目前狀態（2026-11-18）**
+
+| 項目 | 狀態 |
+|---|---|
+| 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 2 個 migration |
+| pm2 | ✅ `mou-welfare-v2-api` 運作中（約 170 MB），已 `pm2 save` |
+| Caddy | ✅ 已加入 `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
+| DNS | ⏸ 需在 Cloudflare 新增 `api-v2` 紀錄（現有的 R2 token 沒有 DNS 權限） |
+| 自動部署 | ⏸ GitHub Actions 透過 SSH 部署尚未設定 |
 
 ### 10.2 前端（Cloudflare）
 
