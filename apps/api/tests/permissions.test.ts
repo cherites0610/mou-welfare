@@ -84,3 +84,19 @@ describe('accessControl：簽章類存取在實作前一律拒絕', () => {
     expect(reached).toBe(false)
   })
 })
+
+describe('CORS', () => {
+  it('信任的來源可帶 cookie 呼叫，預檢不需登入', async () => {
+    const res = await t.app.request('/v1/me', {
+      method: 'OPTIONS',
+      headers: { origin: 'http://localhost:3000', 'access-control-request-method': 'PATCH' },
+    })
+    expect(res.status).toBe(204)
+    expect(res.headers.get('access-control-allow-origin')).toBe('http://localhost:3000')
+    expect(res.headers.get('access-control-allow-credentials')).toBe('true')
+  })
+  it('不信任的來源不會拿到 CORS 標頭', async () => {
+    const res = await t.app.request('/v1/faq', { headers: { origin: 'https://evil.example.com' } })
+    expect(res.headers.get('access-control-allow-origin')).toBeNull()
+  })
+})

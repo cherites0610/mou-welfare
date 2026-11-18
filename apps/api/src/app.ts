@@ -1,4 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { cors } from 'hono/cors'
 import { accessControl, type AppVariables } from './access.ts'
 import type { Db } from './db/client.ts'
 import type { Env } from './env.ts'
@@ -25,6 +26,17 @@ export function createApp(deps: Deps) {
     },
   })
 
+  // 前端在不同網域（mou-welfare.com ↔ api-v2.mou-welfare.com），只允許 TRUSTED_ORIGINS 帶 cookie 呼叫
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => (deps.env.TRUSTED_ORIGINS.includes(origin) ? origin : null),
+      credentials: true,
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['content-type'],
+      maxAge: 600,
+    }),
+  )
   app.use('*', async (c, next) => {
     c.set('deps', deps)
     await next()

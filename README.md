@@ -28,8 +28,11 @@ services/scraper   Python 爬蟲（uv）
 pnpm install
 pnpm typecheck && pnpm test && pnpm build
 
-# API（需要 apps/api/.env，參考 apps/api/src/env.ts）
+# API（需要 apps/api/.env，參考 apps/api/src/env.ts；本機建議 MAIL_DRIVER=log，信件連結會印在終端機）
 pnpm dev:api
+
+# 前端（指向本機 API）
+NUXT_PUBLIC_API_BASE=http://localhost:5031 pnpm dev:web
 pnpm --filter @mou-welfare/api db:generate   # 修改 schema 後產生 migration
 pnpm --filter @mou-welfare/api openapi       # 修改 API 後更新 openapi.json
 

@@ -374,7 +374,7 @@ export interface LLM {
 | 項目 | 做法 |
 |---|---|
 | 部署 | `wrangler deploy`（Nitro 的 Cloudflare preset），由 GitHub Actions 在 `main` 更新時執行 |
-| 呼叫 API | 伺服器端渲染時呼叫 `https://api.mou-welfare.com`（環境變數 `NUXT_API_BASE`）；瀏覽器端也呼叫同一個網域，靠 Better Auth 的 cookie 帶登入狀態（cookie 網域設為 `.mou-welfare.com`） |
+| 呼叫 API | 環境變數 `NUXT_PUBLIC_API_BASE`（目前為 `https://api-v2.mou-welfare.com`）。瀏覽器以 `credentials: 'include'` 呼叫，API 以 CORS 只允許 `TRUSTED_ORIGINS` 帶 cookie。session cookie 屬於 API 網域，所以登入相關與個人頁面設為只在瀏覽器渲染（`routeRules` 的 `ssr: false`）；公開頁面（福利列表、詳情）維持 SSR |
 | 網域 | `mou-welfare.com` 從 Caddy 改指向 Cloudflare Workers（切換時才改） |
 
 ### 10.3 從 v1 切換到 v2
