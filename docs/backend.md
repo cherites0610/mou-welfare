@@ -366,7 +366,7 @@ export interface LLM {
 | 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 2 個 migration |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 170 MB），已 `pm2 save` |
 | Caddy | ✅ 已加入 `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
-| DNS | ⏸ 需在 Cloudflare 新增 `api-v2` 紀錄（現有的 R2 token 沒有 DNS 權限） |
+| DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied）；Caddy 已取得憑證，外部測試 `/health` 為 ok（2026-11-18）。DNS 以 telegram-bot 專案的 Cloudflare token 建立（經使用者同意） |
 | 自動部署 | ⏸ GitHub Actions 透過 SSH 部署尚未設定 |
 
 ### 10.2 前端（Cloudflare）
