@@ -1,0 +1,405 @@
+# 爬蟲設計文件（v2）
+
+> 狀態：設計定案，尚未實作
+> 最後更新：2026-11-18
+> 範圍：22 縣市社會福利資料蒐集，從抓取到推送給後端
+
+---
+
+## 1. 背景：v1 的三個痛點
+
+v1 程式碼保存在 `v1-api` tag 的 `scraper/` 目錄。
+
+| 痛點 | v1 的實際狀況 |
+|---|---|
+| **每個縣市都要從頭寫** | 寫死「根目錄 → 子目錄 → 列表 → 內文」四層爬法，每站要 6–8 個 CSS selector。<br>`BaseScraper` 寫了但沒人用，兩支爬蟲各自複製程式碼。<br>22 縣市只完成 2 支，桃園那支還被註解掉。 |
+| **改版就壞** | selector 抓不到時回傳空字串，照樣推給後端，沒有任何警告。<br>列表頁沒處理分頁，只抓到第一頁。 |
+| **去雜訊做不好** | 從社會處網站的根目錄往下爬，會議紀錄、採購、活動、對團體的補助公告全部進入 LLM。<br>`clean_text` 刪掉所有換行，表格和條列在交給 LLM 前就被壓成一行。 |
+
+v1 的其他問題：
+- 沒有排程。
+- 只用網址去重，公告內容更新了也不會同步，下架也不知道。
+- PDF 只讀前 5 頁，不支援 `.doc`、`.xls`、`.ods`。
+- `requirements.txt` 是整台機器的 `pip freeze`，含 tensorflow 等無關套件。
+
+---
+
+## 2. 決策摘要
+
+1. **不做「AI 爬蟲」。**
+   - 政府網站多為結構化的列表和表格，日常爬取用固定規則，結果可重現、成本低。
+   - AI 只用在三個地方：
+     - **產生站點設定**：每站一次。
+     - **改版後修復設定**：很少發生。
+     - **判斷新公告是不是福利**：每日少量。
+2. **資料來源分三級**，優先使用越結構化的來源：
+   - 開放資料 API
+   - 縣市的福利查詢平台
+   - 社會局（處）網站
+3. **內容抽取完全通用**：用 trafilatura 抽正文並保留結構，不寫任何內文 selector。
+4. **站點差異集中在 YAML 設定**：同一個網站系統的縣市共用一個 adapter。調查發現 22 縣市中有 11 個用同一套系統（見第 4 節）。
+5. **用狀態表偵測新增、更新、下架**，只推送有變動的公告。
+6. **去雜訊分三層**：
+   - 只爬福利專區
+   - 標題規則
+   - LLM 分類
+   
+   另外合併跨年度的同一個福利。
+7. **品質關卡與健康檢查**：資料不合格就不推送；數量異常下降視為改版，自動暫停該站並警告。
+8. **必須從台灣 IP 執行**：建議 GCP `asia-east1`（彰化）。從海外連線時，6 個社會局（處）網站和多數縣市福利平台都逾時（見第 4.2 節）。
+9. **繼續使用 Python**：文件解析（PDF、ODT、DOCX）的套件比 Node 成熟。依賴用 uv 管理。
+
+---
+
+## 3. 整體架構
+
+```
+                 ┌───────────── sources ─────────────┐
+ sites/*.yaml →  │ L1 opendata   L2 portal   L3 cms   │  ← 每種來源一個 adapter
+                 └──────────────┬────────────────────┘
+                                │  RawItem(url, title?, html|fields, attachments[])
+                                ▼
+                 ┌──────── extract（通用）────────┐
+                 │ trafilatura → Markdown（保留表格/條列）
+                 │ 標題/日期：meta → h1 → 規則 → LLM 補
+                 │ 附件：依實際內容類型解析，掃描 PDF 交給 Gemini 讀
+                 └──────────────┬─────────────────┘
+                                ▼
+                 ┌──────── state（SQLite/Postgres）────────┐
+                 │ content_hash 比對 → NEW / UPDATED / UNCHANGED / REMOVED
+                 └──────────────┬─────────────────┘
+                                ▼ （只處理 NEW / UPDATED）
+                 ┌──────── filter ────────┐
+                 │ L1 範圍（設定只含福利專區）
+                 │ L2 標題規則（排除 / 加分）
+                 │ L3 LLM 分類（結構化輸出，結果快取）
+                 └──────────────┬─────────┘
+                                ▼
+                 ┌──────── quality gate ────────┐   不合格 → 隔離區 + 警告
+                 └──────────────┬───────────────┘
+                                ▼
+                 POST /welfare/ingest（upsert）、POST /welfare/remove
+                                ▼
+                 run report：每站數量、與上次的差異、失敗清單 → 異常就警告
+```
+
+---
+
+## 4. 22 縣市資料來源調查
+
+調查方式：2026-11-18，從東京的機器直接連線測試，搭配限定網域的搜尋，以及政府資料開放平臺的資料集頁面。
+
+**連線欄的符號**
+- ✅ 可直接連線
+- ⏱ 從海外連線逾時（推測封鎖海外 IP）
+- 🛡 防爬機制（Cloudflare 或 WAF）
+- 🔍 只透過搜尋確認網址，未實際連線
+
+**網站系統分族**
+- **A 族**：網址為 `cp.aspx` / `cl.aspx` / `News.aspx?n=&sms=` / `News_Content.aspx?n=&s=` / `Content_List.aspx?n=`，參數 `n` 可能是數字或 16 碼 hex。
+- **B 族**：網址為 `home.jsp?id=…&dataserno=…&mserno=…`。
+- **C 族**：各縣市自建的系統。
+
+| # | 縣市 | 主管機關 | 社福網站 | 族 | 福利入口（爬取起點） | 結構化來源（L1 / L2） | 連線 | 建議策略 |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 臺北市 | 社會局 | dosw.gov.taipei | A（hex） | `Content_List.aspx?n=09B2CDA681C47C09`（社會救助）、`n=EA0CF8DD1014E232`（身障經濟補助）、`n=2C486AA08208CD74`（育兒補助）等 | 開放資料 121369、121552 是統計資料，不是福利清單 | ✅ | L3 A 族 |
+| 2 | 新北市 | 社會局 | www.sw.ntpc.gov.tw | B | `home.jsp?id=…`（需整理各福利專區 id） | 「福利補助自己查」（約 2013 年建置，現況待查） | ✅ | L3 B 族 |
+| 3 | 桃園市 | 社會局 | sab.tycg.gov.tw | A（數字） | `cl.aspx?n=7313` 福利服務；身障 7322、兒少 7343、救助 7354、老人 7370 | **開放資料 [26032](https://data.gov.tw/dataset/26032)**：有 API、欄位完整，但只有 26 筆，混了勞動局、漁業的補助；另有 [26017](https://data.gov.tw/en/datasets/26017)；線上申辦目錄 e-services.tycg.gov.tw | ✅ | **L1 + L3**：開放資料補充，主體仍爬網站 |
+| 4 | 臺中市 | 社會局 | www.society.taichung.gov.tw | C（路徑式 `/13710/…/{id}`、`/{id}/post`） | `/13710/13735/13774/13783`（老人福利）等 | **開放資料：[112089](https://data.gov.tw/en/datasets/112089) 身障、[112090](https://data.gov.tw/en/datasets/112090) 長青、[132989](https://data.gov.tw/en/datasets/132989) 婦女福利補助項目**（2026 年有更新） | ⏱ | **L1 優先**，不足的再用 L3 自建 adapter |
+| 5 | 臺南市 | 社會局 | sab.tainan.gov.tw | A（數字） | 各科福利頁（待整理）。注意：`cl.aspx?n=34781`「補助業務公告專區」是對團體的補助，屬於雜訊 | 開放資料 [79613](https://data.gov.tw/dataset/79613)「社會福利項目」：有年齡、設籍、身份等欄位，2025-06 更新 | ✅ | **L1 + L3 A 族** |
+| 6 | 高雄市 | 社會局 | socbu.kcg.gov.tw | C（`index.php?prog=&b_id=&m_id=&s_id=`） | `b_id`：3 婦女、4 老人、5 身障、6 救助、7 單親、25 托育 | — | ⏱🔍 | L3 自建 adapter |
+| 7 | 基隆市 | 社會處 | www.klcg.gov.tw/tw/social | C（`/tw/social/{n}.html`） | `2748.html` 社會福利專區；`2694` 老人、`2696` 身障、`2697` 救助 | — | ✅ | L3 自建 adapter（沿用 v1 經驗） |
+| 8 | 新竹市 | 社會處 | society.hccg.gov.tw | B | `home.jsp?id=73`（社會福利）、經濟補助 `id=127`… | — | 🛡 Cloudflare | L3 B 族；需確認從台灣 IP 是否還會被擋 |
+| 9 | 嘉義市 | 社會處 | social.chiayi.gov.tw | A（數字） | 老人 `News.aspx?n=1101&sms=9555`、身障 `n=393`、救助 `n=397`、兒少 `n=401`、婦女 `n=403` | — | ✅ | L3 A 族 |
+| 10 | 新竹縣 | 社會處 | social.hsinchu.gov.tw | A（數字） | 老人 `News.aspx?n=205&sms=8667`、身障 `n=206&sms=8668` | — | ⏱🔍 | L3 A 族 |
+| 11 | 苗栗縣 | 社會處 | www.miaoli.gov.tw/social_affairs | A（數字，縣府主站的子站） | 補助資訊 `News.aspx?n=8637&sms=14225`、社福資源 `n=693` | — | ✅ | L3 A 族 |
+| 12 | 彰化縣 | 社會處 | social.chcg.gov.tw | C（`07other/other01_list.aspx?topsn=`） | 津貼及補助專區 `main.aspx?main_id=2`；長青 `topsn=711`、救助 `topsn=714` | **福利小幫手 lac.chcg.gov.tw/lachelper**（查詢平台，⏱） | ✅（舊路徑 www.chcg.gov.tw/DTO/social 會被 WAF 擋） | L2 優先，不足的再用 L3 |
+| 13 | 南投縣 | 社會及勞動局 | welfare.nantou.gov.tw | C（`/1486/…`） | 社會福利資訊網（獨立站） | 本身就是福利資訊網 | ✅ | L2/L3 自建 adapter |
+| 14 | 雲林縣 | 社會處 | social.yunlin.gov.tw | A（數字） | `News.aspx?n=9454&sms=16138` 社會福利資源 | **智慧福利資訊網 welfare.yunlin.gov.tw/People/Search** | 🛡 Cloudflare（social）、⏱（welfare） | **L2 優先**，社福網站有 Cloudflare |
+| 15 | 嘉義縣 | 社會局 | sabcc.cyhg.gov.tw | A（hex） | 各科 `cp.aspx?n=…`、`News_Content.aspx?n=67653A9290173E79…`（老人） | — | ⏱🔍 | L3 A 族 |
+| 16 | 屏東縣 | 社會處 | www.pthg.gov.tw/planjdp | A（hex） | **社會福利總覽 `Content_List.aspx?n=46F6EFDFE943D834`**；婦女、老人、兒少、身障、救助各有 Content_List | 社會福利e點靈 socmap.pthg.gov.tw/pt1w | ✅（e點靈 ⏱） | L3 A 族 |
+| 17 | 宜蘭縣 | 社會處 | sntroot.e-land.gov.tw | A（數字） | 服務項目 `cl.aspx?n=10099`；救助 `News.aspx?n=11278`、身障 `n=11280` | — | ✅ | L3 A 族 |
+| 18 | 花蓮縣 | 社會處 | sa.hl.gov.tw | C（`List_sp/{guid}`、`Detail_sp/{guid}`） | 老人、身障、救助、兒少、婦女各有 `List_sp` | 福利地圖 welfare.hl.gov.tw（⏱） | ✅ | L3 自建 adapter |
+| 19 | 臺東縣 | 社會處 | taisoc.taitung.gov.tw | C（`WebSite/…aspx?menuid=`） | 待整理 | ttcd.taitung.gov.tw、育兒專站 ttbaby.taitung.gov.tw | ⏱（ttcd ✅） | L3 自建 adapter |
+| 20 | 澎湖縣 | 社會處 | www.penghu.gov.tw/society | B | 經濟補助 `home.jsp?id=169` | 線上申辦福利專區 eservice.penghu.gov.tw | ⏱🔍 | L3 B 族 |
+| 21 | 金門縣 | 社會處 | social.kinmen.gov.tw | A（hex） | **主題福利服務專區 `Content_List.aspx?n=B709941748334ACA`**；兒少、婦女、老人、身障、救助、新住民各有專區 | **智慧福利服務躍升平台 action.kinmen.gov.tw/people** | ✅ | L2 + L3 A 族 |
+| 22 | 連江縣 | 衛生福利局 | www.matsu.gov.tw/chhtml/…/371043600I | C | 身障 `texthtml/content/371030000A0001/5974`、兒少 `chhtml/news/371043600I/2483` | 縣民服務中心 eservice.matsu.gov.tw | ✅（回應不穩定） | L3 自建 adapter |
+
+### 4.1 網站系統分族統計
+
+| 族 | 縣市 | 數量 | 意義 |
+|---|---|---|---|
+| **A 族** | 臺北、桃園、臺南、嘉義市、新竹縣、苗栗、雲林、嘉義縣、屏東、宜蘭、金門 | **11** | 寫一個 adapter 就涵蓋一半的縣市，各站只差在起點網址 |
+| **B 族** | 新北、新竹市、澎湖 | 3 | 第二個 adapter |
+| **C 族** | 臺中、高雄、基隆、彰化、南投、花蓮、臺東、連江 | 8 | 各自寫小型 adapter。臺中優先用開放資料，彰化、南投優先用福利平台 |
+
+> A 族裡有 8 站實際連線確認過，新竹縣、雲林、嘉義縣 3 站只有從搜尋結果的網址判斷。實作前要在台灣 IP 上逐站驗證。
+
+### 4.2 防爬與連線限制
+
+| 類型 | 縣市 | 對策 |
+|---|---|---|
+| 封鎖海外 IP（推測） | 社會局（處）網站：臺中、高雄、新竹縣、嘉義縣、臺東、澎湖。福利平台：雲林、花蓮、彰化福利小幫手、屏東e點靈、臺中 societydata、澎湖線上申辦 | 在台灣 IP 上執行（GCP `asia-east1`） |
+| Cloudflare 驗證頁 | 雲林社會處、新竹市社會處 | 先從台灣 IP 驗證；仍被擋就改用 L2 平台或開放資料。必要時用無頭瀏覽器並大幅降低頻率。**不嘗試破解驗證機制** |
+| WAF（Request Rejected） | 彰化舊路徑 `www.chcg.gov.tw/DTO/social` | 改用新網域 social.chcg.gov.tw |
+
+**禮貌爬取規則（所有站都適用）**
+- 每站同時只開 1 個連線，每次請求間隔 ≥ 2 秒。
+- 遵守 `robots.txt`。
+- User-Agent 寫明身分和聯絡方式，例如 `MouWelfareBot/2.0 (+https://mou-welfare.com/bot)`。
+- 只在夜間執行。
+
+---
+
+## 5. 執行環境
+
+- **地點**：必須是台灣 IP。從東京測試時，有 6 個社會局（處）網站逾時：臺中、高雄、新竹縣、嘉義縣、臺東、澎湖；另有 6 個福利平台逾時：雲林、花蓮、彰化、屏東、臺中、澎湖。
+- **建議**：GCP Cloud Run Jobs 放在 `asia-east1`，由 Cloud Scheduler 每天凌晨觸發；各站平行，站內依序。
+- **替代方案**：台灣的 VPS，或在後端主機上用 cron 執行。
+- **執行模式**：
+  - 每日增量：抓列表頁，只對新增或變動的網址抓內文。
+  - 每週全量：重新檢查所有已知網址，偵測下架。
+
+---
+
+## 6. 模組設計
+
+### 6.1 站點設定（`sites/*.yaml`）
+
+```yaml
+# sites/kinmen.yaml
+id: kinmen
+city: 金門縣
+adapter: cms_a              # cms_a | cms_b | opendata | portal | custom:<name>
+base_url: https://social.kinmen.gov.tw
+seeds:                      # 只放福利專區，不放「最新消息」
+  - url: /Content_List.aspx?n=B709941748334ACA
+    label: 主題福利服務專區
+  - url: /Content_List.aspx?n=315869EEDF0D4401
+    label: 老人福利專區
+follow: 'Content_List\.aspx\?n=[0-9A-F]{16}'   # 列表之間可往下走的連結
+detail: '(cp|News_Content)\.aspx\?n=[0-9A-F]{16}(&s=[0-9A-F]{16})?'
+pagination: { param: page, max: 20 }
+exclude_title: []           # 該站特有的雜訊關鍵字，會疊加全域規則
+expect:                     # 健康檢查基準，第一次成功執行後自動寫入
+  min_items: 40
+generated_by: llm@2026-11-20  # 留紀錄：由 AI 產生，經人工確認
+```
+
+- **`cms_a` / `cms_b` adapter**：了解該族網站共通的列表、分頁、附件區塊格式。設定只需提供起點網址，`follow` 和 `detail` 有預設值。
+- **`opendata` adapter**：欄位對應寫在設定裡，例如 `policyName → title`、`eligibilityCriteria → requirements`。
+- **`custom:<name>`**：給 C 族使用，寫成小型 Python 類別，只實作「列出內文網址」這一個方法；抽取仍走通用流程。
+
+### 6.2 AI 產生設定與自動修復
+
+```
+scrape init --city 屏東縣 --url https://www.pthg.gov.tw/planjdp/
+  1. 抓首頁和導航，LLM 挑出福利相關的入口連結（排除最新消息、會議、採購）
+  2. 判斷網站屬於哪一族；A 或 B 族直接套範本，C 族由 LLM 提出連結規則
+  3. 試跑：抓 ≥ 20 篇內文，檢查品質關卡的通過率
+  4. 產生報告：入口清單、範例標題、通過率 → 人工確認後寫入 sites/pthg.yaml
+```
+
+```
+健康檢查失敗（數量 < 上次的 50%、或品質通過率 < 70%）
+  → 該站本次結果不推送，狀態標為 degraded，發出警告
+  → 自動執行 init 流程重新產生設定 → 產生差異報告 → 等人工確認
+```
+
+### 6.3 通用抽取
+
+- **正文**：trafilatura 輸出 Markdown，保留表格和條列，不再壓成一行。抓到的正文太短時，退回抓 `<main>`、`<article>` 或最大的文字區塊。
+- **標題**：依序嘗試 `og:title` → `<h1>` → `<title>`，再去掉網站名稱的前後綴。
+- **日期**：先用規則找「發布日期、更新日期、民國年」，找不到再交給 LLM 補。
+- **附件**：抓頁面上所有檔案連結，依實際的檔案類型判斷格式（不看副檔名）。
+
+| 格式 | 解析方式 |
+|---|---|
+| PDF（文字） | pypdf，或 pdfplumber（表格多時）；不限頁數，總字數超過 30k 才截斷 |
+| PDF（掃描） | 抽不到文字時交給 Gemini 讀 |
+| DOCX | python-docx，含表格 |
+| ODT | odfpy |
+| DOC、XLS、ODS | 先用 LibreOffice headless 轉檔再解析；容器內內建 |
+
+### 6.4 狀態表
+
+```sql
+CREATE TABLE pages (
+  url           TEXT PRIMARY KEY,
+  site_id       TEXT NOT NULL,
+  title         TEXT,
+  content_hash  TEXT,            -- 正文和附件文字正規化後的 sha256
+  status        TEXT,            -- active | removed | filtered | quarantined
+  label         TEXT,            -- LLM 分類結果（快取）
+  first_seen    TIMESTAMP,
+  last_seen     TIMESTAMP,
+  last_changed  TIMESTAMP,
+  pushed_hash   TEXT             -- 最後一次成功推送給後端的 hash
+);
+```
+
+- **新增**：狀態表裡沒有這個網址。
+- **更新**：`content_hash` 和 `pushed_hash` 不同。
+- **下架**：全量執行時，連續 2 次沒看到，或內文頁回應 404 / 410。
+
+### 6.5 去雜訊（三層過濾）
+
+**L1：範圍**
+設定只放福利專區，不從「最新消息」或社會處的根目錄開始。這是效果最大的一層。
+
+**L2：標題規則**（全域規則加上各站的規則）
+- **直接排除**：會議紀錄、會議記錄、開會通知、招標、採購、決標、徵才、甄選、新聞稿、活動花絮、成果、志工、評鑑、徵選補助單位、補助民間團體、核銷、公開徵信、統計、預算、決算。
+- **加分**：補助、津貼、給付、救助、減免、申請、資格、費用補助、生活扶助。
+
+**L3：LLM 分類**
+用便宜的模型（例如 Gemini Flash 等級），以結構化輸出回傳以下格式。結果寫進 `pages.label`，同一份內容不重複判斷。
+
+```json
+{
+  "type": "program | announcement | minutes | procurement | org_grant | event | statistics | other",
+  "is_individual_welfare": true,
+  "program_name": "中低收入老人生活津貼",
+  "year": 115,
+  "confidence": 0.92,
+  "reason": "說明個人申請資格與每月補助金額"
+}
+```
+
+- 只有 `type=program` 且 `is_individual_welfare=true` 的公告才往下走。
+- `org_grant`（對團體、機構的補助）要另外列為一類。臺南「補助業務公告專區」、花蓮「徵選補助單位」都是這種，標題看起來很像福利，最容易誤判。
+- `confidence < 0.6` 的放入人工複核清單。
+
+**跨年度合併**：把 `program_name` 正規化（去掉年度、縣市名），再加上 `site_id` 當作合併鍵，同一福利的新年度版本會更新舊紀錄，而不是新增一筆。後端用 `program_key` 做 upsert（見第 7 節）。
+
+**驗證集**：人工標註約 200 篇，橫跨 A、B、C 三族各 2 站，作為調整規則和 prompt 的依據。目標是準確率 ≥ 95%、召回率 ≥ 90%。
+
+### 6.6 品質關卡
+
+以下任一條件成立，該筆就不推送，放入隔離區：
+- 標題空白，或少於 4 個字。
+- 正文加附件少於 80 個字。
+- 正文和其他網址的內容重複度 > 95%（例如網站錯誤頁、共用的「查無資料」頁）。
+- 日期解析出未來超過 1 年的日期。
+
+### 6.7 執行報告
+
+每次執行產生 `reports/{date}.json` 和一份 Markdown 摘要，並在異常時通知（Email、Slack 或 LINE 官方帳號推播）：
+
+```
+site     seen  new  upd  removed  filtered  quarantined  pushed  health
+kinmen     58    2    1        0        37            0       3  ok
+hccg        0    0    0        0         0            0       0  BLOCKED (403 cloudflare)
+pthg       12    0    0        0         4            1       0  DEGRADED (seen 12 < 50% of 61)
+```
+
+---
+
+## 7. 與後端的介面
+
+v1 只有 `POST /welfare/ingest`，用 `sourceUrl` 去重，存在就跳過。v2 改為：
+
+| 端點 | 用途 |
+|---|---|
+| `POST /welfare/ingest` | upsert，鍵為 `program_key`（沒有就用 `source_url`）；`content_hash` 不同才重新交給 LLM 結構化 |
+| `POST /welfare/remove` | 標記下架（軟刪除，保留紀錄） |
+| 驗證 | 改用 HMAC 簽章或 service token；未設定時一律拒絕（v1 在沒設 `API_KEY` 時可被繞過） |
+
+推送格式由 `packages/shared` 的 Zod schema 產出 JSON Schema，爬蟲端用 pydantic 依同一份 schema 驗證：
+
+```json
+{
+  "source": { "site_id": "kinmen", "city": "金門縣", "url": "...", "kind": "cms|opendata|portal" },
+  "program_key": "kinmen:中低收入老人生活津貼",
+  "title": "...",
+  "published_at": "2026-03-01",
+  "content_md": "...（正文 Markdown）",
+  "attachments": [{ "name": "申請表.pdf", "url": "...", "text": "..." }],
+  "structured": { },
+  "classification": { "type": "program", "confidence": 0.92 },
+  "content_hash": "sha256:..."
+}
+```
+
+`structured` 欄位放開放資料原本就有的結構化欄位，例如資格、應備文件。後端可以直接使用這些欄位，或交給 LLM 補齊。
+
+---
+
+## 8. 技術選型
+
+| 用途 | 選擇 |
+|---|---|
+| 語言與依賴 | Python 3.12、**uv**（`pyproject.toml`，只列真正用到的套件） |
+| HTTP | httpx（同一個 client 重複使用、重試、每站限速） |
+| HTML 解析 | selectolax（快）或 BeautifulSoup |
+| 正文抽取 | trafilatura |
+| 文件解析 | pypdf、pdfplumber、python-docx、odfpy、LibreOffice headless |
+| LLM | Gemini（Flash 等級做分類，視覺模型讀掃描 PDF）；結構化輸出 |
+| 狀態 | 本機開發用 SQLite；正式環境用後端的 Postgres，獨立 schema `scraper` |
+| CLI | Typer：`scrape run [--site X] [--dry-run]`、`scrape init`、`scrape report` |
+| 測試 | pytest，搭配存成檔案的 HTML 快照，可離線執行 |
+| 不採用 | Scrapy（對這個規模太重）、Crawl4AI（功能重疊；之後 C 族站點太多再評估）、Playwright（只在 Cloudflare 站點確認必要時才引入） |
+
+---
+
+## 9. 目錄結構
+
+```
+services/scraper/
+├── pyproject.toml
+├── sites/                  # 22 份站點設定（YAML）
+│   ├── kinmen.yaml
+│   └── ...
+├── src/scraper/
+│   ├── cli.py
+│   ├── adapters/
+│   │   ├── base.py         # Adapter 介面：list_items() -> Iterable[RawItem]
+│   │   ├── cms_a.py
+│   │   ├── cms_b.py
+│   │   ├── opendata.py
+│   │   └── custom/         # C 族：taichung.py、kaohsiung.py、klcg.py …
+│   ├── extract/            # trafilatura 包裝、附件解析、日期與標題
+│   ├── filter/             # rules.py、classify.py（LLM）
+│   ├── state.py
+│   ├── quality.py
+│   ├── push.py             # 推送到後端
+│   ├── report.py
+│   └── initgen.py          # AI 產生設定與修復設定
+└── tests/
+    ├── fixtures/{site}/*.html
+    └── test_{adapter}.py
+```
+
+---
+
+## 10. 推進計畫
+
+| 階段 | 內容 | 完成標準 |
+|---|---|---|
+| **P0 原型** | 3 站各代表一族：**金門（A）、新北（B）、基隆（C）**；再加臺中開放資料（L1）。只做抓取、抽取、狀態、規則過濾，不做 AI 產生設定 | 3 站都能穩定跑完；人工檢查 50 篇，抽取品質可接受 |
+| **P1 去雜訊** | LLM 分類加上 200 篇驗證集 | 準確率 ≥ 95%、召回率 ≥ 90% |
+| **P2 A 族擴展** | 其餘 10 個 A 族縣市（用 `scrape init` 產生設定） | 11 站上線；記錄 AI 產生設定第一次就成功的比例 |
+| **P3 部署** | Cloud Run Jobs（`asia-east1`）、排程、執行報告與警告；後端 ingest 改為 upsert | 每日自動執行 7 天，沒有人工介入 |
+| **P4 B、C 族與平台** | 新竹市、澎湖（B）；高雄、彰化、南投、花蓮、臺東、連江（C）；雲林、彰化 L2 平台 | 22 縣市全數上線 |
+| **P5 自動修復** | 健康檢查觸發重新產生設定 | 模擬改版能被偵測並產生修復建議 |
+
+---
+
+## 11. 待確認事項
+
+- [ ] 從台灣 IP 重新測試標 ⏱ 和 🛡 的站：新竹市、雲林的 Cloudflare 是否仍會擋？
+- [ ] 新竹縣、雲林、嘉義縣是否確實屬於 A 族（目前只從網址判斷）。
+- [ ] 臺中 112089、112090、132989 三個資料集的筆數、欄位、更新頻率，以及是否涵蓋社會救助、兒少。
+- [ ] 臺南 79613 的實際內容與筆數（2025-06 之後是否還有更新）。
+- [ ] 雲林、金門、彰化的福利平台有沒有可介接的 API，或是否需要逐頁抓取。
+- [ ] 新北「福利補助自己查」是否仍在運作。
+- [ ] 政府資料開放平臺上，有沒有其他縣市的福利補助資料集（本次只搜尋到桃園、臺中、臺南）。
+- [ ] LLM 分類的費用估算（P1 時用實際的公告量計算）。
+
+---
+
+## 參考來源
+
+- 政府資料開放平臺：[桃園市福利補助資訊 26032](https://data.gov.tw/dataset/26032)、[桃園市福利補助申請資格資訊 26017](https://data.gov.tw/en/datasets/26017)、[臺中市身心障礙福利補助項目 112089](https://data.gov.tw/en/datasets/112089)、[臺中市長青福利補助項目 112090](https://data.gov.tw/en/datasets/112090)、[臺中市婦女福利補助項目 132989](https://data.gov.tw/en/datasets/132989)、[社會福利項目（臺南）79613](https://data.gov.tw/dataset/79613)、[臺北市補助團體一覽表 121369](https://data.gov.tw/dataset/121369)、[臺北市公益彩券盈餘分配 121552](https://data.gov.tw/dataset/121552)
+- 搜尋結果確認的網址：[臺中市社會局 老人福利](https://www.society.taichung.gov.tw/13710/13735/13774/13783)、[高雄市社會局 老人福利](https://socbu.kcg.gov.tw/index.php?prog=1&b_id=4)、[新竹市社會處 社會福利](https://society.hccg.gov.tw/ch/home.jsp?id=73&parentpath=0,2,12)、[新竹縣社會處](https://social.hsinchu.gov.tw/)、[彰化縣社會處 津貼及補助專區](https://social.chcg.gov.tw/07other/main.aspx?main_id=2)、[彰化縣福利小幫手](https://lac.chcg.gov.tw/lachelper/home/findAll)、[南投縣社會福利資訊網](https://welfare.nantou.gov.tw/)、[雲林縣社會處](https://social.yunlin.gov.tw/News.aspx?n=9454&sms=16138)、[雲林縣智慧福利資訊網](https://welfare.yunlin.gov.tw/People/Search/64?Q_Keyword=%E8%A3%9C%E5%8A%A9)、[嘉義縣社會局](https://sabcc.cyhg.gov.tw/cp.aspx?n=E81A92B24ABAFB50)、[臺東縣社會處](https://taisoc.taitung.gov.tw/WebSite/About/Organization.aspx?menuid=0zGMn1bvUYg%3D)、[臺東 ttcd](https://ttcd.taitung.gov.tw/index-A.php)、[澎湖縣社會處](https://www.penghu.gov.tw/society/)、[澎湖線上申辦福利專區](https://eservice.penghu.gov.tw/Service.aspx?n=27B2D25ACBA52DAB&p=EA9BC86940EC0DD5)、[連江縣 兒童及少年福利](https://www.matsu.gov.tw/chhtml/news/371043600I/2483)
+- 直接連線確認（2026-11-18）：dosw.gov.taipei、www.sw.ntpc.gov.tw、sab.tycg.gov.tw、sab.tainan.gov.tw、www.klcg.gov.tw、social.chiayi.gov.tw、www.miaoli.gov.tw/social_affairs、social.chcg.gov.tw、welfare.nantou.gov.tw、www.pthg.gov.tw/planjdp、sntroot.e-land.gov.tw、sa.hl.gov.tw、social.kinmen.gov.tw、action.kinmen.gov.tw、ttcd.taitung.gov.tw、opendata.tycg.gov.tw（26032 下載）
+- 工具：[Crawl4AI 與 trafilatura 搭配（DEV）](https://dev.to/murroughfoley/how-to-use-rs-trafilatura-with-crawl4ai-3nfd)、[Crawl4AI 介紹（Scrapfly）](https://scrapfly.io/blog/posts/crawl4AI-explained)
