@@ -136,6 +136,13 @@ describe('POST /internal/ingest', () => {
     expect((await post('/internal/ingest', 'not json')).status).toBe(400)
   })
 
+  it('附件文字含 NUL（PDF 常見）→ 去掉後寫入，不會 500', async () => {
+    const res = await post('/internal/ingest', item({ attachments: [{ name: '申請表', url: 'https://x.example/a.pdf', text: '申請\u0000資格' }] }))
+    expect(res.status).toBe(200)
+    const [a] = await t.db.select().from(welfareAttachments)
+    expect(a!.text).toBe('申請資格')
+  })
+
   it('開放資料的原始欄位保留', async () => {
     await post('/internal/ingest', item({ structured: { 應備文件: '身分證' } }))
     const [p] = await programs()

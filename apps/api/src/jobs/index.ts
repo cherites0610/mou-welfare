@@ -22,8 +22,9 @@ export async function startJobs(opts: {
 }): Promise<Jobs> {
   const { db, boss, structurer, llm } = opts
 
-  // 一次處理一筆：結構化會呼叫 LLM，避免和 API 搶資源，也避免超過 Gemini 的速率限制
-  await boss.work<{ programId: string }>('welfare-structure', { batchSize: 1 }, async ([job]) => {
+  // 一次處理一筆：結構化會呼叫 LLM，避免和 API 搶資源，也避免超過 Gemini 的速率限制。
+  // pg-boss 預設每 2 秒才取一次工作，佇列有積壓時太慢（每秒不到一筆），縮短為 0.5 秒
+  await boss.work<{ programId: string }>('welfare-structure', { batchSize: 1, pollingIntervalSeconds: 0.5 }, async ([job]) => {
     if (!job) return
     const outcome = await structureProgram(db, structurer, llm, job.data.programId)
     return { outcome }

@@ -7,6 +7,9 @@ import type { Queue } from '../../lib/queue.ts'
 
 export type IngestAction = 'created' | 'updated' | 'unchanged'
 
+/** Postgres 的 text 不能存 NUL；爬蟲端也會過濾，這裡再擋一次，避免單筆資料讓整個請求 500 */
+const clean = (s: string) => s.replaceAll('\u0000', '')
+
 export async function ingest(db: Db, queue: Queue, item: IngestItem): Promise<{ id: string; action: IngestAction }> {
   const url = item.source.url
   const fields = {
@@ -14,7 +17,7 @@ export async function ingest(db: Db, queue: Queue, item: IngestItem): Promise<{ 
     siteId: item.source.site_id,
     sourceUrl: url,
     sourceKind: item.source.kind,
-    contentMd: item.content_md,
+    contentMd: clean(item.content_md),
     contentHash: item.content_hash,
     sourceFields: item.structured,
     publishedAt: item.published_at,
@@ -32,7 +35,7 @@ export async function ingest(db: Db, queue: Queue, item: IngestItem): Promise<{ 
     if (!existing) {
       const [row] = await tx
         .insert(w)
-        .values({ programKey: item.program_key, name: item.title, status: 'pending', ...fields })
+        .values({ programKey: item.program_key, name: clean(item.title), status: 'pending', ...fields })
         .returning({ id: w.id })
       id = row!.id
       action = 'created'
@@ -54,7 +57,7 @@ export async function ingest(db: Db, queue: Queue, item: IngestItem): Promise<{ 
       if (item.attachments.length) {
         await tx
           .insert(welfareAttachments)
-          .values(item.attachments.map((a) => ({ programId: id, name: a.name, url: a.url, text: a.text })))
+          .values(item.attachments.map((a) => ({ programId: id, name: clean(a.name), url: a.url, text: clean(a.text) })))
       }
     }
     // 來源網址可能從別的福利移過來（標題改了 → program_key 不同），以最新的推送為準

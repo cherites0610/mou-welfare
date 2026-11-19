@@ -45,3 +45,27 @@ def test_後端拒絕時丟出錯誤() -> None:
 def test_金鑰太短拒絕() -> None:
     with pytest.raises(ValueError):
         Pusher("https://api.example", "short")
+
+
+def test_replay_把dry_run結果推送(tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    from typer.testing import CliRunner
+
+    from scraper import cli
+
+    run_dir = tmp_path  # type: ignore[assignment]
+    (run_dir / "kinmen.jsonl").write_text(
+        json.dumps(sample().to_payload(), ensure_ascii=False) + "\n", encoding="utf-8"
+    )  # type: ignore[operator]
+    seen: list[httpx.Request] = []
+    real_client = httpx.Client
+
+    def fake_client(**kw: object) -> httpx.Client:
+        return real_client(transport=httpx.MockTransport(lambda r: seen.append(r) or httpx.Response(200)))
+
+    monkeypatch.setattr(httpx, "Client", fake_client)
+    monkeypatch.setenv("API_BASE", "https://api.example")
+    monkeypatch.setenv("INGEST_HMAC_KEY", KEY)
+    result = CliRunner().invoke(cli.app, ["replay", str(run_dir)])
+    assert result.exit_code == 0, result.output
+    assert "kinmen     pushed 1" in result.output
+    assert [str(r.url) for r in seen] == ["https://api.example/internal/ingest"]

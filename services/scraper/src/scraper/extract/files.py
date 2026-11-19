@@ -47,7 +47,12 @@ def sniff(content: bytes) -> str:
     return "unknown"
 
 
+# PDF 抽出的文字常夾雜 NUL 等控制字元；Postgres 的 text 不能存 NUL（後端會回 500）
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
 def _normalize(text: str) -> str:
+    text = _CONTROL.sub("", text)
     text = re.sub(r"[ \t　\xa0]+", " ", text)
     text = re.sub(r"\n\s*\n+", "\n\n", text)
     return text.strip()[:MAX_ATTACHMENT_CHARS]

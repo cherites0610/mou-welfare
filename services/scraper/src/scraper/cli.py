@@ -90,6 +90,50 @@ def run(
 
 
 @app.command()
+def replay(
+    run_dir: Annotated[Path, typer.Argument(help="dry-run 的輸出目錄（out/{run_id}）")],
+    site: Annotated[list[str] | None, typer.Option(help="只送指定站點（可重複）")] = None,
+) -> None:
+    """把 dry-run 的結果推送到 API（人工檢查過 dry-run 後再發布，不必重新爬）。
+
+    不會更新狀態檔：之後正式執行時這些網址仍視為新增，後端以 program_key upsert，內容相同會判定為沒變。
+    """
+    import json
+
+    from scraper.models import IngestItem
+    from scraper.push import PushError
+
+    api_base, key = os.environ.get("API_BASE"), os.environ.get("INGEST_HMAC_KEY")
+    if not api_base or not key:
+        raise typer.BadParameter("需要環境變數 API_BASE 與 INGEST_HMAC_KEY")
+    files = sorted(run_dir.glob("*.jsonl"))
+    if site:
+        files = [f for f in files if f.stem in site]
+    if not files:
+        raise typer.BadParameter(f"{run_dir} 沒有要推送的 *.jsonl")
+    pusher = Pusher(api_base, key)
+    failed = 0
+    try:
+        for f in files:
+            sent = 0
+            for line in f.read_text(encoding="utf-8").splitlines():
+                if not line:
+                    continue
+                try:
+                    pusher.ingest(IngestItem.model_validate(json.loads(line)))
+                    sent += 1
+                except PushError as e:
+                    failed += 1
+                    typer.echo(f"  ✗ {e}", err=True)
+            typer.echo(f"{f.stem:<10} pushed {sent}")
+    finally:
+        pusher.close()
+    if failed:
+        typer.echo(f"failed: {failed}", err=True)
+        raise typer.Exit(code=1)
+
+
+@app.command()
 def sample(
     run_dir: Annotated[Path, typer.Argument(help="dry-run 的輸出目錄（out/{run_id}）")],
     n: Annotated[int, typer.Option("-n", help="抽樣篇數，各站平均分配")] = 50,

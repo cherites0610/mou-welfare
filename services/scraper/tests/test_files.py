@@ -81,3 +81,9 @@ def test_不支援或損毀的檔案回傳空字串() -> None:
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr("other.txt", "x")
     assert parse_file(buf.getvalue()).format == "unknown"
+
+
+def test_去掉控制字元() -> None:
+    from scraper.extract.files import _normalize
+
+    assert _normalize("申請\x00資格\x07：年滿65歲\n\n\n說明") == "申請資格：年滿65歲\n\n說明"
