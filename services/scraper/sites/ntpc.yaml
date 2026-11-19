@@ -1,0 +1,32 @@
+# 新北市政府社會局（B 族）：各福利分類的公告列表，內文常只有附件
+id: ntpc
+city: 新北市
+adapter: cms_b
+base_url: https://www.sw.ntpc.gov.tw
+seeds:
+  - url: /home.jsp?id=96f17c1750c49c4b
+    label: 兒童及少年福利
+  - url: /home.jsp?id=b2dfefc09cf046f2
+    label: 兒童托育
+  - url: /home.jsp?id=af6b347895e3de2c
+    label: 兒童健康發展／早期療育
+  - url: /home.jsp?id=a359e98e33007b78
+    label: 身心障礙者經濟安全服務
+  - url: /home.jsp?id=b51403733dcb08dc
+    label: 身心障礙者多元照顧支持服務
+  - url: /home.jsp?id=a547dda78bf6d2aa
+    label: 身心障礙者社會參與服務
+  - url: /home.jsp?id=bd3ac04bd17eafde
+    label: 老人福利
+  - url: /home.jsp?id=4ee902eba1348b6f
+    label: 婦女福利
+  - url: /home.jsp?id=dff618d9d6f956fa
+    label: 社會救助
+max_depth: 0
+pagination: { param: page, max: 10 }
+drop_params: [mserno]
+# 社會救助等分類的項目多半直接連到市府的線上申辦網站，那裡有完整的資格、補助內容與應備文件
+extra_hosts: [service.ntpc.gov.tw]
+detail: '(home\.jsp\?id=[0-9a-f]{16}&act=[0-9a-f]{16}&dataserno=[0-9a-f]{32}|service\.ntpc\.gov\.tw/eservice/CaseData\.action\?itemId=\d+)$'
+
+exclude_title: [得獎名單, 錄取名單, 正備取, 師資名單, 種子教師, 績優, 防災資訊, 培訓]

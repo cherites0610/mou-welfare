@@ -78,7 +78,7 @@ v1 的其他問題：
                  ┌──────── quality gate ────────┐   不合格 → 隔離區 + 警告
                  └──────────────┬───────────────┘
                                 ▼
-                 POST /welfare/ingest（upsert）、POST /welfare/remove
+                 POST /internal/ingest（upsert）、POST /internal/remove
                                 ▼
                  run report：每站數量、與上次的差異、失敗清單 → 異常就警告
 ```
@@ -239,8 +239,10 @@ CREATE TABLE pages (
 ```
 
 - **新增**：狀態表裡沒有這個網址。
-- **更新**：`content_hash` 和 `pushed_hash` 不同。
-- **下架**：全量執行時，連續 2 次沒看到，或內文頁回應 404 / 410。
+- **更新**：這次的 hash 和上次「處理完」時記下的 `content_hash` 不同。推送、過濾、隔離都算處理完；推送失敗則不更新，下次重試。
+- **下架**：完整執行（沒有 `--limit`）且健康檢查正常時，連續 2 次沒看到。只有推送過的網址會通知後端。
+- **hash 的範圍**：正文（去掉點閱次數、最後更新時間等每天會變的欄位）加上附件網址。附件內容不列入，因此沒變動的頁面不必每次重新下載附件。
+- 實作時另外加了 `last_run`、`miss_count`（下架判定）與 `runs` 表（每站每次看到的數量，作為健康檢查的基準）。
 
 ### 6.5 去雜訊（三層過濾）
 
@@ -300,9 +302,18 @@ v1 只有 `POST /welfare/ingest`，用 `sourceUrl` 去重，存在就跳過。v2
 
 | 端點 | 用途 |
 |---|---|
-| `POST /welfare/ingest` | upsert，鍵為 `program_key`（沒有就用 `source_url`）；`content_hash` 不同才重新交給 LLM 結構化 |
-| `POST /welfare/remove` | 標記下架（軟刪除，保留紀錄） |
-| 驗證 | 改用 HMAC 簽章或 service token；未設定時一律拒絕（v1 在沒設 `API_KEY` 時可被繞過） |
+| `POST /internal/ingest` | upsert，鍵為 `program_key`（沒有就用 `source_url`）；`content_hash` 不同才重新交給 LLM 結構化 |
+| `POST /internal/remove` | 標記下架（軟刪除，保留紀錄）。內容：`{ "site_id": "kinmen", "urls": ["..."] }` |
+| 驗證 | HMAC 簽章加時間戳；金鑰未設定時一律拒絕（v1 在沒設 `API_KEY` 時可被繞過） |
+
+**簽章**（`services/scraper/src/scraper/push.py`，後端依同樣規則驗證）：
+
+```
+X-Mou-Timestamp: 1700000000                       # unix 秒
+X-Mou-Signature: sha256=<hex>                     # HMAC-SHA256(INGEST_HMAC_KEY, "{timestamp}.{原始 body}")
+```
+
+後端用原始 body 計算、以常數時間比較，時間戳與伺服器時間相差超過 5 分鐘就拒絕（防重放）。
 
 推送格式由 `packages/shared` 的 Zod schema 產出 JSON Schema，爬蟲端用 pydantic 依同一份 schema 驗證：
 
@@ -346,27 +357,31 @@ v1 只有 `POST /welfare/ingest`，用 `sourceUrl` 去重，存在就跳過。v2
 ```
 services/scraper/
 ├── pyproject.toml
-├── sites/                  # 22 份站點設定（YAML）
-│   ├── kinmen.yaml
-│   └── ...
+├── sites/                  # 站點設定（YAML），一站一檔
+│   ├── kinmen.yaml         # A 族
+│   ├── ntpc.yaml           # B 族
+│   ├── klcg.yaml           # C 族
+│   └── taichung.yaml       # 開放資料
 ├── src/scraper/
-│   ├── cli.py
+│   ├── cli.py              # scrape sites / scrape run
+│   ├── fetch.py            # 共用 HTTP client：限速、robots.txt、重試、大小上限
 │   ├── adapters/
-│   │   ├── base.py         # Adapter 介面：list_items() -> Iterable[RawItem]
-│   │   ├── cms_a.py
-│   │   ├── cms_b.py
+│   │   ├── base.py         # Adapter 介面：list_items() -> Iterator[RawItem]
+│   │   ├── crawl.py        # 列表 → 內文的通用爬法；CmsA、CmsB 只是預設值不同
 │   │   ├── opendata.py
-│   │   └── custom/         # C 族：taichung.py、kaohsiung.py、klcg.py …
-│   ├── extract/            # trafilatura 包裝、附件解析、日期與標題
-│   ├── filter/             # rules.py、classify.py（LLM）
+│   │   └── custom/         # C 族：klcg.py …（多數只需要覆寫預設值）
+│   ├── extract/            # html.py（trafilatura、標題、附件連結）、dates.py、files.py（附件解析）
+│   ├── filter/             # rules.py、classify.py（LLM，P1）
+│   ├── normalize.py        # program_key、content_hash
 │   ├── state.py
 │   ├── quality.py
-│   ├── push.py             # 推送到後端
+│   ├── pipeline.py         # 單站流程與健康檢查
+│   ├── push.py             # 推送到後端（HMAC 簽章）
 │   ├── report.py
-│   └── initgen.py          # AI 產生設定與修復設定
+│   └── initgen.py          # AI 產生設定與修復設定（P2）
 └── tests/
-    ├── fixtures/{site}/*.html
-    └── test_{adapter}.py
+    ├── fixtures/{site}/*   # 存成檔案的網頁快照，測試不連網路
+    └── test_*.py
 ```
 
 ---
@@ -382,13 +397,49 @@ services/scraper/
 | **P4 B、C 族與平台** | 新竹市、澎湖（B）；高雄、彰化、南投、花蓮、臺東、連江（C）；雲林、彰化 L2 平台 | 22 縣市全數上線 |
 | **P5 自動修復** | 健康檢查觸發重新產生設定 | 模擬改版能被偵測並產生修復建議 |
 
+### 10.1 P0 實作紀錄（2026-11-19）
+
+從東京主機實際跑完 4 個來源（臺中社會局網站封鎖海外 IP，改用開放資料；其他 3 站可以直接連）。數量見下表，抽查清單由 `scrape sample` 產生。
+
+| 站點 | 族 | 看到 | 標題規則排除 | 隔離 | 可推送 | 有附件 | 執行時間 |
+|---|---|---|---|---|---|---|---|
+| 金門 `kinmen` | A | 148 | 0 | 4（正文空白） | 144 | 95 | 約 15 分鐘 |
+| 新北 `ntpc` | B | 182 | 15 | 0 | 167 | 102 | 約 40 分鐘 |
+| 基隆 `klcg` | C | 141 | 8 | 1 | 132 | 96 | 約 20 分鐘 |
+| 臺中 `taichung` | 開放資料 | 34 | 0 | 0 | 34 | — | 數秒 |
+
+- 合計 477 筆可推送；同一站內 `program_key` 重複的有 14 組（同一福利出現在多個分類），由後端合併。
+- 第二次執行（臺中）34 筆全部判定為沒變，不推送。
+- 每站都在禮貌爬取規則內（同一主機間隔 2 秒），各站可以平行執行。新北多數公告附多個 PDF，是最慢的一站。
+- 抽查 52 篇（各站 13 篇）：標題、正文、日期、附件文字大致正確；不是個人福利的項目（宣導影片、繪本、機構管理、定型化契約）約佔 1/5，留給 P1 的 LLM 分類。
+
+**實際跑出來、已經處理的問題**
+
+| 問題 | 站點 | 處理方式 |
+|---|---|---|
+| 每天都會變的欄位（點閱次數、最後更新時間）讓 hash 每天不同 | 基隆、新北 | 抽取後先刪除這些行再算 hash（`extract/html.py` `_VOLATILE_LINE`） |
+| 網站在負載高時對正常網址回傳 200 的「找不到網頁」頁面（soft 404），而且是間歇性的 | 金門 | 品質關卡新增 `error_page`；被隔離的頁面下次 hash 不同會自動重新處理 |
+| 正文區塊是空的時，trafilatura 退回整頁文字，把選單當正文 | 金門 | 輸出的行大多是頁面上的連結文字時視為失敗，改用正文區塊（`content` selector）；仍不足 80 字就隔離，有附件則併入附件文字 |
+| 列表預設每頁 10 筆，只抓到第 1 頁 | 基隆 | GET `nowPage` / `pageSize=40` 分頁；帶額外參數時從第 1 頁重抓 |
+| 項目直接連到另一個主機（市府線上申辦網站），內容反而最完整 | 新北 | 站點設定 `extra_hosts`：其他主機只收內文頁，不往下走列表 |
+| A 族的 `cp.aspx?n=X` 顯示第一個子項目，同時列出 `&s=` 子項目，會重複 | 金門 | `CmsA.is_hub()`：有子項目的目錄頁不輸出 |
+| 附件在頁尾區塊，不在內容區塊 | 金門 | A 族的 `body` 加上 `div.file-download-multiple` |
+| 只有內容在附件裡的公告 | 新北 | 正文不足 80 字時把附件文字併入正文 |
+
+**還沒處理（後續階段）**
+
+- 托嬰中心、機構名冊、調查報告、捐款明細這類「不是個人可申請的福利」，標題規則只能擋一部分，交給 P1 的 LLM 分類。
+- 同一個福利在不同分類各有一頁（例如金門「申請社會救助專戶」出現在老人、身障、社會救助三個分類），`program_key` 相同，由後端 upsert 合併。
+- 舊格式附件（DOC、XLS）與掃描 PDF 目前沒有文字（LibreOffice、Gemini 在之後加入）；超過 15 MB 的附件不下載。
+- 每次執行都會重新抓所有內文頁（hash 才能比對）；之後若站點變多，再加上依 `Last-Modified` / ETag 的條件請求。
+
 ---
 
 ## 11. 待確認事項
 
 - [ ] 從台灣 IP 重新測試標 ⏱ 和 🛡 的站：新竹市、雲林的 Cloudflare 是否仍會擋？
 - [ ] 新竹縣、雲林、嘉義縣是否確實屬於 A 族（目前只從網址判斷）。
-- [ ] 臺中 112089、112090、132989 三個資料集的筆數、欄位、更新頻率，以及是否涵蓋社會救助、兒少。
+- [x] 臺中 112089、112090、132989 三個資料集：分別 15、15、4 筆，JSON 可直接下載（不需金鑰），每年更新；欄位含資格、應備文件、收件單位與原始網頁連結。只涵蓋身障、長青、婦女，社會救助與兒少不在其中。
 - [ ] 臺南 79613 的實際內容與筆數（2025-06 之後是否還有更新）。
 - [ ] 雲林、金門、彰化的福利平台有沒有可介接的 API，或是否需要逐頁抓取。
 - [ ] 新北「福利補助自己查」是否仍在運作。

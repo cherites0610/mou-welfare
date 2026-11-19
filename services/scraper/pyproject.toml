@@ -5,8 +5,13 @@ description = "哞福利 v2 爬蟲（docs/scraper.md）"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28",
+    "odfpy>=1.4.1",
     "pydantic>=2.10",
+    "pypdf>=7.1.1",
+    "python-docx>=1.2.0",
     "pyyaml>=6.0",
+    "selectolax>=1.0.2",
+    "trafilatura>=2.3.1",
     "typer>=0.15",
 ]
 
@@ -18,6 +23,7 @@ dev = [
     "jsonschema>=4.23",
     "mypy>=1.15",
     "pytest>=8.3",
+    "respx>=0.23.1",
     "ruff>=0.9",
     "types-pyyaml>=6.0",
 ]
@@ -33,6 +39,8 @@ module-name = "scraper"
 testpaths = ["tests"]
 markers = ["live: 連到真實政府網站的金絲雀測試（不在 CI 執行）"]
 addopts = "-m 'not live'"
+# 有設定 SOCKS proxy 的環境變數時，urllib3（trafilatura 的依賴）會警告缺少 PySocks；與測試無關
+filterwarnings = ["ignore::urllib3.exceptions.DependencyWarning"]
 
 [tool.ruff]
 line-length = 120
@@ -46,3 +54,7 @@ python_version = "3.12"
 strict = true
 packages = ["scraper"]
 mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = ["odf.*", "trafilatura.*"]
+ignore_missing_imports = true

@@ -1,13 +1,25 @@
 # 金門縣社會處（A 族，docs/scraper.md §4）
+# 起點只放各分類的「福利服務項目」與福利相關專區，不從首頁或「主題福利服務專區」（含人民團體、志工等）開始。
 id: kinmen
 city: 金門縣
 adapter: cms_a
 base_url: https://social.kinmen.gov.tw
 seeds:
-  - url: /Content_List.aspx?n=B709941748334ACA
-    label: 主題福利服務專區
-  - url: /Content_List.aspx?n=315869EEDF0D4401
-    label: 老人福利專區
-follow: 'Content_List\.aspx\?n=[0-9A-F]{16}'
-detail: '(cp|News_Content)\.aspx\?n=[0-9A-F]{16}(&s=[0-9A-F]{16})?'
-pagination: { param: page, max: 20 }
+  - url: /cp.aspx?n=C8CDE0088D2E9571
+    label: 老人福利／福利服務項目
+  - url: /cp.aspx?n=69B652E4C1464FFE
+    label: 兒少福利／福利服務項目
+  - url: /cp.aspx?n=23A3A23B56E70887
+    label: 婦女福利／福利服務項目
+  - url: /cp.aspx?n=A3F704E25195CDB4
+    label: 身心障礙者福利／福利服務項目
+  - url: /cp.aspx?n=99FF9571F64E278F
+    label: 社會救助／福利服務項目
+  - url: /cp.aspx?n=2A0F7ABB8AAB0C34
+    label: 勞工服務／福利服務項目
+  - url: /Content_List.aspx?n=07E013BF6DAC8E2D
+    label: 新住民福利專區
+  - url: /Content_List.aspx?n=B728D35F4F5918AC
+    label: 育兒資源專區
+max_depth: 1
+exclude_title: [委員會, 機構管理, 場地租借]

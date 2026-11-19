@@ -36,8 +36,11 @@ NUXT_PUBLIC_API_BASE=http://localhost:5031 pnpm dev:web
 pnpm --filter @mou-welfare/api db:generate   # 修改 schema 後產生 migration
 pnpm --filter @mou-welfare/api openapi       # 修改 API 後更新 openapi.json
 
-# 爬蟲
-cd services/scraper && uv sync && uv run pytest && uv run scrape sites
+# 爬蟲（dry-run 結果寫到 services/scraper/out/，報告在 out/reports/）
+cd services/scraper && uv sync && uv run pytest
+uv run scrape sites
+uv run scrape run --site kinmen --limit 10   # 試跑 10 筆
+uv run scrape run --push                     # 推送到 API（需要 API_BASE、INGEST_HMAC_KEY）
 ```
 
 API 整合測試需要測試資料庫：CI 使用 `TEST_DATABASE_URL` 環境變數，本機則讀取 `apps/api/.env.test`（不進版控）。

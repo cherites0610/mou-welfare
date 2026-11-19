@@ -27,3 +27,7 @@ logs/
 .output/
 .wrangler/
 *.tsbuildinfo
+
+# scraper 本機輸出與狀態
+services/scraper/out/
+services/scraper/.state/

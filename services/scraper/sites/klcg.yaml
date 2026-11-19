@@ -1,0 +1,21 @@
+# 基隆市政府社會處（C 族）：社會福利專區底下的分類 → 子分類列表 → 內文
+id: klcg
+city: 基隆市
+adapter: custom:klcg
+base_url: https://www.klcg.gov.tw
+seeds:
+  - url: /tw/social/2749.html
+    label: 老人福利
+  - url: /tw/social/2794.html
+    label: 身心障礙福利
+  - url: /tw/social/2808.html
+    label: 社會救助
+  - url: /tw/social/2758.html
+    label: 婦女福利
+max_depth: 1
+# 列表預設每頁 10 筆；GET 參數 nowPage / pageSize 可以直接翻頁
+pagination: { param: nowPage, max: 10, extra: { pageSize: "40" } }
+# 機構專區、身障機構管理、團體培力、優先採購、法令規章、社會救助金專戶（徵信）、
+# 實物銀行捐贈名冊、遊民安置中心、婦女年度計畫、婦女團體組織
+exclude_urls: ['/tw/social/(2755|2759|2760|2800|2801|2802|2809|2813|2814|2815)(-\d+)?\.html$']
+exclude_title: [機構專區, 機構評鑑, 名冊, 特約廠商, 捐款及支出明細, 調查報告, 優先採購, 核銷]

@@ -1,0 +1,24 @@
+# 臺中市（C 族，L1 開放資料）：社會局網站封鎖海外 IP，開放資料可以直接下載
+id: taichung
+city: 臺中市
+adapter: opendata
+base_url: https://newdatacenter.taichung.gov.tw
+datasets:
+  - url: https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=17401e3d-9737-47fb-ac23-0f0a1334357a
+    label: 臺中市身心障礙福利補助項目
+    page_url: https://data.gov.tw/dataset/112089
+    title: 補助名稱
+    id: 補助流水號
+    link: 相關連結
+  - url: https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=22131e55-91f5-48a2-8a3b-18867b55f9d5
+    label: 臺中市長青福利補助項目
+    page_url: https://data.gov.tw/dataset/112090
+    title: 補助名稱
+    id: 編號
+    link: 詳細資訊連結
+  - url: https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=9b38286d-36e9-4ad5-808f-1e5d1319c31d
+    label: 臺中市婦女福利補助項目
+    page_url: https://data.gov.tw/dataset/132989
+    title: 補助名稱
+    id: 編號
+    link: 詳細資訊連結
