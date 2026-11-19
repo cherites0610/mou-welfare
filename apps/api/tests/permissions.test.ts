@@ -60,6 +60,8 @@ describe('權限矩陣', () => {
     ['POST', '/v1/uploads/avatar', 401, 400], // 登入後沒帶檔案 → 400
     ['GET', '/v1/welfare/00000000-0000-4000-8000-000000000000', 404, 404],
     ['GET', '/v1/not-registered', 401, 404], // 未登記：匿名 401，登入後才看到 404
+    ['POST', '/internal/ingest', 401, 401], // 只接受 HMAC，登入也沒用
+    ['POST', '/internal/remove', 401, 401],
   ] as const
 
   it.each(matrix)('%s %s：匿名 %i / 登入 %i', async (method, path, anon, user) => {
@@ -69,12 +71,12 @@ describe('權限矩陣', () => {
   })
 })
 
-describe('accessControl：簽章類存取在實作前一律拒絕', () => {
+describe('accessControl：簽章類存取沒有金鑰或尚未實作時一律拒絕', () => {
   it.each(['hmac', 'line'] as const)('%s → 401，且不會執行路由', async (kind: Access) => {
     let reached = false
     // 這兩種存取不會用到 auth，傳入空物件即可
     const app = new Hono()
-      .use('*', accessControl({} as Auth, () => kind))
+      .use('*', accessControl({} as Auth, { resolve: () => kind }))
       .get('/x', (c) => {
         reached = true
         return c.text('ok')

@@ -17,6 +17,7 @@ export async function createProgram(db: Db, input: ProgramInput = {}) {
       summary: '測試用摘要',
       sourceUrl: 'https://social.kinmen.gov.tw/cp.aspx?n=1',
       sourceKind: 'cms',
+      status: 'active',
       ...input,
     })
     .returning()

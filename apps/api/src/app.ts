@@ -1,4 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { bodyLimit } from 'hono/body-limit'
 import { cors } from 'hono/cors'
 import { accessControl, type AppVariables } from './access.ts'
 import type { Db } from './db/client.ts'
@@ -6,15 +7,17 @@ import type { Env } from './env.ts'
 import { faqRoutes } from './features/faq/routes.ts'
 import { favoriteRoutes } from './features/favorite/routes.ts'
 import { healthRoutes } from './features/health/routes.ts'
+import { ingestRoutes } from './features/ingest/routes.ts'
 import { meRoutes } from './features/me/routes.ts'
 import { uploadRoutes } from './features/upload/routes.ts'
 import { welfareRoutes } from './features/welfare/routes.ts'
 import { AUTH_BASE_PATH, type Auth } from './lib/auth.ts'
 import type { Mailer } from './lib/mail/index.ts'
+import type { Queue } from './lib/queue.ts'
 import type { Storage } from './lib/storage.ts'
 import { apiError } from './lib/errors.ts'
 
-export type Deps = { db: Db; auth: Auth; env: Env; mailer: Mailer; storage: Storage | null }
+export type Deps = { db: Db; auth: Auth; env: Env; mailer: Mailer; storage: Storage | null; queue: Queue }
 export type AppEnv = { Variables: AppVariables & { deps: Deps } }
 
 export function createApp(deps: Deps) {
@@ -41,7 +44,14 @@ export function createApp(deps: Deps) {
     c.set('deps', deps)
     await next()
   })
-  app.use('*', accessControl(deps.auth))
+  // 爬蟲推送含正文與附件文字（各約 30k 字），簽章驗證前先限制大小
+  // （掛在 '*' 再判斷路徑：掛在 '/internal/*' 會被路由普查當成一條未登記的路由）
+  const internalLimit = bodyLimit({
+    maxSize: 2 * 1024 * 1024,
+    onError: (c) => apiError(c, 413, 'invalid_request', '推送內容太大'),
+  })
+  app.use('*', (c, next) => (c.req.path.startsWith('/internal/') ? internalLimit(c, next) : next()))
+  app.use('*', accessControl(deps.auth, { hmacKey: deps.env.INGEST_HMAC_KEY }))
 
   app.on(['GET', 'POST'], `${AUTH_BASE_PATH}/*`, (c) => deps.auth.handler(c.req.raw))
 
@@ -51,6 +61,7 @@ export function createApp(deps: Deps) {
   app.route('/', favoriteRoutes)
   app.route('/', welfareRoutes)
   app.route('/', uploadRoutes)
+  app.route('/', ingestRoutes)
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

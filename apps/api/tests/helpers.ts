@@ -4,6 +4,7 @@ import { createDb } from '../src/db/client.ts'
 import { user } from '../src/db/schema/index.ts'
 import { createAuth } from '../src/lib/auth.ts'
 import { MemoryMailer } from '../src/lib/mail/index.ts'
+import { MemoryQueue } from '../src/lib/queue.ts'
 import { MemoryStorage, type Storage } from '../src/lib/storage.ts'
 import { testEnv } from './test-env.ts'
 
@@ -15,15 +16,16 @@ export function setupApp(overrides: Partial<Record<string, string>> = {}, opts: 
   const mailer = new MemoryMailer()
   const storage = opts.storage === undefined ? new MemoryStorage() : opts.storage
   const auth = createAuth(db, env, mailer)
-  const app = createApp({ db, auth, env, mailer, storage })
-  return { app, db, env, mailer, storage, close: () => client.end() }
+  const queue = new MemoryQueue()
+  const app = createApp({ db, auth, env, mailer, storage, queue })
+  return { app, db, env, mailer, storage, queue, close: () => client.end() }
 }
 
 type T = ReturnType<typeof setupApp>
 
 export async function resetDb(db: T['db']) {
   await db.execute(
-    sql`truncate table "user", session, account, verification, faqs, worker_heartbeat, welfare_programs, welfare_attachments, favorites cascade`,
+    sql`truncate table "user", session, account, verification, faqs, worker_heartbeat, welfare_programs, welfare_attachments, welfare_sources, ingest_log, favorites cascade`,
   )
 }
 

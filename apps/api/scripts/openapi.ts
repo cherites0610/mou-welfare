@@ -5,6 +5,7 @@ import { createDb } from '../src/db/client.ts'
 import { loadEnv } from '../src/env.ts'
 import { createAuth } from '../src/lib/auth.ts'
 import { LogMailer } from '../src/lib/mail/index.ts'
+import { MemoryQueue } from '../src/lib/queue.ts'
 
 // 產生文件不需要連資料庫（postgres.js 在第一次查詢前不會連線）
 const env = loadEnv({
@@ -16,7 +17,7 @@ const env = loadEnv({
 })
 const { db, sql } = createDb(env.DATABASE_URL, { max: 1 })
 const mailer = new LogMailer()
-const app = createApp({ db, auth: createAuth(db, env, mailer), env, mailer, storage: null })
+const app = createApp({ db, auth: createAuth(db, env, mailer), env, mailer, storage: null, queue: new MemoryQueue() })
 const doc = await (await app.request('/openapi.json')).json()
 await sql.end()
 

@@ -4,6 +4,7 @@ import { createDb } from '../src/db/client.ts'
 import { faqs, workerHeartbeat } from '../src/db/schema/index.ts'
 import { createAuth } from '../src/lib/auth.ts'
 import { MemoryMailer } from '../src/lib/mail/index.ts'
+import { MemoryQueue } from '../src/lib/queue.ts'
 import { FakeLLM } from '../src/lib/llm/index.ts'
 import { z } from 'zod'
 import { resetDb, setupApp, signUp } from './helpers.ts'
@@ -43,7 +44,7 @@ describe('GET /health', () => {
     const env = testEnv({ DATABASE_URL: 'postgresql://nobody:x@127.0.0.1:1/none' })
     const { db, sql } = createDb(env.DATABASE_URL, { max: 1 })
     const mailer = new MemoryMailer()
-    const app = createApp({ db, auth: createAuth(db, env, mailer), env, mailer, storage: null })
+    const app = createApp({ db, auth: createAuth(db, env, mailer), env, mailer, storage: null, queue: new MemoryQueue() })
     const res = await app.request('/health')
     expect(res.status).toBe(503)
     await sql.end()

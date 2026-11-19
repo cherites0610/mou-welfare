@@ -161,7 +161,9 @@ welfare_programs(
   content_md text,                  -- 原文（Markdown），附件文字另存
   source_url text, source_kind text,  -- cms | opendata | portal
   published_at date, deadline date,
-  status text,                      -- active | expired | removed
+  status text,                      -- pending（待結構化，不出現在搜尋）| active | rejected（不是個人福利）| expired | removed
+  site_id text, source_fields jsonb,  -- 爬蟲站點；開放資料原本的結構化欄位
+  structured_hash text, structured_by text, structured_at, structure_error,  -- 結構化時的 content_hash、llm | rules
   content_hash text,                -- 內容沒變就不重新交給 LLM
   embedding vector(768),            -- RAG 用
   created_at, updated_at
@@ -177,7 +179,9 @@ faqs(id, question, answer, sort, published)
 chat_sessions(id, user_id, family_id null, title, options jsonb, created_at, updated_at)
 chat_messages(id, session_id, role, content, metadata jsonb, created_at)
 notification_log(id, user_id, channel, template, payload jsonb, status, sent_at)
-ingest_log(id, program_key, action, content_hash, received_at, processed_at, error)
+ingest_log(id, program_key, source_url, action, content_hash, received_at)   -- action: created | updated | unchanged | removed
+welfare_sources(url pk, program_id, site_id, content_hash, first_seen_at, last_seen_at)
+  -- 一個福利可能來自多個網址（同一福利出現在多個分類）；所有網址都下架才把福利標為 removed
 ```
 
 ### 5.2 索引
@@ -278,7 +282,9 @@ export interface LLM {
 
 - **實作**：`gemini.ts`（`@google/genai`）。可選擇經過 Cloudflare AI Gateway 來看用量和做快取，但不是必要。
 - **結構化輸出**：用 `z.toJSONSchema()` 把 Zod schema 轉成 Gemini 的 `responseSchema`，回傳後再用 Zod 驗證；不合格就重試一次，帶上錯誤訊息。
-- **Embedding**：用 Gemini 的 embedding 模型輸出 768 維（實作時確認模型支援自訂輸出維度）。
+- **Embedding**：用 Gemini 的 embedding 模型輸出 768 維（`gemini-embedding-001` 支援 `outputDimensionality`），正規化後存入 pgvector。
+- **沒有金鑰時**（`GEMINI_API_KEY` 未設定或 `LLM_DRIVER=rules`）：改用關鍵字規則結構化（`features/welfare/structure.ts` 的 `RuleStructurer`），只依標題標身分、寧可少標；不做 embedding。資料可以先被搜尋到。設定金鑰後重新啟動，啟動時的 backfill 會把規則結構化的福利全部重新排入。
+- **身分欄位的語意**：`identities` 是「一定要具備」的身分，多個特殊身分視為全部都要；「A 或 B」不列、「低收入戶或中低收入戶」只列中低收入戶（`match()` 的相容規則會涵蓋）。這段寫在 prompt 裡，規則版也遵守。
 
 | 用途 | 時機 | 執行位置 |
 |---|---|---|
@@ -290,7 +296,7 @@ export interface LLM {
 
 | 名稱 | 類型 | 內容 |
 |---|---|---|
-| `welfare-structure` | pg-boss 佇列 | 結構化、embedding、寫回資料庫；失敗重試 3 次（指數退避），之後進入 dead letter |
+| `welfare-structure` | pg-boss 佇列 | 結構化、embedding、寫回資料庫；一次一筆；失敗重試 3 次（指數退避，30 秒起）。內容 hash 沒變就略過，所以重複執行是安全的；啟動時補送遺失的工作（backfill）。結構化期間內容又被更新時不寫回，由新的工作處理 |
 | `notify` | pg-boss 佇列 | Email（Resend）、LINE push |
 | `deadline-reminder` | pg-boss cron（每日） | 通知收藏的福利即將截止 |
 | `expire` | pg-boss cron（每日） | 把超過截止日的福利標為 `expired` |
@@ -431,7 +437,7 @@ export interface LLM {
 |---|---|---|
 | **P0 骨架與驗證** | monorepo（pnpm）、`packages/shared`、API（Hono + Drizzle + Better Auth + pg-boss）部署到 `api-v2.mou-welfare.com`、Nuxt 骨架部署到 Workers | 第 11 節四項驗證全部通過 |
 | **P1 核心 API** | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出 |
-| **P2 資料流** | `/internal/ingest`、pg-boss 結構化、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到 |
+| **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到 |
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | — |
 | **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | — |
 | **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用 |

@@ -3,19 +3,35 @@
 import { sql } from 'drizzle-orm'
 import type { Db } from '../db/client.ts'
 import { workerHeartbeat } from '../db/schema/index.ts'
-import { createBoss } from '../lib/queue.ts'
+import type { Structurer } from '../features/welfare/structure.ts'
+import type { LLM } from '../lib/llm/index.ts'
+import { type Boss, BossQueue } from '../lib/queue.ts'
+import { backfill, structureProgram } from './structure.ts'
 
 export const HEARTBEAT_NAME = 'jobs'
 export const HEARTBEAT_MS = 15_000
 
 export type Jobs = { stop: () => Promise<void> }
 
-export async function startJobs(opts: { db: Db; databaseUrl: string; heartbeatMs?: number }): Promise<Jobs> {
-  const { db } = opts
-  const boss = await createBoss(opts.databaseUrl)
+export async function startJobs(opts: {
+  db: Db
+  boss: Boss
+  structurer: Structurer
+  llm: LLM | null
+  heartbeatMs?: number
+}): Promise<Jobs> {
+  const { db, boss, structurer, llm } = opts
 
-  // TODO(P2)：welfare-structure（同時處理數設低，避免影響 API 回應）、notify
-  // TODO(P4)：deadline-reminder、expire、cleanup 等 cron
+  // 一次處理一筆：結構化會呼叫 LLM，避免和 API 搶資源，也避免超過 Gemini 的速率限制
+  await boss.work<{ programId: string }>('welfare-structure', { batchSize: 1 }, async ([job]) => {
+    if (!job) return
+    const outcome = await structureProgram(db, structurer, llm, job.data.programId)
+    return { outcome }
+  })
+  const queued = await backfill(db, new BossQueue(boss), structurer)
+  if (queued) console.log(`[jobs] welfare-structure: queued ${queued} programs (${structurer.kind})`)
+
+  // TODO(P4)：notify、deadline-reminder、expire、cleanup 等 cron
 
   const beat = () =>
     db
@@ -28,7 +44,7 @@ export async function startJobs(opts: { db: Db; databaseUrl: string; heartbeatMs
   return {
     stop: async () => {
       clearInterval(timer)
-      await boss.stop({ graceful: true, timeout: 10_000 })
+      await boss.offWork('welfare-structure')
     },
   }
 }

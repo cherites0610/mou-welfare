@@ -14,7 +14,14 @@ const EnvSchema = z
       .string()
       .default('')
       .transform((s) => s.split(',').map((x) => x.trim()).filter(Boolean)),
+    /** 爬蟲推送的 HMAC 金鑰（services/scraper/src/scraper/push.py 用同一把簽章） */
     INGEST_HMAC_KEY: z.string().min(32, '至少 32 字元'),
+
+    /** 福利結構化：gemini＝呼叫 Gemini；rules＝關鍵字規則（沒有金鑰時的備案）。未設定時有金鑰就用 gemini */
+    LLM_DRIVER: z.enum(['gemini', 'rules']).optional(),
+    GEMINI_API_KEY: z.string().optional(),
+    GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+    GEMINI_EMBED_MODEL: z.string().default('gemini-embedding-001'),
     /** 背景工作的執行方式：inline＝在 API 程序內；separate＝由 src/worker.ts 獨立程序；off＝不執行（測試用） */
     WORKER_MODE: z.enum(['inline', 'separate', 'off']).default('inline'),
 
@@ -38,6 +45,9 @@ const EnvSchema = z
   .superRefine((e, ctx) => {
     if (e.MAIL_DRIVER === 'resend' && !e.RESEND_API_KEY) {
       ctx.addIssue({ code: 'custom', path: ['RESEND_API_KEY'], message: 'MAIL_DRIVER=resend 時必填' })
+    }
+    if (e.LLM_DRIVER === 'gemini' && !e.GEMINI_API_KEY) {
+      ctx.addIssue({ code: 'custom', path: ['GEMINI_API_KEY'], message: 'LLM_DRIVER=gemini 時必填' })
     }
     if (e.STORAGE_DRIVER === 'r2') {
       for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_BASE_URL'] as const) {
