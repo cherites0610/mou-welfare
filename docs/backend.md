@@ -1,7 +1,7 @@
 # 後端設計文件（v2）
 
-> 狀態：實作中（P2 資料流已上線；P1 核心 API、家庭與帳號管理已完成，見第 12 節）
-> 最後更新：2026-11-22（家庭、邀請碼、刪除帳號）
+> 狀態：實作中（P2 資料流已上線；P1 核心 API、家庭與帳號管理已完成；前端個人設定相關頁面已上線，見第 12 節）
+> 最後更新：2026-11-23（個人設定頁、6 碼邀請碼、訂閱通知欄位、v1 資料庫連線異常）
 > 相關文件：[爬蟲設計](scraper.md)、[v1 文件](v1/)
 
 ---
@@ -215,7 +215,7 @@ welfare_sources(url pk, program_id, site_id, content_hash, first_seen_at, last_s
 | 成員 | `GET /v1/families/:id/members`、`PATCH/DELETE /v1/families/:id/members/:userId` | 成員 / admin |
 | 邀請 | `POST /v1/families/:id/invites`、`GET /v1/invites/:code`（加入前預覽：家庭名稱與人數）、`POST /v1/invites/:code/accept` | admin / 登入 |
 | 聊天 | `GET/POST /v1/chat/sessions`、`GET/DELETE /v1/chat/sessions/:id`、`POST /v1/chat/sessions/:id/messages`（SSE 串流） | 登入，且需為 session 擁有者 |
-| FAQ | `GET /v1/faq`；`POST/PATCH/DELETE /v1/admin/faq/*` | 公開 / admin |
+| FAQ | `GET /v1/faq`；`POST/PATCH/DELETE /v1/admin/faq/*` | 公開 / admin。2026-11-23 起前端常見問題直接寫死在 `apps/web/app/utils/faqs.ts`（v1 的 10 題原文），不呼叫這個端點；端點保留給部署煙霧測試使用，資料表目前是空的 |
 | 上傳 | `POST /v1/uploads/avatar`（multipart；以內容判斷格式，只收 JPEG/PNG/WebP/GIF，上限 5 MB；壓縮為 512×512 WebP 並移除 EXIF 後存到 R2） | 登入 |
 | LINE | `POST /v1/line/webhook` | **驗證 `x-line-signature`**（HMAC-SHA256，用原始 body 計算） |
 | 爬蟲 | `POST /internal/ingest`、`POST /internal/remove` | **HMAC 簽章加時間戳**，金鑰未設定時一律拒絕 |
@@ -373,16 +373,16 @@ export interface LLM {
 | 日誌 | pm2 日誌加上 pm2-logrotate（主機上已安裝） |
 | 監控 | 外部定時檢查 `/health`（例如 UptimeRobot 或 Cloudflare Health Checks）；錯誤追蹤可選 Sentry |
 
-**目前狀態（2026-11-22）**
+**目前狀態（2026-11-23）**
 
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 3 個 migration（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 5 個 migration（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
-| 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）與前端（Workers），再做正式環境煙霧測試；最近一次（`35bea4e`）四個 job 全部成功 |
+| 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）與前端（Workers），再做正式環境煙霧測試；最近一次（`6a7ec4b`，2026-11-23）API 已套用新 migration、前端新頁面皆回 200 |
 | 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,471 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,008 筆），見 `docs/scraper.md` §10.3 |
 | 結構化 | ⚠️ 目前全部由**關鍵字規則**結構化（`LLM_DRIVER=rules`），沒有 embedding。原因：Gemini 帳戶的預付額度用完（API 回 `402 RESOURCE_EXHAUSTED`，2026-11-22 實測）。儲值後把 `api.env` 的 `LLM_DRIVER` 刪除或改為 `gemini` 並重啟，啟動時的 backfill 會把規則結構化的福利全部重新排入 |
 | 爬蟲排程 | ⏸ 還沒有排程；目前在主機上手動執行（`~/.config/mou-welfare/scraper.env` 提供 `API_BASE`、`INGEST_HMAC_KEY`），見 `docs/scraper.md` §10.2 |
@@ -400,6 +400,7 @@ export interface LLM {
 | 呼叫 API | 環境變數 `NUXT_PUBLIC_API_BASE`（目前為 `https://api-v2.mou-welfare.com`）。瀏覽器以 `credentials: 'include'` 呼叫，API 以 CORS 只允許 `TRUSTED_ORIGINS` 帶 cookie。session cookie 屬於 API 網域，所以登入相關與個人頁面設為只在瀏覽器渲染（`routeRules` 的 `ssr: false`）；公開頁面（福利列表、詳情）維持 SSR |
 | 網域 | 過渡期為 `v2.mou-welfare.com`（Workers 自訂網域）；正式切換時改為 `mou-welfare.com`（目前仍由 Caddy 提供 v1） |
 | 目前狀態 | ✅ 2026-11-19 部署，2026-11-22 起由 GitHub Actions 自動部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 已加入 `https://v2.mou-welfare.com` |
+| 已完成頁面 | 登入註冊流程；福利列表與詳情（粗糙版，檢核爬蟲資料用）；2026-11-23 依 v1 介面完成：個人設定 `/profile`（家庭管理、邀請 QR Code、帳號管理）、編輯個人資料 `/profile/edit`、收藏 `/favorites`、常見問題 `/question`（SSR，含 FAQPage JSON-LD）、服務條款 `/terms`、隱私權政策 `/private` |
 
 ### 10.3 從 v1 切換到 v2
 
@@ -415,6 +416,7 @@ export interface LLM {
 | API | pm2 `mou-welfare-api`，執行 `~/Project/mou-welfare-v1/api/dist/main.js`（git worktree，`c1ba047` 加上綁定 HOST 的修改），port 5009 |
 | 前端 | Caddy 提供 `~/Project/mou-welfare-v1-web/web/dist`（git worktree，`v1-web`），build 時沒有 `VITE_LIFF_ID` |
 | 注意 | v1 的 `.env` 設定了 `DB_SYNC=true`，**不要在 v1 上部署其他版本**，否則 TypeORM 會自動修改資料表結構 |
+| ⚠️ 2026-11-23 | v1 API 連不到資料庫：`getaddrinfo ENOTFOUND postgres.cherites.org`（主機上也查不到這個網域），所有讀資料庫的 API 回 500。v2 透過 localhost 連線不受影響。待確認 DNS 紀錄（見第 11 節） |
 
 **預估月費**：前端用 Cloudflare Workers（先用免費方案，SSR 若超出 CPU 限制再升級 Paid，每月 5 美元）；R2 在免費額度內；主機為現有資源；Gemini 依用量計費（預付制，額度用完會回 402，結構化工作會重試 3 次後停在 failed，資料維持規則版或舊版結果）。
 
@@ -435,6 +437,7 @@ export interface LLM {
 - [x] ~~建立 R2 API Token 並填入 `backup.env`~~（已完成，但需重發，見上一項）
 - [x] ~~確認騰訊雲安全群組對 5432 port 的規則~~（已確認沒問題）
 - [x] ~~GitHub Actions 自動部署的 SSH 金鑰與 5 個 secrets~~：2026-11-22 完成。
+- [ ] **v1 資料庫連線**：2026-11-23 發現 `postgres.cherites.org` 無法解析，v1 API 讀資料庫全部失敗（見 §10.4）。確認 DNS 紀錄是否被刪除或過期。
 - [ ] **Gemini 儲值**：預付額度已用完（2026-11-22），儲值後把 `api.env` 的 `LLM_DRIVER=rules` 刪除並重啟 API。建議在 AI Studio 設定用量上限與通知。
 
 **之後再決定**
@@ -463,7 +466,7 @@ export interface LLM {
 | **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（2026-11-22 正式環境 4 縣市 463 筆；Gemini 結構化待儲值後補做） |
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天未開始 |
 | **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | — |
-| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用 |
+| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情仍是粗糙版） |
 
 ---
 
