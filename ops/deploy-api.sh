@@ -10,16 +10,18 @@ set -euo pipefail
 
 DEPLOY_DIR="${DEPLOY_DIR:-$HOME/apps/mou-welfare-v2}"
 ENV_FILE="${ENV_FILE:-$HOME/.config/mou-welfare/api.env}"
-# 部署目標：參數 > SSH forced command 傳入的 commit SHA（GitHub Actions）> origin/main
-REF="${1:-origin/main}"
-if [[ -n "${SSH_ORIGINAL_COMMAND:-}" ]]; then
-  # 透過 authorized_keys 的 command= 執行時，只接受完整的 40 碼 SHA，其他內容一律拒絕
-  if [[ "$SSH_ORIGINAL_COMMAND" =~ ^[0-9a-f]{40}$ ]]; then
+# 部署目標：參數 > origin/main。
+# GitHub Actions 透過 SSH 連線：authorized_keys 的 command= 以 --from-ssh 執行本腳本，
+# 這時只接受 SSH_ORIGINAL_COMMAND 傳入的完整 40 碼 commit SHA，其他內容（包括空白）一律拒絕。
+if [[ "${1:-}" == "--from-ssh" ]]; then
+  if [[ "${SSH_ORIGINAL_COMMAND:-}" =~ ^[0-9a-f]{40}$ ]]; then
     REF="$SSH_ORIGINAL_COMMAND"
   else
     echo "rejected: expected a 40-char commit SHA" >&2
     exit 2
   fi
+else
+  REF="${1:-origin/main}"
 fi
 APP=mou-welfare-v2-api
 PORT="$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2)"

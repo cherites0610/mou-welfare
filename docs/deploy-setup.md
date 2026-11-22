@@ -10,7 +10,7 @@
 
 ```bash
 ssh-keygen -t ed25519 -N '' -C 'github-actions mou-welfare deploy' -f ~/.ssh/mou-welfare-deploy
-echo "command=\"$HOME/apps/mou-welfare-v2/ops/deploy-api.sh\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty $(cat ~/.ssh/mou-welfare-deploy.pub)" >> ~/.ssh/authorized_keys
+echo "command=\"$HOME/apps/mou-welfare-v2/ops/deploy-api.sh --from-ssh\",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty $(cat ~/.ssh/mou-welfare-deploy.pub)" >> ~/.ssh/authorized_keys
 
 # 本機測試：應該會執行一次部署（部署目前的 main）
 ssh -i ~/.ssh/mou-welfare-deploy -o IdentitiesOnly=yes cherites@localhost "$(git -C ~/apps/mou-welfare-v2 rev-parse origin/main)"
