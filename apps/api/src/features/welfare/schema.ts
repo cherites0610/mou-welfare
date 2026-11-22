@@ -9,6 +9,12 @@ const csvOf = (allowed: readonly string[], name: string) =>
     .refine((v) => !v || v.split(',').every((x) => allowed.includes(x.trim())), { message: `${name} 含有不支援的值` })
     .openapi({ description: `逗號分隔，可選值：${allowed.join('、')}` })
 
+/** 家庭模式：附上家人的資格比對。需登入且為該家庭成員，否則 401 / 403（R6） */
+export const FamilyIdQuery = z
+  .uuid()
+  .optional()
+  .openapi({ description: '家庭模式：附上家人的資格比對（需登入且為成員）' })
+
 export const splitCsv = (v: string | undefined) => (v ? v.split(',').map((x) => x.trim()) : undefined)
 
 export const SearchQuery = z.object({
@@ -17,6 +23,7 @@ export const SearchQuery = z.object({
   category: csvOf(CATEGORIES, 'category'),
   page: z.coerce.number().int().min(1).max(1000).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+  familyId: FamilyIdQuery,
 })
 
 export const MatchResultSchema = z
@@ -26,6 +33,10 @@ export const MatchResultSchema = z
     reasons: z.array(z.string()),
   })
   .openapi('MatchResult')
+
+export const FamilyMatchSchema = z
+  .object({ userId: z.string(), name: z.string(), image: z.string().nullable(), match: MatchResultSchema })
+  .openapi('FamilyMatch')
 
 export const WelfareSummarySchema = z
   .object({
@@ -38,6 +49,10 @@ export const WelfareSummarySchema = z
     publishedAt: z.string().nullable(),
     deadline: z.string().nullable(),
     match: MatchResultSchema.nullable().openapi({ description: '登入或試算時才有' }),
+    familyMatches: z
+      .array(FamilyMatchSchema)
+      .nullable()
+      .openapi({ description: '帶 familyId 時才有：家人（不含自己）的比對結果' }),
   })
   .openapi('WelfareSummary')
 
@@ -66,7 +81,7 @@ export const ProfileInput = z
   })
   .openapi('ProfileInput')
 
-export const SimulateBody = SearchQuery.omit({ page: true, limit: true })
+export const SimulateBody = SearchQuery.omit({ page: true, limit: true, familyId: true })
   .extend({
     profile: ProfileInput,
     page: z.number().int().min(1).max(1000).default(1),

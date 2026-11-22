@@ -11,6 +11,7 @@ import {
 import { and, arrayOverlaps, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm'
 import type { Db } from '../../db/client.ts'
 import { favorites, welfareAttachments, welfarePrograms as w } from '../../db/schema/index.ts'
+import { type FamilyMatch, type FamilyProfile, matchFamily } from '../family/service.ts'
 
 export type SearchParams = {
   q?: string | undefined
@@ -30,6 +31,7 @@ export type WelfareSummary = {
   publishedAt: string | null
   deadline: string | null
   match: MatchResult | null
+  familyMatches: FamilyMatch[] | null
 }
 
 const summaryColumns = {
@@ -73,13 +75,19 @@ export async function searchPrograms(
   p: SearchParams,
   profile: MatchProfile | null,
   today: Date = new Date(),
+  family: FamilyProfile[] | null = null,
 ): Promise<{ data: WelfareSummary[]; total: number }> {
   const where = filters(p)
-  // R4：有身分限制的福利排前面；登入時再把「使用者可能符合」的排前面
+  // R4：有身分限制的福利排前面；登入時再把「使用者可能符合」的排前面；家庭模式再把「家人可能符合」的排前面
+  //（v1 的權重是「本人分數 × 1000 + 家人最高分」：本人優先，其次家人）
   const order: SQL[] = [desc(sql`cardinality(${w.identities}) > 0`)]
   if (profile) {
     const mine = satisfiableIdentities(profile, today)
     if (mine.length) order.push(desc(arrayOverlaps(w.identities, mine)))
+  }
+  if (family?.length) {
+    const theirs = [...new Set(family.flatMap((m) => satisfiableIdentities(m, today)))]
+    if (theirs.length) order.push(desc(arrayOverlaps(w.identities, theirs)))
   }
   order.push(sql`${w.publishedAt} desc nulls last`, asc(w.id))
 
@@ -94,12 +102,22 @@ export async function searchPrograms(
     db.select({ n: count() }).from(w).where(where),
   ])
   return {
-    data: rows.map((r) => ({ ...r, match: profile ? match(profile, r.identities, today) : null })),
+    data: rows.map((r) => ({
+      ...r,
+      match: profile ? match(profile, r.identities, today) : null,
+      familyMatches: family ? matchFamily(family, r.identities, today) : null,
+    })),
     total: totalRow?.n ?? 0,
   }
 }
 
-export async function getProgram(db: Db, id: string, profile: MatchProfile | null, userId: string | null) {
+export async function getProgram(
+  db: Db,
+  id: string,
+  profile: MatchProfile | null,
+  userId: string | null,
+  family: FamilyProfile[] | null = null,
+) {
   const [row] = await db
     .select({
       ...summaryColumns,
@@ -132,6 +150,7 @@ export async function getProgram(db: Db, id: string, profile: MatchProfile | nul
     attachments,
     isFavorite: fav ? (fav[0]?.n ?? 0) > 0 : null,
     match: profile ? match(profile, row.identities) : null,
+    familyMatches: family ? matchFamily(family, row.identities) : null,
   }
 }
 

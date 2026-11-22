@@ -63,6 +63,8 @@ export const uploadRoutes = new OpenAPIHono<AppEnv>().openapi(
     const u = c.var.user!
     const url = await storage.put(`avatars/${u.id}/${randomUUID()}.webp`, image.data, image.contentType)
     await db.update(user).set({ image: url }).where(eq(user.id, u.id))
+    // 舊頭像不再使用：刪除失敗不影響這次上傳
+    if (u.image && u.image !== url) await storage.remove(u.image).catch((e: unknown) => console.error('avatar cleanup', e))
     return c.json({ data: { url } }, 200)
   },
   // multipart 由 handler 自行解析與驗證，略過 zod 預設驗證錯誤格式

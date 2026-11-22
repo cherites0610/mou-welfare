@@ -45,8 +45,7 @@ describe('R10 不能透過註冊端點寫入身分、角色等欄位', () => {
 })
 
 describe.todo('R1 沒有 email 的 LINE 帳號登入不能取得既有使用者的 session（P4：LINE / LIFF）')
-describe.todo('R6 帶非所屬家庭的 familyId 回傳 403（P1 / P3）')
+// R6、R9 見 tests/family.test.ts
 describe.todo('R7 讀取、刪除、續聊他人的聊天 session 回傳 404（P3）')
-describe.todo('R9 只能透過有效邀請碼加入家庭（P3）')
 describe.todo('R11 LINE webhook 簽章錯誤回傳 401 且不排入工作（P4）')
 describe.todo('R13 OAuth state 不符時拒絕登入（P4）')

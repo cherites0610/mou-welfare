@@ -5,6 +5,7 @@ import { accessControl, type AppVariables } from './access.ts'
 import type { Db } from './db/client.ts'
 import type { Env } from './env.ts'
 import { faqRoutes } from './features/faq/routes.ts'
+import { familyRoutes } from './features/family/routes.ts'
 import { favoriteRoutes } from './features/favorite/routes.ts'
 import { healthRoutes } from './features/health/routes.ts'
 import { ingestRoutes } from './features/ingest/routes.ts'
@@ -15,7 +16,7 @@ import { AUTH_BASE_PATH, type Auth } from './lib/auth.ts'
 import type { Mailer } from './lib/mail/index.ts'
 import type { Queue } from './lib/queue.ts'
 import type { Storage } from './lib/storage.ts'
-import { apiError } from './lib/errors.ts'
+import { ApiError, apiError } from './lib/errors.ts'
 
 export type Deps = { db: Db; auth: Auth; env: Env; mailer: Mailer; storage: Storage | null; queue: Queue }
 export type AppEnv = { Variables: AppVariables & { deps: Deps } }
@@ -59,6 +60,7 @@ export function createApp(deps: Deps) {
   app.route('/', faqRoutes)
   app.route('/', meRoutes)
   app.route('/', favoriteRoutes)
+  app.route('/', familyRoutes)
   app.route('/', welfareRoutes)
   app.route('/', uploadRoutes)
   app.route('/', ingestRoutes)
@@ -75,6 +77,7 @@ export function createApp(deps: Deps) {
 
   app.notFound((c) => apiError(c, 404, 'not_found', '找不到資源'))
   app.onError((err, c) => {
+    if (err instanceof ApiError) return apiError(c, err.status, err.code, err.message)
     console.error(err)
     return apiError(c, 500, 'internal', '伺服器錯誤')
   })

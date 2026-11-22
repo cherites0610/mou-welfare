@@ -52,6 +52,15 @@ describe('POST /v1/uploads/avatar', () => {
     expect(row?.image).toBe(data.url)
   })
 
+  it('重新上傳時刪除舊頭像，只保留新的', async () => {
+    const { cookie } = await signUp(t)
+    const first = await upload(cookie, new Blob([await photo()]), 'photo.jpg', 'image/jpeg')
+    const second = await upload(cookie, new Blob([await photo()]), 'photo.jpg', 'image/jpeg')
+    const [a, b] = [(await first.json()) as { data: { url: string } }, (await second.json()) as { data: { url: string } }]
+    expect(a.data.url).not.toBe(b.data.url)
+    expect([...storage.objects.keys()].map((k) => `https://files.test/${k}`)).toEqual([b.data.url])
+  })
+
   it('以實際內容判斷格式：Content-Type 寫錯的 PNG 仍可上傳', async () => {
     const { cookie } = await signUp(t)
     const png = await sharp({ create: { width: 64, height: 64, channels: 4, background: '#fff' } }).png().toBuffer()

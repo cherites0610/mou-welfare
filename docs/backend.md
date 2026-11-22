@@ -1,7 +1,7 @@
 # 後端設計文件（v2）
 
-> 狀態：設計定案，尚未實作（資料庫基礎設施已建立，見第 9 節）
-> 最後更新：2026-11-18（API 部署改為自有主機）
+> 狀態：實作中（P2 資料流已上線；P1 核心 API、家庭與帳號管理已完成，見第 12 節）
+> 最後更新：2026-11-22（家庭、邀請碼、刪除帳號）
 > 相關文件：[爬蟲設計](scraper.md)、[v1 文件](v1/)
 
 ---
@@ -146,7 +146,7 @@ mou-welfare/
 ```
 families(id uuid pk, name, created_by → user, created_at)
 family_members(family_id → families, user_id → user, role 'admin'|'member', joined_at, pk(family_id, user_id))
-family_invites(code text pk, family_id, created_by, expires_at, used_at)        -- 取代 v1 存在 Redis 的邀請碼
+family_invites(code text pk, family_id, created_by, expires_at, used_at, used_by, created_at)  -- 取代 v1 存在 Redis 的邀請碼；一次性，3 天內有效
 ```
 
 **福利**
@@ -207,13 +207,13 @@ welfare_sources(url pk, program_id, site_id, content_hash, first_seen_at, last_s
 | 群組 | 端點 | 權限 |
 |---|---|---|
 | 登入 | `/v1/auth/*`（由 Better Auth 處理：Email 密碼、Google、LINE、LIFF ID Token、驗證信、重設密碼） | 公開 |
-| 個人 | `GET/PATCH /v1/me`、`DELETE /v1/me` | 登入 |
-| 收藏 | `GET /v1/me/favorites`、`PUT/DELETE /v1/me/favorites/:programId` | 登入 |
-| 福利 | `GET /v1/welfare?q=&city=&category=&familyId=&page=`、`GET /v1/welfare/:id` | 公開；**帶比對結果時以登入身分為準**，不再接受從前端傳 `userId` |
+| 個人 | `GET/PATCH /v1/me`、`DELETE /v1/me`（body 必須是 `{"confirm":"DELETE"}`） | 登入 |
+| 收藏 | `GET /v1/me/favorites?familyId=`、`PUT/DELETE /v1/me/favorites/:programId` | 登入 |
+| 福利 | `GET /v1/welfare?q=&city=&category=&familyId=&page=`、`GET /v1/welfare/:id?familyId=` | 公開；**帶比對結果時以登入身分為準**，不再接受從前端傳 `userId`；帶 `familyId` 時必須登入（401）且為成員（403） |
 | 試算 | `POST /v1/welfare/simulate`（手動輸入身分試算） | 公開 |
 | 家庭 | `GET/POST /v1/families`、`GET/PATCH/DELETE /v1/families/:id` | 登入；查看需為成員，修改或刪除需為 admin |
 | 成員 | `GET /v1/families/:id/members`、`PATCH/DELETE /v1/families/:id/members/:userId` | 成員 / admin |
-| 邀請 | `POST /v1/families/:id/invites`、`POST /v1/invites/:code/accept` | admin / 登入 |
+| 邀請 | `POST /v1/families/:id/invites`、`GET /v1/invites/:code`（加入前預覽：家庭名稱與人數）、`POST /v1/invites/:code/accept` | admin / 登入 |
 | 聊天 | `GET/POST /v1/chat/sessions`、`GET/DELETE /v1/chat/sessions/:id`、`POST /v1/chat/sessions/:id/messages`（SSE 串流） | 登入，且需為 session 擁有者 |
 | FAQ | `GET /v1/faq`；`POST/PATCH/DELETE /v1/admin/faq/*` | 公開 / admin |
 | 上傳 | `POST /v1/uploads/avatar`（multipart；以內容判斷格式，只收 JPEG/PNG/WebP/GIF，上限 5 MB；壓縮為 512×512 WebP 並移除 EXIF 後存到 R2） | 登入 |
@@ -262,6 +262,15 @@ await assertChatOwner(db, sessionId, user.id)
 - 身分白名單和相容規則（例如低收入戶也符合中低收入戶的條件）移到 `packages/shared`，前後端共用。
 - 比對寫成純函式 `match(profile, requiredIdentities) → { light, score, reasons }`，放在 `packages/shared/src/matching.ts`，分支覆蓋率 100%。
 - 家庭模式：一次撈出成員資料，在記憶體中比對，排序權重沿用 v1 的公式：本人分數 × 1000 + 家人最高分。
+
+### 8.1.1 家庭
+
+- 建立者成為管理者（`admin`）。管理者可以改名、刪除家庭、產生邀請碼、修改角色、移除成員；一般成員只能查看與退出。
+- **只能透過邀請碼加入**（R9）：8 碼（去掉 0/O、1/I/L，不分大小寫），一次性，3 天內有效。已是成員時回 409 且不消耗邀請碼；已使用或過期回 410；同一碼同時被兩人使用時只有一人成功（條件式更新）。
+- 家庭**至少保留一位管理者**：最後一位管理者不能降級或退出（409），要先指定其他管理者；最後一位成員退出時刪除家庭。
+- 上限：每人最多 10 個家庭，每個家庭最多 20 人。
+- 成員資料只回傳姓名、頭像、角色、加入時間；家庭模式的比對結果只回傳家人的姓名、頭像與紅黃綠燈，**不回傳生日、身分**。
+- 刪除帳號（`DELETE /v1/me`）：自己是唯一管理者的家庭，由最早加入的成員接任管理者；只剩自己的家庭直接刪除；登入方式、session、收藏由外鍵一併刪除；上傳的頭像從 R2 刪除。重新上傳頭像時也會刪除舊的。
 
 ### 8.2 搜尋
 
@@ -450,9 +459,9 @@ export interface LLM {
 | 階段 | 內容 | 完成標準 |
 |---|---|---|
 | **P0 骨架與驗證** | monorepo（pnpm）、`packages/shared`、API（Hono + Drizzle + Better Auth + pg-boss）部署到 `api-v2.mou-welfare.com`、Nuxt 骨架部署到 Workers | 第 11 節四項驗證全部通過 |
-| **P1 核心 API** | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出 |
+| **P1 核心 API** | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出（2026-11-22 除管理端 `/v1/admin/*` 外已完成） |
 | **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（2026-11-22 正式環境 4 縣市 463 筆；Gemini 結構化待儲值後補做） |
-| **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | — |
+| **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天未開始 |
 | **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | — |
 | **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用 |
 

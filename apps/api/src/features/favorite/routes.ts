@@ -2,7 +2,8 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { and, desc, eq, ne } from 'drizzle-orm'
 import type { AppEnv } from '../../app.ts'
 import { favorites, welfarePrograms as w } from '../../db/schema/index.ts'
-import { WelfareSummarySchema } from '../welfare/schema.ts'
+import { familyMode, matchFamily } from '../family/service.ts'
+import { FamilyIdQuery, WelfareSummarySchema } from '../welfare/schema.ts'
 import { profileOf } from '../welfare/service.ts'
 import { match } from '@mou-welfare/shared'
 
@@ -13,9 +14,11 @@ const list = createRoute({
   method: 'get',
   path: '/v1/me/favorites',
   tags: ['favorite'],
-  summary: '我的收藏（新到舊）',
+  summary: '我的收藏（新到舊；帶 familyId 時附上家人的資格比對）',
+  request: { query: z.object({ familyId: FamilyIdQuery }) },
   responses: {
     200: { description: '收藏列表', content: { 'application/json': { schema: z.object({ data: z.array(WelfareSummarySchema) }) } } },
+    403: { description: '不是該家庭成員', content: { 'application/json': { schema: ErrorSchema } } },
   },
 })
 
@@ -59,7 +62,13 @@ export const favoriteRoutes = new OpenAPIHono<AppEnv>()
       .where(and(eq(favorites.userId, u.id), ne(w.status, 'removed')))
       .orderBy(desc(favorites.createdAt))
     const profile = profileOf(u)!
-    return c.json({ data: rows.map((r) => ({ ...r, match: match(profile, r.identities) })) }, 200)
+    const family = await familyMode(c.var.deps.db, c.req.valid('query').familyId, u.id)
+    const data = rows.map((r) => ({
+      ...r,
+      match: match(profile, r.identities),
+      familyMatches: family ? matchFamily(family, r.identities) : null,
+    }))
+    return c.json({ data }, 200)
   })
   .openapi(add, async (c) => {
     const { programId } = c.req.valid('param')

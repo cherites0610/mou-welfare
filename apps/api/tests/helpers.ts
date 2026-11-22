@@ -25,7 +25,7 @@ type T = ReturnType<typeof setupApp>
 
 export async function resetDb(db: T['db']) {
   await db.execute(
-    sql`truncate table "user", session, account, verification, faqs, worker_heartbeat, welfare_programs, welfare_attachments, welfare_sources, ingest_log, favorites cascade`,
+    sql`truncate table "user", session, account, verification, faqs, worker_heartbeat, welfare_programs, welfare_attachments, welfare_sources, ingest_log, favorites, families, family_members, family_invites cascade`,
   )
 }
 
