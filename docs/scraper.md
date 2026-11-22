@@ -298,7 +298,7 @@ pthg       12    0    0        0         4            1       0  DEGRADED (seen 
 
 ## 7. 與後端的介面
 
-v1 只有 `POST /welfare/ingest`，用 `sourceUrl` 去重，存在就跳過。v2 改為：
+v1 只有 `POST /welfare/ingest`，用 `sourceUrl` 去重，存在就跳過。v2 改為（2026-11-19 實作，`apps/api/src/features/ingest/`）：
 
 | 端點 | 用途 |
 |---|---|
@@ -393,7 +393,7 @@ services/scraper/
 | **P0 原型** | 3 站各代表一族：**金門（A）、新北（B）、基隆（C）**；再加臺中開放資料（L1）。只做抓取、抽取、狀態、規則過濾，不做 AI 產生設定 | 3 站都能穩定跑完；人工檢查 50 篇，抽取品質可接受 |
 | **P1 去雜訊** | LLM 分類加上 200 篇驗證集 | 準確率 ≥ 95%、召回率 ≥ 90% |
 | **P2 A 族擴展** | 其餘 10 個 A 族縣市（用 `scrape init` 產生設定） | 11 站上線；記錄 AI 產生設定第一次就成功的比例 |
-| **P3 部署** | Cloud Run Jobs（`asia-east1`）、排程、執行報告與警告；後端 ingest 改為 upsert | 每日自動執行 7 天，沒有人工介入 |
+| **P3 部署** | Cloud Run Jobs（`asia-east1`）、排程、執行報告與警告（後端 ingest upsert 已在 2026-11-19 完成） | 每日自動執行 7 天，沒有人工介入 |
 | **P4 B、C 族與平台** | 新竹市、澎湖（B）；高雄、彰化、南投、花蓮、臺東、連江（C）；雲林、彰化 L2 平台 | 22 縣市全數上線 |
 | **P5 自動修復** | 健康檢查觸發重新產生設定 | 模擬改版能被偵測並產生修復建議 |
 
@@ -432,6 +432,26 @@ services/scraper/
 - 同一個福利在不同分類各有一頁（例如金門「申請社會救助專戶」出現在老人、身障、社會救助三個分類），`program_key` 相同，由後端 upsert 合併。
 - 舊格式附件（DOC、XLS）與掃描 PDF 目前沒有文字（LibreOffice、Gemini 在之後加入）；超過 15 MB 的附件不下載。
 - 每次執行都會重新抓所有內文頁（hash 才能比對）；之後若站點變多，再加上依 `Last-Modified` / ETag 的條件請求。
+
+### 10.2 正式環境推送（2026-11-22）
+
+- 4 個來源的 dry-run 結果以 `scrape replay` 推送到 `https://api-v2.mou-welfare.com`：477 筆推送，合併為 463 筆福利（同一福利多個網址），全部可搜尋。
+- 推送設定在主機的 `~/.config/mou-welfare/scraper.env`（權限 600）：`API_BASE`、`INGEST_HMAC_KEY`（與 `api.env` 同一把）。手動執行：
+
+  ```bash
+  cd ~/Project/mou-welfare/services/scraper
+  set -a; . ~/.config/mou-welfare/scraper.env; set +a
+  uv run scrape run --push                  # 爬取並推送（狀態檔 .state/state.db）
+  uv run scrape replay out/<run_id>         # 推送人工檢查過的 dry-run 結果，不重新爬
+  ```
+
+- `replay` 不更新狀態檔：之後第一次 `run --push` 會把這些網址當成新增再送一次，後端判定內容沒變（`unchanged`），不會重新結構化。
+- 還沒有排程（P3）。東京主機只能爬金門、新北、基隆與開放資料；其他縣市要等台灣 IP 的執行環境。
+
+**本機端對端測試時發現並修正**
+
+- PDF 抽出的文字含 NUL 字元，Postgres 的 text 存不下 → 爬蟲端去掉控制字元，API 端再過濾一次。
+- 結構化工作每秒不到一筆（pg-boss 預設每 2 秒輪詢）→ 縮短為 0.5 秒。
 
 ---
 

@@ -357,32 +357,40 @@ export interface LLM {
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
 | 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
 | HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
-| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定）。完整定義見 `apps/api/src/env.ts` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定，但目前 `LLM_DRIVER=rules`，見下方「目前狀態」）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
-| 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。GitHub Actions（`deploy.yml`）在 CI 通過後透過 SSH 傳入 commit SHA 觸發，設定見 `docs/deploy-setup.md` |
+| 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。GitHub Actions（`deploy.yml`）在 CI 通過後透過 SSH 傳入 commit SHA 觸發：authorized_keys 以 `command="…/deploy-api.sh --from-ssh"` 限定這把金鑰只能執行部署，`--from-ssh` 模式只接受完整的 40 碼 SHA（其他內容、包括空白一律拒絕）。設定見 `docs/deploy-setup.md` |
 | 日誌 | pm2 日誌加上 pm2-logrotate（主機上已安裝） |
 | 監控 | 外部定時檢查 `/health`（例如 UptimeRobot 或 Cloudflare Health Checks）；錯誤追蹤可選 Sentry |
 
-**目前狀態（2026-11-18）**
+**目前狀態（2026-11-22）**
 
 | 項目 | 狀態 |
 |---|---|
-| 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone） |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 2 個 migration |
-| pm2 | ✅ `mou-welfare-v2-api` 運作中（約 170 MB），已 `pm2 save` |
-| Caddy | ✅ 已加入 `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
-| DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied）；Caddy 已取得憑證，外部測試 `/health` 為 ok（2026-11-18）。DNS 以 telegram-bot 專案的 Cloudflare token 建立（經使用者同意） |
-| 自動部署 | ⏸ `deploy.yml` 已加入；需依 `docs/deploy-setup.md` 設定 SSH 金鑰與 secrets |
+| 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 3 個 migration（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`） |
+| pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
+| Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
+| DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
+| 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）與前端（Workers），再做正式環境煙霧測試；最近一次（`35bea4e`）四個 job 全部成功 |
+| 福利資料 | ✅ 2026-11-22 推送 4 個來源（金門、新北、基隆、臺中開放資料），共 463 筆福利（477 筆推送，同一福利多個網址合併），全部 `active`、可搜尋 |
+| 結構化 | ⚠️ 目前全部由**關鍵字規則**結構化（`LLM_DRIVER=rules`），沒有 embedding。原因：Gemini 帳戶的預付額度用完（API 回 `402 RESOURCE_EXHAUSTED`，2026-11-22 實測）。儲值後把 `api.env` 的 `LLM_DRIVER` 刪除或改為 `gemini` 並重啟，啟動時的 backfill 會把規則結構化的福利全部重新排入 |
+| 爬蟲排程 | ⏸ 還沒有排程；目前在主機上手動執行（`~/.config/mou-welfare/scraper.env` 提供 `API_BASE`、`INGEST_HMAC_KEY`），見 `docs/scraper.md` §10.2 |
+
+**事故紀錄**
+
+- **2026-11-22 重複的結構化工作**：每次重啟時 backfill 都把所有尚未結構化的福利重新排入，多次重啟後累積約 2,200 個重複工作。重複執行本身是安全的（hash 沒變就略過），但在 Gemini 模式下會重複呼叫 API。已修正為略過已在佇列中的福利（`be05feb`）。
+- **2026-11-22 改回規則時覆蓋了 LLM 的結果**：結構化只比對「方式是否相同」，從 gemini 改回 rules 時，LLM 已完成的結果會被規則版本覆蓋。已修正為內容沒變時不覆蓋 LLM 的結果。
 
 ### 10.2 前端（Cloudflare）
 
 | 項目 | 做法 |
 |---|---|
-| 部署 | `pnpm --filter @mou-welfare/web build && pnpm --filter @mou-welfare/web deploy`（`apps/web/wrangler.jsonc`，Worker 名稱 `mou-welfare-web`）。GitHub Actions（`deploy.yml`）在 CI 通過後自動部署，設定見 `docs/deploy-setup.md` |
+| 部署 | `pnpm --filter @mou-welfare/web build && pnpm --filter @mou-welfare/web run deploy`（要加 `run`：pnpm 有同名的內建指令 `deploy`；`apps/web/wrangler.jsonc`，Worker 名稱 `mou-welfare-web`）。GitHub Actions（`deploy.yml`）在 CI 通過後自動部署，設定見 `docs/deploy-setup.md` |
 | 呼叫 API | 環境變數 `NUXT_PUBLIC_API_BASE`（目前為 `https://api-v2.mou-welfare.com`）。瀏覽器以 `credentials: 'include'` 呼叫，API 以 CORS 只允許 `TRUSTED_ORIGINS` 帶 cookie。session cookie 屬於 API 網域，所以登入相關與個人頁面設為只在瀏覽器渲染（`routeRules` 的 `ssr: false`）；公開頁面（福利列表、詳情）維持 SSR |
 | 網域 | 過渡期為 `v2.mou-welfare.com`（Workers 自訂網域）；正式切換時改為 `mou-welfare.com`（目前仍由 Caddy 提供 v1） |
-| 目前狀態 | ✅ 2026-11-19 部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 已加入 `https://v2.mou-welfare.com` |
+| 目前狀態 | ✅ 2026-11-19 部署，2026-11-22 起由 GitHub Actions 自動部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 已加入 `https://v2.mou-welfare.com` |
 
 ### 10.3 從 v1 切換到 v2
 
@@ -399,7 +407,9 @@ export interface LLM {
 | 前端 | Caddy 提供 `~/Project/mou-welfare-v1-web/web/dist`（git worktree，`v1-web`），build 時沒有 `VITE_LIFF_ID` |
 | 注意 | v1 的 `.env` 設定了 `DB_SYNC=true`，**不要在 v1 上部署其他版本**，否則 TypeORM 會自動修改資料表結構 |
 
-**預估月費**：前端用 Cloudflare Workers（先用免費方案，SSR 若超出 CPU 限制再升級 Paid，每月 5 美元）；R2 在免費額度內；主機為現有資源；Gemini 依用量計費。
+**預估月費**：前端用 Cloudflare Workers（先用免費方案，SSR 若超出 CPU 限制再升級 Paid，每月 5 美元）；R2 在免費額度內；主機為現有資源；Gemini 依用量計費（預付制，額度用完會回 402，結構化工作會重試 3 次後停在 failed，資料維持規則版或舊版結果）。
+
+**Gemini 用量估算**：每筆福利結構化一次（輸入上限 16,000 字，含附件文字）加一次 embedding。首次全量約 470 筆；之後只有爬蟲判定內容變動的才會重做，日常每天個位數到數十筆。換模型或改 prompt 時才需要全量重做。
 
 ---
 
@@ -415,6 +425,8 @@ export interface LLM {
 - [x] ~~作廢並重發（Roll）備份用的 API Token~~：2026-11-22 完成，舊 token 驗證已失效，新 token 實測備份上傳成功。
 - [x] ~~建立 R2 API Token 並填入 `backup.env`~~（已完成，但需重發，見上一項）
 - [x] ~~確認騰訊雲安全群組對 5432 port 的規則~~（已確認沒問題）
+- [x] ~~GitHub Actions 自動部署的 SSH 金鑰與 5 個 secrets~~：2026-11-22 完成。
+- [ ] **Gemini 儲值**：預付額度已用完（2026-11-22），儲值後把 `api.env` 的 `LLM_DRIVER=rules` 刪除並重啟 API。建議在 AI Studio 設定用量上限與通知。
 
 **之後再決定**
 - [ ] `pg_hba.conf` 加入規則，限制 `mou_welfare` 只能連自己的資料庫。
@@ -422,6 +434,8 @@ export interface LLM {
 - [ ] pgvector 要不要升級：改用 PostgreSQL 官方的 PGDG 套件庫，可以裝到較新的版本（目前 0.6.0 已夠用）。
 - [ ] 從 v1 資料庫 `mou-welfare` 搬資料（使用者、家庭、收藏）的範圍和方式。
 - [ ] v1 前端的 `VITE_LIFF_ID`（知道的話可以重新 build v1，讓 LINE 內自動登入恢復）。
+- [ ] 外部監控：定時檢查 `/health`，並在結構化工作持續失敗（`structure_error` 增加）時通知。
+- [ ] 清理 pg-boss 舊工作：`completed` 預設保留 7 天，目前不需要處理；若改為長期保留，要加上 `cleanup` cron。
 
 **P0 原型必須驗證**
 - [ ] Nuxt 在 Workers 上做伺服器端渲染並呼叫東京的 API，熱門頁面的 TTFB（目標 p95 < 500ms，有快取時 < 100ms）。
@@ -437,7 +451,7 @@ export interface LLM {
 |---|---|---|
 | **P0 骨架與驗證** | monorepo（pnpm）、`packages/shared`、API（Hono + Drizzle + Better Auth + pg-boss）部署到 `api-v2.mou-welfare.com`、Nuxt 骨架部署到 Workers | 第 11 節四項驗證全部通過 |
 | **P1 核心 API** | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出 |
-| **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到 |
+| **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（2026-11-22 正式環境 4 縣市 463 筆；Gemini 結構化待儲值後補做） |
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | — |
 | **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | — |
 | **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用 |

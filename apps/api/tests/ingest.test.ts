@@ -232,6 +232,18 @@ describe('welfare-structure 工作', () => {
     expect(await structureProgram(t.db, s, null, id)).toBe('skipped')
   })
 
+  it('改回規則時不覆蓋 LLM 的結果；LLM 會重做規則的結果', async () => {
+    const id = await ingestOne()
+    const llm = new FakeLLM({ generate: () => LLM_OUTPUT })
+    await structureProgram(t.db, new LLMStructurer(llm), llm, id)
+    expect(await structureProgram(t.db, new RuleStructurer(), null, id)).toBe('skipped')
+    expect((await programs())[0]!.structuredBy).toBe('llm')
+
+    const id2 = await ingestOne({ program_key: 'kinmen:老人假牙補助', title: '老人假牙補助', url: 'https://x.example/2' })
+    await structureProgram(t.db, new RuleStructurer(), null, id2)
+    expect(await structureProgram(t.db, new LLMStructurer(llm), llm, id2)).toBe('done')
+  })
+
   it('不是個人福利 → rejected，不做 embedding', async () => {
     const id = await ingestOne()
     const llm = new FakeLLM({ generate: () => ({ ...LLM_OUTPUT, isIndividualWelfare: false }) })

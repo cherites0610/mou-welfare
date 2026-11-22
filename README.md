@@ -9,6 +9,7 @@
 | [`docs/backend.md`](docs/backend.md) | 後端架構（Hono on Node、Drizzle、Better Auth、pg-boss）與部署 |
 | [`docs/scraper.md`](docs/scraper.md) | 爬蟲設計與 22 縣市資料來源調查 |
 | [`docs/testing.md`](docs/testing.md) | 測試規範（權限矩陣、v1 回歸清單、CI 流程） |
+| [`docs/deploy-setup.md`](docs/deploy-setup.md) | GitHub Actions 自動部署的金鑰與 secrets（已設定完成，重建時參考） |
 | [`docs/v1/`](docs/v1/) | v1 的 API、頁面與樣式紀錄（用瀏覽器開 `index.html`） |
 
 ## 結構
@@ -40,7 +41,9 @@ pnpm --filter @mou-welfare/api openapi       # 修改 API 後更新 openapi.json
 cd services/scraper && uv sync && uv run pytest
 uv run scrape sites
 uv run scrape run --site kinmen --limit 10   # 試跑 10 筆
-uv run scrape run --push                     # 推送到 API（需要 API_BASE、INGEST_HMAC_KEY）
+uv run scrape run --push                     # 推送到 API（需要 API_BASE、INGEST_HMAC_KEY；主機上在 ~/.config/mou-welfare/scraper.env）
+uv run scrape replay out/<run_id>            # 推送人工檢查過的 dry-run 結果
+uv run scrape sample out/<run_id>            # 產生抽查清單
 ```
 
 API 整合測試需要測試資料庫：CI 使用 `TEST_DATABASE_URL` 環境變數，本機則讀取 `apps/api/.env.test`（不進版控）。

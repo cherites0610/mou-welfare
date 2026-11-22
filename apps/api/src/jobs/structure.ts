@@ -34,7 +34,10 @@ export async function structureProgram(
   const [p] = await db.select().from(w).where(eq(w.id, programId))
   if (!p) return 'missing'
   if (p.status === 'removed') return 'skipped'
-  if (p.structuredHash === p.contentHash && p.structuredBy === structurer.kind) return 'skipped'
+  // 內容沒變就不重做；改回規則時也不覆蓋 LLM 已經做好的結果（2026-11-22 Gemini 額度用完、改回 rules 時發生過）
+  if (p.structuredHash === p.contentHash && (p.structuredBy === structurer.kind || p.structuredBy === 'llm')) {
+    return 'skipped'
+  }
 
   const attachments = await db
     .select({ name: welfareAttachments.name, text: welfareAttachments.text })
@@ -86,10 +89,6 @@ export async function structureProgram(
   return updated.length ? 'done' : 'skipped'
 }
 
-/**
- * 啟動時補送工作：內容和結構化結果不一致的（工作遺失），以及改用 LLM 後、之前由規則結構化的。
- * 一次最多送 limit 筆，其餘下次啟動再補。
- */
 /** 佇列裡已經有等待、重試或執行中的工作的福利（pg-boss 還沒建立時回傳空集合） */
 async function alreadyQueued(db: Db): Promise<Set<string>> {
   const [exists] = await db.execute<{ ok: boolean }>(sql`select to_regclass('pgboss.job') is not null as ok`)
@@ -101,6 +100,10 @@ async function alreadyQueued(db: Db): Promise<Set<string>> {
   return new Set(rows.map((r) => r.id))
 }
 
+/**
+ * 啟動時補送工作：內容和結構化結果不一致的（工作遺失），以及改用 LLM 後、之前由規則結構化的。
+ * 一次最多送 limit 筆，其餘下次啟動再補。
+ */
 export async function backfill(db: Db, queue: Queue, structurer: Structurer, limit = 1000): Promise<number> {
   const stale = or(
     isNull(w.structuredHash),

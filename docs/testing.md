@@ -109,6 +109,8 @@ const matrix = [
 - **搜尋**：中文關鍵字（pg_trgm）、多條件組合、分頁邊界（最後一頁、超出範圍的頁數）。
 - **pg-boss 工作**：處理函式可以單獨呼叫測試；另外要有一個整合測試，走完「排入佇列 → 背景工作處理 → 資料庫更新」整個流程。也要測**失敗重試**，以及**同一個工作重複執行時結果不變**（冪等）。
 - **LLM**：用 `FakeLLM` 實作 `lib/llm` 介面，依照輸入回傳預先錄好的結果。要測三種情況：回傳格式不符 schema（應重試一次後失敗）、逾時、成功。
+  - Gemini 實作（`gemini.ts`）以 `vi.mock('@google/genai')` 模擬 SDK 測試：結構化輸出的重試、錯誤分類、embedding 維度與正規化（`tests/gemini.test.ts`）。
+  - 結構化工作另外測：內容沒變不重做、不是個人福利 → `rejected`、截止日已過 → `expired`、結構化期間內容被更新時不覆蓋、改回規則時不覆蓋 LLM 結果、backfill 不重複排入。
 - **環境變數**：缺少必要的變數時，應用程式拒絕啟動，並在錯誤訊息裡列出缺少的變數名稱。
 
 ---
@@ -126,7 +128,8 @@ const matrix = [
 | 契約 | 檢查方式 |
 |---|---|
 | API 對前端 | CI 從 app 產生 `openapi.json`，再用 orval 產生前端 client；**只要產生的結果和 repo 裡的版本不同，CI 就失敗**（代表有人改了 API 卻沒有更新 client） |
-| 爬蟲對 API | `packages/shared` 輸出推送格式的 JSON Schema（`ingest.schema.json`）；爬蟲端的 pytest 用它驗證每一筆輸出；API 端的測試用同一份 fixture 實際打 `/internal/ingest` |
+| 爬蟲對 API | `packages/shared` 輸出推送格式的 JSON Schema（`ingest.schema.json`）；爬蟲端的 pytest 用它驗證每一筆輸出（`test_contract.py`、`test_pipeline.py`）；API 端以同一份 Zod schema 驗證輸入，`tests/ingest.test.ts` 實際簽章後打 `/internal/ingest`、`/internal/remove` |
+| 簽章 | Python（`push.py`）與 Node（`lib/hmac.ts`）各自實作 HMAC；`ingest.test.ts` 用 Python 算出的固定向量比對，任一邊改了格式就會失敗 |
 | 破壞性變更 | OpenAPI 的變更會自動比對；刪除欄位或修改型別時，PR 必須加上 `breaking-change` 標籤 |
 
 ---
