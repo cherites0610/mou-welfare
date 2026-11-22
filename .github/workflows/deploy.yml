@@ -90,7 +90,7 @@ jobs:
       - if: steps.cfg.outputs.enabled == 'true'
         run: pnpm --filter @mou-welfare/web build
       - if: steps.cfg.outputs.enabled == 'true'
-        run: pnpm --filter @mou-welfare/web deploy
+        run: pnpm --filter @mou-welfare/web run deploy  # 要加 run：pnpm 有同名的內建指令 deploy
 
   smoke:
     name: production smoke test
