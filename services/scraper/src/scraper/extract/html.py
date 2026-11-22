@@ -157,12 +157,14 @@ def extract_html(
     for node in doc.css("script, style, noscript"):
         node.decompose()
     text = ""
-    if content:
-        # 站點設定了正文區塊：先只抽這個區塊，選單和頁尾不會混進來（花蓮：正文很長時整頁文字的選單比例不夠高，擋不掉）
-        region = "".join(n.html or "" for n in doc.css(content))
-        if region:
-            text = clean_markdown(_trafilatura(f"<html><body><article>{region}</article></body></html>", url))
-    if len(text) < MIN_BODY_CHARS:
+    region_nodes = doc.css(content) if content else []
+    if region_nodes:
+        # 站點設定了正文區塊、而且頁面上有這個區塊：只抽這個區塊，不退回整頁。
+        # 整頁文字在正文很長時選單比例不夠高、在正文空白時就是整個選單（花蓮），兩種都擋不乾淨；
+        # 正文太短時交給流程併入附件文字或隔離。
+        region = "".join(n.html or "" for n in region_nodes)
+        text = clean_markdown(_trafilatura(f"<html><body><article>{region}</article></body></html>", url))
+    else:
         text = clean_markdown(_trafilatura(html, url))
     # 正文區塊是空的時，trafilatura 會退回整頁文字（選單、頁尾），這種結果不能用
     if navigation_ratio(doc, text) > MAX_NAVIGATION_RATIO:

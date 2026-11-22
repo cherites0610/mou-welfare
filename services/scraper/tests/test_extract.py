@@ -167,3 +167,10 @@ def test_雜訊行與script() -> None:
     script = '<script>$(function () { $.ajax({url: "x"}) })</script>'
     html = f'<html><body><div class="c">{body}{script}</div></body></html>'
     assert "ajax" not in extract_html(html, "https://x.example/", content="div.c").content_md
+
+
+def test_正文區塊空白時不退回整頁() -> None:
+    # 花蓮：內容只在附件裡的頁面，正文區塊是空的；退回整頁就會得到整個選單
+    nav = "".join(f'<li><a href="/List_sp/{i}">選單項目{i}</a></li>' for i in range(40))
+    html = f'<html><body><ul>{nav}</ul><p>{"頁尾說明文字。" * 30}</p><div class="edit_box"></div></body></html>'
+    assert extract_html(html, "https://sa.hl.gov.tw/Detail_sp/x", content="div.edit_box").content_md == ""
