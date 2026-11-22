@@ -374,7 +374,7 @@ export interface LLM {
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
 | 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）與前端（Workers），再做正式環境煙霧測試；最近一次（`35bea4e`）四個 job 全部成功 |
-| 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,491 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,028 筆），見 `docs/scraper.md` §10.3 |
+| 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,471 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,008 筆），見 `docs/scraper.md` §10.3 |
 | 結構化 | ⚠️ 目前全部由**關鍵字規則**結構化（`LLM_DRIVER=rules`），沒有 embedding。原因：Gemini 帳戶的預付額度用完（API 回 `402 RESOURCE_EXHAUSTED`，2026-11-22 實測）。儲值後把 `api.env` 的 `LLM_DRIVER` 刪除或改為 `gemini` 並重啟，啟動時的 backfill 會把規則結構化的福利全部重新排入 |
 | 爬蟲排程 | ⏸ 還沒有排程；目前在主機上手動執行（`~/.config/mou-welfare/scraper.env` 提供 `API_BASE`、`INGEST_HMAC_KEY`），見 `docs/scraper.md` §10.2 |
 
