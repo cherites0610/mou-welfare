@@ -1,0 +1,20 @@
+# 臺南市政府社會局（A 族，數字）：sab.tainan.gov.tw
+# 注意：cl.aspx?n=34781「補助業務公告專區」是對團體的補助（docs/scraper.md §6.5），不列入
+id: tainan
+city: 臺南市
+adapter: cms_a
+base_url: https://sab.tainan.gov.tw
+seeds:
+  - { url: '/News.aspx?n=21344&sms=19473', label: 兒少／經濟補助 }
+  - { url: '/News.aspx?n=21444&sms=19550', label: 托育補助 }
+  - { url: '/News.aspx?n=21448&sms=19675', label: 育有未滿2歲兒童育兒津貼 }
+  - { url: '/cl.aspx?n=22470', label: 特殊境遇家庭扶助專區 }
+  - { url: '/News.aspx?n=21365&sms=19493', label: 婦女／福利服務與資源 }
+  - { url: '/cl.aspx?n=21583', label: 長者福利與服務 }
+  - { url: '/News.aspx?n=21384&sms=19508', label: 身心障礙／經濟補助 }
+  - { url: '/News.aspx?n=21398&sms=19521', label: 社會救助／醫療補助 }
+  - { url: '/cl.aspx?n=21587', label: 急難救助 }
+max_depth: 1
+pagination: { param: page, max: 10 }
+exclude_urls: ['cl\.aspx\?n=34781$', 'News\.aspx\?n=3478\d&']
+exclude_title: [委員會, 機構, 團體, 核銷, 徵信]

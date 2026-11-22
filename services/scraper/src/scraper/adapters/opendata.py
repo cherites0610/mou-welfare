@@ -1,8 +1,10 @@
-"""開放資料 adapter（L1 來源，docs/scraper.md §2）：資料集是 JSON 陣列，每一筆就是一個福利。
+"""開放資料 adapter（L1 來源，docs/scraper.md §2）：資料集是 JSON 陣列或 CSV，每一筆就是一個福利。
 
 原始欄位整筆放進 `structured`，後端可以直接使用（資格、應備文件等），不必再交給 LLM 猜。
 """
 
+import csv
+import io
 import json
 from collections.abc import Iterator
 from typing import Any
@@ -15,6 +17,18 @@ def _str(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
+def parse_records(content: bytes, fmt: str) -> list[Any]:
+    """JSON 陣列或 CSV（第一列為欄位名稱）。欄位名稱去掉 BOM：臺南的 CSV 開頭有兩個 BOM。"""
+    text = content.decode("utf-8-sig")
+    if fmt == "csv":
+        rows = csv.DictReader(io.StringIO(text))
+        return [{(k or "").lstrip("\ufeff").strip(): v for k, v in row.items()} for row in rows]
+    data = json.loads(text)
+    if not isinstance(data, list):
+        raise ValueError("not_a_list")
+    return data
+
+
 class OpenData(Adapter):
     def list_items(self) -> Iterator[RawItem]:
         for ds in self.site.datasets:
@@ -25,12 +39,9 @@ class OpenData(Adapter):
                 continue
             self.stats.pages += 1
             try:
-                records = json.loads(res.content.decode("utf-8-sig"))
-            except (ValueError, UnicodeDecodeError) as e:
-                self.stats.errors.append(f"bad_json {ds.url}: {e}")
-                continue
-            if not isinstance(records, list):
-                self.stats.errors.append(f"not_a_list {ds.url}")
+                records = parse_records(res.content, ds.format)
+            except (ValueError, UnicodeDecodeError, csv.Error) as e:
+                self.stats.errors.append(f"bad_{ds.format} {ds.url}: {e}")
                 continue
             for i, rec in enumerate(records):
                 if not isinstance(rec, dict) or not _str(rec.get(ds.title)):
@@ -40,6 +51,6 @@ class OpenData(Adapter):
                 yield RawItem(
                     url=f"{ds.page_url}#{key or i + 1}",
                     title_hint=_str(rec[ds.title]),
-                    fields={k: _str(v) for k, v in rec.items()},
+                    fields={ds.labels.get(str(k), str(k)): _str(v) for k, v in rec.items()},
                     link=link if link.startswith(("http://", "https://")) else ds.page_url,
                 )

@@ -1,0 +1,15 @@
+# 花蓮縣政府社會處（C 族）：sa.hl.gov.tw
+id: hualien
+city: 花蓮縣
+adapter: custom:hualien
+base_url: https://sa.hl.gov.tw
+seeds:
+  - { url: '/List_sp/07677500345645edbc88c555255344b5', label: 老人福利 }
+  - { url: '/List_sp/d748efad4a284e7c95322573ec875058', label: 身心障礙福利 }
+  - { url: '/List_sp/056bbe6a99d945fb959363f07e6c388d', label: 社會救助 }
+  - { url: '/List_sp/63e0d49fda6c41059e0567d65e449e64', label: 兒少福利 }
+  - { url: '/List_sp/91b2643a79f1491b93dc93bd449ec0fa', label: 婦女及家庭福利 }
+max_depth: 1
+# 違反老人福利法公告、社區照顧關懷據點專區（機構）
+exclude_urls: ['/List_sp/(d340adac82fa43099adc163b381dd70e|9b3c7b8db0324d86808ea3ef60b49868)$']
+exclude_title: [委員會, 機構, 團體, 徵選補助單位, 徵求補助計畫, 錄取, 違反, 據點, 統計]

@@ -71,3 +71,26 @@ def test_同一主機的請求間隔() -> None:
 
 def test_user_agent_寫明身分() -> None:
     assert "MouWelfareBot" in USER_AGENT and "mou-welfare.com" in USER_AGENT
+
+
+def test_主機連不上時之後立刻失敗() -> None:
+    import httpx
+
+    calls: list[str] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        calls.append(str(req.url))
+        if req.url.host == "down.example":
+            raise httpx.ConnectTimeout("timed out", request=req)
+        return httpx.Response(200, text="ok", headers={"content-type": "text/html"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    f = Fetcher(delay=0, client=client, sleep=lambda _: None, retries=1)
+    for i in range(3):
+        with pytest.raises(FetchError):
+            f.get(f"https://down.example/file{i}.pdf")
+    n = len(calls)
+    with pytest.raises(FetchError) as e:
+        f.get("https://down.example/another.pdf")
+    assert e.value.reason == "host_down" and len(calls) == n  # 沒有再連線
+    assert f.get("https://up.example/x").status == 200  # 其他主機不受影響

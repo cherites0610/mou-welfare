@@ -1,0 +1,10 @@
+# 彰化縣政府社會處（C 族）：津貼及補助專區（33 筆，2026-11-22），已經是整理好的福利清單
+# 舊路徑 www.chcg.gov.tw/DTO/social 的其他頁面曾被 WAF 擋（docs/scraper.md §4.2），這個專區可以直接連
+id: changhua
+city: 彰化縣
+adapter: custom:changhua
+base_url: https://www.chcg.gov.tw
+seeds:
+  - { url: '/DTO/social/06service/service01_list.aspx?cate_id=2434', label: 津貼及補助專區 }
+max_depth: 0
+pagination: { param: page, max: 10 }

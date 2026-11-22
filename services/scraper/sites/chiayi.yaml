@@ -1,0 +1,16 @@
+# 嘉義市政府社會處（A 族，數字）：social.chiayi.gov.tw
+id: chiayi
+city: 嘉義市
+adapter: cms_a
+base_url: https://social.chiayi.gov.tw
+seeds:
+  - { url: '/News.aspx?n=1101&sms=9555', label: 老人福利 }
+  - { url: '/News.aspx?n=393&sms=9376', label: 身心障礙福利 }
+  - { url: '/News.aspx?n=397&sms=9377', label: 社會救助 }
+  - { url: '/News.aspx?n=401&sms=9380', label: 兒童少年福利 }
+  - { url: '/News.aspx?n=403&sms=9382', label: 婦女福利 }
+  - { url: '/cl.aspx?n=3833', label: 家庭福利 }
+  - { url: '/cl.aspx?n=3834', label: 新住民福利 }
+max_depth: 1
+pagination: { param: page, max: 10 }
+exclude_title: [委員會, 推動小組, 機構, 徵信, 兒少代表, 事故傷害, 名冊]

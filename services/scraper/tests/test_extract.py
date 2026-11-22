@@ -120,3 +120,50 @@ def test_連結文字去掉開啟新視窗() -> None:
 def test_正文去掉無障礙定位文字與多餘空白() -> None:
     md = clean_markdown("中央內容區塊\n\n特殊境遇家庭扶助\n-                     \t\t網頁維護：社會局")
     assert md == "特殊境遇家庭扶助\n- 網頁維護：社會局"
+
+
+def test_去掉Word項目符號與附件名稱的下載字樣() -> None:
+    assert (
+        clean_markdown("l年滿65歲\nØ申請資格\nline 不受影響\n- l設籍本縣")
+        == "年滿65歲\n申請資格\nline 不受影響\n- 設籍本縣"
+    )
+    from selectolax.lexbor import LexborHTMLParser
+
+    from scraper.extract.html import find_attachments
+
+    doc = LexborHTMLParser('<main><a href="/Upload/a.pdf">下載 申請表.pdf</a></main>')
+    assert find_attachments(doc, "https://sa.hl.gov.tw/", None)[0].name == "申請表.pdf"
+
+
+def test_連結文字去掉清單編號() -> None:
+    assert dedupe_halves("1-1彰化縣政府生育補助") == "彰化縣政府生育補助"
+    assert dedupe_halves("2-10 身心障礙者生活補助") == "身心障礙者生活補助"
+    assert dedupe_halves("1. 敬老優惠措施") == "敬老優惠措施"
+    assert dedupe_halves("3、重陽敬老金") == "重陽敬老金"
+    assert dedupe_halves("65歲以上老人健保補助") == "65歲以上老人健保補助"
+    assert dedupe_halves("115年度「中低收入老人」補助") == "115年度「中低收入老人」補助"
+
+
+def test_標題編號_數字後接單位時保留() -> None:
+    assert dedupe_halves("0-6歲國家一起養") == "0-6歲國家一起養"
+    assert dedupe_halves("6. 社福卡") == "社福卡"
+
+
+def test_有正文區塊設定時_只抽正文區塊() -> None:
+    # 花蓮：正文很長時，整頁文字的選單比例不夠高，選單會混進正文（2026-11-22）
+    nav = "".join(f'<li><a href="/List_sp/{i}">選單項目{i}</a></li>' for i in range(40))
+    body = "<p>補助對象：設籍本縣並已通報主管機關之發展遲緩兒童，得申請早期療育費用補助。</p>" * 6
+    html = f'<html><body><ul class="menu">{nav}</ul><div class="edit_box">{body}</div></body></html>'
+    ext = extract_html(html, "https://sa.hl.gov.tw/Detail_sp/x", content="div.edit_box")
+    assert "選單項目" not in ext.content_md
+    assert "早期療育費用補助" in ext.content_md
+
+
+def test_雜訊行與script() -> None:
+    md = clean_markdown("申請資格\n- pdf(557.24 KB) MD5:13ccd48104db857831e70ecac4b18297\n.  .  .  .\n補助內容")
+    assert md == "申請資格\n補助內容"
+    assert dedupe_halves("移至2-6罹患癌症之兒童及青少年醫療費用補助") == "罹患癌症之兒童及青少年醫療費用補助"
+    body = "<p>申請資格：設籍本市並領有身心障礙證明者，可申請監護宣告費用補助。</p>" * 3
+    script = '<script>$(function () { $.ajax({url: "x"}) })</script>'
+    html = f'<html><body><div class="c">{body}{script}</div></body></html>'
+    assert "ajax" not in extract_html(html, "https://x.example/", content="div.c").content_md

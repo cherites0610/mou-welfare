@@ -1,0 +1,31 @@
+# 桃園市福利補助資訊（開放資料 26032，每年更新）：26 筆，含勞動局、原民局、農業局等其他局處的個人補助
+id: tycg_od
+city: 桃園市
+adapter: opendata
+base_url: https://opendata.tycg.gov.tw
+datasets:
+  - url: https://opendata.tycg.gov.tw/api/dataset/b20a8017-2736-448e-86e4-4032211073d7/resource/80eecbec-9112-4f3b-9b7d-20ace73eb7b3/download
+    label: 桃園市福利補助資訊
+    page_url: https://data.gov.tw/dataset/26032
+    title: policyName  # 欄位名稱以原始名稱指定（labels 只影響正文與 structured）
+    id: policyName  # 沒有流水號，福利名稱在資料集內不重複
+    link: sourceUrl
+    labels:
+      policyName: 福利名稱
+      policyCategory: 福利類別
+      welfareIdentity: 適用身分
+      dataPublishedDate: 資料發布日期
+      agencyName: 主管機關
+      divisionName: 承辦科室
+      policyDescription: 福利說明
+      eligibilityCriteria: 申請資格
+      applicationMethod: 申請方式
+      processingTime: 處理時間
+      applicationLocation: 申請地點
+      requiredDocuments: 應備文件
+      sourceUrl: 原始網址
+      contactUnit: 聯絡單位
+      市話: 聯絡電話
+      contactExtension: 分機
+      competentAuthorityUrl: 主管機關網址
+      tyeserviceurl: 線上申辦網址

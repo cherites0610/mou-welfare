@@ -9,6 +9,7 @@
 import re
 from collections import deque
 from collections.abc import Iterator
+from html import escape as html_escape
 from typing import ClassVar
 from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
@@ -88,6 +89,10 @@ class LinkCrawler(Adapter):
         """內文網址但其實是目錄（例如 A 族的 cp.aspx?n=X 會顯示第一筆，同時列出 &s= 子項目）。"""
         return False
 
+    def merge_hub(self, url: str, hint: str | None, details: list[Link]) -> RawItem | None:
+        """目錄頁的子項目其實是同一福利的分頁籤時，合併成一筆（見 SiteConfig.merge_tabs）；預設不合併。"""
+        return None
+
     def page_url(self, url: str, page: int) -> str:
         assert self.site.pagination is not None
         parts = urlsplit(url)
@@ -122,6 +127,10 @@ class LinkCrawler(Adapter):
             url, depth, hint = queue.popleft()
             if url in visited:
                 continue
+            if self.stats.pages >= self.site.max_pages:
+                # 頁數上限：規則寫錯或網站結構改變時，不會無限制地爬下去；健康檢查會看到錯誤
+                self.stats.errors.append(f"max_pages {self.site.max_pages} reached, {len(queue) + 1} urls left")
+                return
             visited.add(url)
             fetched = self.fetch_doc(url)
             if fetched is None:
@@ -132,7 +141,13 @@ class LinkCrawler(Adapter):
             lists = [link for link in links if self.is_list(link[0])]
 
             if self.is_detail(url):
-                if not self.is_hub(url, details):
+                if self.is_hub(url, details):
+                    merged = self.merge_hub(url, hint, details)
+                    if merged is not None:
+                        yield merged
+                        visited.update(u for u, _ in details if u.startswith(url))
+                        continue
+                else:
                     yield RawItem(url=url, title_hint=hint, html=html)
                 # 內文頁旁邊常列出同一分類的其他項目，一起收進來；但不從內文頁往其他列表走
                 queue.extend((u, depth, t) for u, t in details if u not in visited)
@@ -171,12 +186,19 @@ class LinkCrawler(Adapter):
             yield from new
 
 
+# A 族的 n / s / sms 參數有兩種：16 碼 hex（臺北、金門、屏東）或數字（桃園、臺南、嘉義市、宜蘭）
+_A_ID = r"(?:[0-9A-F]{16}|\d+)"
+
+
 class CmsA(LinkCrawler):
-    """A 族（臺北、桃園、臺南、金門等 11 縣市共用的 CMS）：Content_List / cp / News_Content。"""
+    """A 族（臺北、桃園、臺南、金門等 11 縣市共用的 CMS）。
+
+    列表：Content_List.aspx?n= / cl.aspx?n= / News.aspx?n=&sms=；內文：cp.aspx?n=(&s=) / News_Content.aspx?n=&s=
+    """
 
     DEFAULTS: ClassVar[dict[str, str]] = {
-        "follow": r"Content_List\.aspx\?n=[0-9A-F]{16}$",
-        "detail": r"(cp|News_Content)\.aspx\?n=[0-9A-F]{16}(&s=[0-9A-F]{16})?$",
+        "follow": rf"((Content_List|cl)\.aspx\?n={_A_ID}|News\.aspx\?n={_A_ID}&sms={_A_ID})$",
+        "detail": rf"(cp\.aspx\?n={_A_ID}(&s={_A_ID})?|News_Content\.aspx\?n={_A_ID}&s={_A_ID}(&sms={_A_ID})?)$",
         "region": "div.page-content",
         "body": "div.page-content, div.area-editor, div.file-download-multiple",
         # 正文：日期資訊 + 編輯區；不含 page-content 裡同分類的項目清單
@@ -185,6 +207,31 @@ class CmsA(LinkCrawler):
 
     def is_hub(self, url: str, details: list[Link]) -> bool:
         return "&s=" not in url and any(u.startswith(url + "&s=") for u, _ in details)
+
+    def merge_hub(self, url: str, hint: str | None, details: list[Link]) -> RawItem | None:
+        if not self.site.merge_tabs:
+            return None
+        tabs = [(u, t) for u, t in details if u.startswith(url + "&s=")]
+        sections: list[str] = []
+        files: list[str] = []
+        for tab_url, tab_name in tabs:
+            fetched = self.fetch_doc(tab_url)
+            if fetched is None:
+                continue
+            doc = fetched[1]
+            for node in doc.css("script, style, noscript"):
+                node.decompose()
+            content = "".join(n.html or "" for n in doc.css(self._setting("content") or "div.area-editor"))
+            sections.append(f"<section><h2>{html_escape(tab_name)}</h2>{content}</section>")
+            files += [n.html or "" for n in doc.css("div.file-download-multiple")]
+        if not sections:
+            return None
+        title = html_escape(hint or "")
+        merged = (
+            f"<html><head><title>{title}</title></head><body><main><article><h1>{title}</h1>"
+            f"{''.join(sections)}</article>{''.join(files)}</main></body></html>"
+        )
+        return RawItem(url=url, title_hint=hint, html=merged)
 
 
 class CmsB(LinkCrawler):

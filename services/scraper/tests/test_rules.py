@@ -12,6 +12,7 @@ from scraper.filter.rules import judge_title
         "115年度社會福利補助案件核銷注意事項",
         "社會救助金專戶公開徵信",
         "身心障礙者臨時照顧服務採購案決標公告",
+        "何○○違反身心障礙者權益保障法第75條公告",
     ],
 )
 def test_雜訊標題被排除(title: str) -> None:

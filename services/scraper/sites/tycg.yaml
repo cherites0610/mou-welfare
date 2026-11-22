@@ -1,0 +1,16 @@
+# 桃園市政府社會局（A 族，數字）：sab.tycg.gov.tw
+id: tycg
+city: 桃園市
+adapter: cms_a
+base_url: https://sab.tycg.gov.tw
+seeds:
+  - { url: '/cl.aspx?n=7322', label: 身心障礙者福利 }
+  - { url: '/cl.aspx?n=7343', label: 兒少福利 }
+  - { url: '/cl.aspx?n=7354', label: 社會救助 }
+  - { url: '/cl.aspx?n=7370', label: 老人福利 }
+  - { url: '/cl.aspx?n=24054', label: 新住民友善 }
+max_depth: 2
+pagination: { param: page, max: 10 }
+# 補助申請及經費核銷專區（對團體）、社會救助金專區（徵信）
+exclude_urls: ['News\.aspx\?n=(8987|7362)&']
+exclude_title: [委員會, 機構, 核銷, 徵信, 基金會, 遊戲場, 每年, 短片, 文宣下載, 友善連結, 防疫紓困, 公共安全, 災害應變]

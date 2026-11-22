@@ -1,0 +1,28 @@
+# 臺北市政府社會局（A 族，hex）：dosw.gov.taipei
+# 起點只放「補助、津貼、服務」類的分類；機構管理、委員會、補助民間團體、稽查公告不列入
+id: taipei
+city: 臺北市
+adapter: cms_a
+base_url: https://dosw.gov.taipei
+seeds:
+  - { url: '/Content_List.aspx?n=2C486AA08208CD74', label: 育兒及托育相關補助 }
+  - { url: '/Content_List.aspx?n=E943BC9BC6699A2A', label: 兒童托育方案補助 }
+  - { url: '/Content_List.aspx?n=CDDF315EA8D0BB43', label: 社會救助／生活經濟輔助 }
+  - { url: '/Content_List.aspx?n=CBF8AAEF232010B8', label: 社會救助／健保及醫療補助 }
+  - { url: '/Content_List.aspx?n=AC42C1BBCBA9DA83', label: 社會救助／國民年金保費補助 }
+  - { url: '/Content_List.aspx?n=289A4DE501EAEE7E', label: 社會救助／急難及災害救助 }
+  - { url: '/Content_List.aspx?n=EA0CF8DD1014E232', label: 身心障礙／經濟補助 }
+  - { url: '/Content_List.aspx?n=1C86CF7388C1C6EE', label: 身心障礙／輔具補助及服務 }
+  - { url: '/Content_List.aspx?n=319A92B2EE6F1662', label: 身心障礙者服務 }
+  - { url: '/Content_List.aspx?n=F8FBEB676ADE6E17', label: 老人／經濟補助 }
+  - { url: '/Content_List.aspx?n=2916B1C48BBE8F36', label: 老人／健保費補助及健康維護 }
+  - { url: '/Content_List.aspx?n=DC3DB0703F035BFD', label: 獨居老人服務 }
+  - { url: '/Content_List.aspx?n=4E6B8DF90FC434E0', label: 早期療育資源及補助 }
+  - { url: '/Content_List.aspx?n=27572369655BF62F', label: 兒少／生活經濟扶(補)助 }
+  - { url: '/Content_List.aspx?n=28A2C732E02B18F1', label: 特殊境遇家庭扶助 }
+  - { url: '/News.aspx?n=592FE8F37325CACD&sms=12009A93B2FA491B', label: 好孕2U專車補助 }
+max_depth: 1
+# cp.aspx?n=X 底下的 &s= 是同一福利的分頁籤（服務內容／應備文件／洽辦窗口），合併成一筆
+merge_tabs: true
+pagination: { param: page, max: 10 }
+exclude_title: [委員會, 機構管理, 稽查, 違反, 補助民間團體, 補助團體, 補助辦理, 獎勵私立, 補助臺北市社區]

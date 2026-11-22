@@ -119,7 +119,8 @@ class SiteRun:
         for link in ext.attachments[:MAX_ATTACHMENTS]:
             if link.url not in self._attachment_cache:
                 try:
-                    res = self.fetcher.get(link.url)
+                    # 附件只重試一次：附件抓不到不影響正文，不值得等太久
+                    res = self.fetcher.get(link.url, retries=1)
                     text = parse_file(res.content).text if res.status < 400 else ""
                 except FetchError as e:
                     self.result.errors.append(f"attachment {e.reason} {link.url}")

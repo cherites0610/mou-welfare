@@ -16,14 +16,22 @@ MIN_BODY_CHARS = 80
 _VOLATILE_LINE = re.compile(r"(點閱|瀏覽|人次|最後更新|更新日期|更新時間|友善列印|回上一頁|:::)")
 # 無障礙用的定位文字，不是正文
 _ACCESSKEY_LINE = re.compile(r"^(?:#+\s*)?(?:中央內容區塊|跳到主要內容區塊?|主要內容區)$")
+# 清單編號前綴：彰化「1-1彰化縣政府生育補助」、臺南「1. 敬老優惠措施」；要有 - 或 . 、 分隔才去掉，避免誤刪「65歲以上…」
+_LIST_NUMBER = re.compile(r"^\d{1,2}(?:(?:-\d{1,2})+\s*|[.、．]\s*)(?![歲年月日週個人元次%])(?=[一-鿿【「(（])")
+_WORD_BULLET = re.compile(r"^((?:[-*]\s*)?)[lnØ§üvq]\s?(?=[\u4e00-\u9fff（(「])")
+# 不是正文的行：檔案清單的 MD5、PDF 目錄頁轉出的整排點點
+_NOISE_LINE = re.compile(r"MD5\s*[:：]\s*[0-9a-fA-F]{32}|^[\s.·…‧•\-_]{3,}$")
+# 連結 title 屬性常見的前綴：彰化「移至2-6罹患癌症…」
+_LINK_PREFIX = re.compile(r"^(?:移至|前往|連結至|開啟)\s*")
 _NEW_WINDOW = re.compile(r"\s*[(（\[［](?:另開|開啟)新視窗[)）\]］]")
 _FILE_LINK = re.compile(
-    r"(?i)(\.(pdf|odt|ods|odp|docx?|xlsx?|pptx?)(?:$|[?#&])|download\.ashx|downdoc|/attachment/|/download/)"
+    r"(?i)(\.(pdf|odt|ods|odp|docx?|xlsx?|pptx?)(?:$|[?#&])|download\.ashx|getfile\.aspx|downdoc|/attachment/|/download/)"
 )
 _FILE_EXT = r"(?:pdf|odt|ods|odp|docx?|xlsx?|pptx?)"
 _FILE_NAME_NOISE = [
     re.compile(rf"^{_FILE_EXT}\s+", re.I),  # A 族：「docx 開立專戶申請書(14.29 KB).docx[另開新視窗]」
     re.compile(r"[\[［(（]另開新視窗[\]］)）]"),
+    re.compile(r"^下載\s*"),  # 花蓮：「下載 申請表.pdf」
     re.compile(r"[(（]\s*[\d.]+\s*[KMG]?B\s*[)）]", re.I),
     re.compile(rf"[（(](?:{_FILE_EXT}|檔案下載|、)+[)）]\s*$", re.I),  # 基隆：「(PDF、檔案下載)」
 ]
@@ -52,7 +60,7 @@ def clean_text(text: str) -> str:
 
 def dedupe_halves(text: str) -> str:
     """A 族網站的連結文字常是「標題 標題」（畫面文字 + 給報讀軟體的隱藏文字）；也去掉「(開啟新視窗)」。"""
-    text = clean_text(_NEW_WINDOW.sub("", text))
+    text = clean_text(_LIST_NUMBER.sub("", _LINK_PREFIX.sub("", clean_text(_NEW_WINDOW.sub("", text)))))
     half, rest = divmod(len(text), 2)
     if rest == 1 and text[half] == " " and text[:half] == text[half + 1 :]:
         return text[:half]
@@ -81,13 +89,19 @@ def pick_title(doc: LexborHTMLParser, hint: str | None) -> str:
     page_title = clean_page_title(title_node.text()) if title_node else ""
     # og:title 比 <title> 短很多時，通常只是分類名稱
     if og and len(og) >= 4 and not (page_title and og in page_title and len(og) < len(page_title) // 2):
-        return clean_page_title(og)
-    return page_title or og or ""
+        return dedupe_halves(clean_page_title(og))
+    return dedupe_halves(page_title or og or "")
 
 
 def clean_markdown(md: str) -> str:
     lines = [re.sub(r"[ \t\u3000\xa0]+", " ", ln).strip() for ln in md.splitlines()]
-    lines = [ln for ln in lines if not _VOLATILE_LINE.search(ln) and not _ACCESSKEY_LINE.match(ln)]
+    lines = [
+        ln
+        for ln in lines
+        if not _VOLATILE_LINE.search(ln) and not _ACCESSKEY_LINE.match(ln) and not _NOISE_LINE.search(ln)
+    ]
+    # 從 Word 貼上的項目符號（Wingdings）會變成英文字母：「l年滿65歲」「Ø申請資格」
+    lines = [_WORD_BULLET.sub(r"\1", ln) for ln in lines]
     text = "\n".join(lines)
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
@@ -127,15 +141,29 @@ def navigation_ratio(doc: LexborHTMLParser, md: str) -> float:
 MAX_NAVIGATION_RATIO = 0.5
 
 
+def _trafilatura(html: str, url: str) -> str:
+    md = trafilatura.extract(
+        html, url=url, output_format="markdown", include_tables=True, include_links=False, include_images=False
+    )
+    return md or ""
+
+
 def extract_html(
     html: str, url: str, *, hint: str | None = None, body: str | None = None, content: str | None = None
 ) -> Extracted:
     """`body`：找附件的區塊；`content`：正文區塊，trafilatura 失敗時的備援（沒有就用 body）。"""
     doc = LexborHTMLParser(html)
-    md = trafilatura.extract(
-        html, url=url, output_format="markdown", include_tables=True, include_links=False, include_images=False
-    )
-    text = clean_markdown(md or "")
+    # 正文區塊裡的 <script> 會被當成文字（臺北：點閱數的 $.ajax 出現在正文）
+    for node in doc.css("script, style, noscript"):
+        node.decompose()
+    text = ""
+    if content:
+        # 站點設定了正文區塊：先只抽這個區塊，選單和頁尾不會混進來（花蓮：正文很長時整頁文字的選單比例不夠高，擋不掉）
+        region = "".join(n.html or "" for n in doc.css(content))
+        if region:
+            text = clean_markdown(_trafilatura(f"<html><body><article>{region}</article></body></html>", url))
+    if len(text) < MIN_BODY_CHARS:
+        text = clean_markdown(_trafilatura(html, url))
     # 正文區塊是空的時，trafilatura 會退回整頁文字（選單、頁尾），這種結果不能用
     if navigation_ratio(doc, text) > MAX_NAVIGATION_RATIO:
         text = ""

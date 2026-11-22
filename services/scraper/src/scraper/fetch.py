@@ -4,6 +4,8 @@
 - 遵守 robots.txt（取不到 robots.txt 時視為允許）。
 - User-Agent 寫明身分與聯絡方式。
 - 逾時、連線錯誤、429、5xx 會以指數退避重試。
+- 同一主機連續 3 次連不上（連線逾時或拒絕），這次執行就不再連它，避免每個請求都等到逾時
+  （宜蘭的附件主機有一個 IP 不通，曾讓單一頁面卡住 10 分鐘以上）。
 """
 
 import time
@@ -17,6 +19,8 @@ import httpx
 USER_AGENT = "MouWelfareBot/2.0 (+https://mou-welfare.com/bot)"
 RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 MAX_BYTES = 15 * 1024 * 1024  # 附件上限：超過就不下載
+CONNECT_TIMEOUT = 10.0
+HOST_DOWN_AFTER = 3  # 連續幾次連線失敗後視為主機無法連線
 
 
 class FetchError(Exception):
@@ -59,13 +63,14 @@ class Fetcher:
         self.retries = retries
         self._client = client or httpx.Client(
             headers={"User-Agent": USER_AGENT, "Accept-Language": "zh-TW,zh;q=0.9"},
-            timeout=timeout,
+            timeout=httpx.Timeout(timeout, connect=CONNECT_TIMEOUT),
             follow_redirects=True,
         )
         self._sleep = sleep
         self._clock = clock
         self._last: dict[str, float] = {}
         self._robots: dict[str, RobotFileParser | None] = {}
+        self._connect_failures: dict[str, int] = {}
         self.requests = 0
 
     def close(self) -> None:
@@ -77,10 +82,15 @@ class Fetcher:
     def __exit__(self, *_: object) -> None:
         self.close()
 
-    def get(self, url: str, *, max_bytes: int = MAX_BYTES) -> Response:
+    def get(self, url: str, *, max_bytes: int = MAX_BYTES, retries: int | None = None) -> Response:
+        if self.host_down(url):
+            raise FetchError(url, "host_down")
         if not self.allowed(url):
             raise RobotsDenied(url)
-        return self._request(url, max_bytes)
+        return self._request(url, max_bytes, retries)
+
+    def host_down(self, url: str) -> bool:
+        return self._connect_failures.get(urlsplit(url).netloc, 0) >= HOST_DOWN_AFTER
 
     def allowed(self, url: str) -> bool:
         parts = urlsplit(url)
@@ -114,12 +124,15 @@ class Fetcher:
         attempts = (self.retries if retries is None else retries) + 1
         reason = "unknown"
         for attempt in range(attempts):
+            if self._connect_failures.get(host, 0) >= HOST_DOWN_AFTER:
+                raise FetchError(url, "host_down")
             if attempt:
                 self._sleep(min(2**attempt * self.delay, 60))
             self._throttle(host)
             self.requests += 1
             try:
                 with self._client.stream("GET", url) as res:
+                    self._connect_failures.pop(host, None)
                     if res.status_code in RETRY_STATUS:
                         reason = f"http_{res.status_code}"
                         continue
@@ -138,6 +151,9 @@ class Fetcher:
                         content=bytes(body),
                         encoding=res.encoding,
                     )
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                reason = type(e).__name__
+                self._connect_failures[host] = self._connect_failures.get(host, 0) + 1
             except (httpx.TimeoutException, httpx.TransportError) as e:
                 reason = type(e).__name__
         raise FetchError(url, reason)

@@ -1,0 +1,14 @@
+# 屏東縣政府社會處（A 族，hex，舊版型）：www.pthg.gov.tw/planjdp
+# 舊版型沒有 div.page-content：列表在 div.data_midlle_service，內文在 div.data_midlle_cp；
+# 內文頁的「相關連結」（RelData）會連到其他分類，不放進找連結的區塊
+id: pthg
+city: 屏東縣
+adapter: cms_a
+base_url: https://www.pthg.gov.tw
+seeds:
+  - { url: '/planjdp/Content_List.aspx?n=46F6EFDFE943D834', label: 社會福利總覽 }
+region: div.data_midlle_service, div.data_midlle_cp
+body: div#data_midlle
+content: div.data_midlle_cp
+max_depth: 1
+exclude_title: [委員會, 機構, 團體, 徵信, 法規, 公益勸募, 防災, 性騷擾, 公所專區, 函釋, 來文, 表揚, 社工師]

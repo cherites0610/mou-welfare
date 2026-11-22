@@ -29,10 +29,12 @@ class Dataset(BaseModel):
 
     url: str
     label: str
+    format: Literal["json", "csv"] = "json"
     title: str  # 福利名稱的欄位
     link: str | None = None  # 原始網頁連結的欄位（沒有就用 page_url）
     id: str | None = None  # 流水號欄位，用來組出穩定的來源網址
     page_url: str  # 資料集頁面（data.gov.tw）
+    labels: dict[str, str] = Field(default_factory=dict)  # 欄位名稱改為中文（例如桃園用英文欄位名）
 
 
 class SiteConfig(BaseModel):
@@ -48,6 +50,10 @@ class SiteConfig(BaseModel):
     body: str | None = None  # 內文區塊（找附件用）
     content: str | None = None  # 正文區塊（trafilatura 失敗時的備援；沒有就用 body）
     max_depth: int = Field(default=2, ge=0, le=5)
+    max_pages: int = Field(default=600, ge=1, le=5000)  # 每次執行最多抓幾頁（列表 + 內文，不含附件）
+    # A 族的 cp.aspx?n=X 底下的 &s= 是同一福利的分頁籤（臺北：服務內容／應備文件／洽辦窗口），合併成一筆；
+    # 預設 false：金門等站的 &s= 是各自獨立的福利
+    merge_tabs: bool = False
     pagination: Pagination | None = None
     drop_params: list[str] = Field(default_factory=list)  # 正規化網址時去掉的參數
     extra_hosts: list[str] = Field(

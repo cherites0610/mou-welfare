@@ -111,21 +111,31 @@ def replay(
         files = [f for f in files if f.stem in site]
     if not files:
         raise typer.BadParameter(f"{run_dir} 沒有要推送的 *.jsonl")
+    from scraper.filter.rules import judge_title
+
+    all_sites = load_sites()
     pusher = Pusher(api_base, key)
     failed = 0
     try:
         for f in files:
-            sent = 0
-            for line in f.read_text(encoding="utf-8").splitlines():
+            sent = skipped = 0
+            cfg = all_sites.get(f.stem)
+            # 用 \n 分行，不能用 splitlines()：正文裡的 U+2028 等字元在 JSON 中沒有跳脫，會被誤切
+            for line in f.read_text(encoding="utf-8").split("\n"):
                 if not line:
                     continue
+                item = IngestItem.model_validate(json.loads(line))
+                # 用目前的標題規則再篩一次：dry-run 之後新增的排除字也會生效，不必重新爬
+                if judge_title(item.title, tuple(cfg.exclude_title) if cfg else ()) == "exclude":
+                    skipped += 1
+                    continue
                 try:
-                    pusher.ingest(IngestItem.model_validate(json.loads(line)))
+                    pusher.ingest(item)
                     sent += 1
                 except PushError as e:
                     failed += 1
                     typer.echo(f"  ✗ {e}", err=True)
-            typer.echo(f"{f.stem:<10} pushed {sent}")
+            typer.echo(f"{f.stem:<10} pushed {sent}" + (f", skipped {skipped} by title rules" if skipped else ""))
     finally:
         pusher.close()
     if failed:
@@ -151,7 +161,7 @@ def sample(
     parts = [f"# 抽取品質抽查（{run_dir.name}）", ""]
     parts += ["每篇檢查：標題正確、正文完整（沒有選單或頁尾）、日期正確、附件有文字、是個人可申請的福利。", ""]
     for f in files:
-        items = [json.loads(line) for line in f.read_text(encoding="utf-8").splitlines() if line]
+        items = [json.loads(line) for line in f.read_text(encoding="utf-8").split("\n") if line]
         for d in rng.sample(items, min(per_site, len(items))):
             atts = ", ".join(f"{a['name']}（{len(a['text'])} 字）" for a in d["attachments"]) or "無"
             parts += [

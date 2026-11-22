@@ -1,0 +1,16 @@
+# 宜蘭縣政府社會處（A 族，數字）：sntroot.e-land.gov.tw
+# 「服務項目」（cl.aspx?n=10099）範圍太廣（人民團體、公益勸募、志願服務、公務車租借…），只用福利分類當起點。
+# 社會處網站沒有老人福利分類（長照等業務在其他單位）。
+# 附件主機 www-ws.e-land.gov.tw 從海外連不上（2026-11-22）：內容只在附件裡的頁面會被隔離，要等台灣 IP
+id: eland
+city: 宜蘭縣
+adapter: cms_a
+base_url: https://sntroot.e-land.gov.tw
+seeds:
+  - { url: '/cp.aspx?n=10392', label: 婦女服務 }
+  - { url: '/News.aspx?n=11275&sms=12832', label: 兒童與少年服務 }
+  - { url: '/News.aspx?n=11278&sms=12835', label: 社會救助 }
+  - { url: '/News.aspx?n=11280&sms=12837', label: 身心障礙者服務 }
+max_depth: 1
+pagination: { param: page, max: 10 }
+exclude_title: [委員會, 機構, 團體, 徵信, 調查, 研究, 優先採購, 推動小組, 公務車]

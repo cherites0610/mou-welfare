@@ -228,3 +228,58 @@ def test_exclude_urls_整個分類不抓() -> None:
     with web.fetcher() as f:
         assert list(get_adapter(cfg, f).list_items()) == []
     assert not any("/2750" in r or "/2755" in r for r in web.requests)
+
+
+def test_開放資料_CSV_去掉BOM_欄位改中文名稱() -> None:
+    from scraper.adapters.opendata import parse_records
+
+    # 臺南的 CSV：檔頭有兩個 BOM（utf-8-sig 只會去掉第一個）
+    raw = "﻿﻿補助流水號,補助名稱\n1,低收入戶\n".encode()
+    assert parse_records(raw, "csv") == [{"補助流水號": "1", "補助名稱": "低收入戶"}]
+
+    url = "https://data.example/ty.json"
+    body = json.dumps([{"policyName": "身心障礙者生活補助", "eligibilityCriteria": "設籍本市"}], ensure_ascii=False)
+    web = MockWeb({url: (200, body, "application/json")})
+    cfg = site(
+        adapter="opendata",
+        base_url="https://data.example",
+        datasets=[
+            {
+                "url": url,
+                "label": "x",
+                "page_url": "https://data.gov.tw/dataset/26032",
+                "title": "policyName",
+                "id": "policyName",
+                "labels": {"policyName": "福利名稱", "eligibilityCriteria": "申請資格"},
+            }
+        ],
+    )
+    with web.fetcher() as f:
+        [item] = list(get_adapter(cfg, f).list_items())
+    assert item.title_hint == "身心障礙者生活補助"
+    assert item.url == "https://data.gov.tw/dataset/26032#身心障礙者生活補助"
+    assert item.fields == {"福利名稱": "身心障礙者生活補助", "申請資格": "設籍本市"}
+
+
+def test_A族數字參數的網址規則() -> None:
+    cfg = site(base_url="https://sab.tycg.gov.tw", seeds=[{"url": "/cl.aspx?n=7322", "label": "x"}])
+    with MockWeb().fetcher() as f:
+        a = get_adapter(cfg, f)
+        assert isinstance(a, CmsA)
+        for u in ["/cl.aspx?n=7322", "/News.aspx?n=1101&sms=9555", "/Content_List.aspx?n=09B2CDA681C47C09"]:
+            assert a.is_list("https://sab.tycg.gov.tw" + u), u
+        for u in ["/cp.aspx?n=385", "/cp.aspx?n=385&s=12", "/News_Content.aspx?n=1101&s=934324&sms=9555"]:
+            assert a.is_detail("https://sab.tycg.gov.tw" + u), u
+        # 分頁連結不是新的列表
+        assert not a.is_list("https://sab.tycg.gov.tw/News.aspx?n=1101&sms=9555&page=2&PageSize=20")
+
+
+def test_頁數上限() -> None:
+    hub = f"{KINMEN}/cp.aspx?n=C8CDE0088D2E9571"
+    web = MockWeb({hub: html(fixture("kinmen/cp_hub.html"))}, default=html(fixture("kinmen/cp_item.html")))
+    cfg = site(seeds=[{"url": "/cp.aspx?n=C8CDE0088D2E9571", "label": "x"}], max_pages=5)
+    with web.fetcher() as f:
+        a = get_adapter(cfg, f)
+        items = list(a.list_items())
+    assert a.stats.pages == 5 and len(items) == 4
+    assert any(e.startswith("max_pages 5") for e in a.stats.errors)
