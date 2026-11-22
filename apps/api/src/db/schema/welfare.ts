@@ -41,6 +41,8 @@ export const welfarePrograms = pgTable(
     structuredHash: text('structured_hash'),
     structuredBy: text('structured_by', { enum: STRUCTURED_BY }),
     structuredAt: timestamp('structured_at', { withTimezone: true }),
+    /** 置頂：有值的福利在搜尋結果中排最前面（越晚置頂越前面）。目前用於開發用的範例資料，之後給管理端使用 */
+    pinnedAt: timestamp('pinned_at', { withTimezone: true }),
     structureError: text('structure_error'),
     embedding: vector('embedding', { dimensions: 768 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

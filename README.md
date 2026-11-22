@@ -36,6 +36,7 @@ pnpm dev:api
 NUXT_PUBLIC_API_BASE=http://localhost:5031 pnpm dev:web
 pnpm --filter @mou-welfare/api db:generate   # 修改 schema 後產生 migration
 pnpm --filter @mou-welfare/api openapi       # 修改 API 後更新 openapi.json
+pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts   # 寫入置頂的範例福利（--remove 刪除）
 
 # 爬蟲（dry-run 結果寫到 services/scraper/out/，報告在 out/reports/）
 cd services/scraper && uv sync && uv run pytest

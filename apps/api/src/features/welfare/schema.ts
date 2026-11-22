@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi'
-import { CATEGORIES, CITIES, GENDERS, SPECIAL_IDENTITIES } from '@mou-welfare/shared'
+import { CATEGORIES, CITIES, GENDERS, IDENTITIES } from '@mou-welfare/shared'
 
 /** 逗號分隔的白名單值，例如 `city=臺北市,新北市` */
 const csvOf = (allowed: readonly string[], name: string) =>
@@ -77,7 +77,8 @@ export const ProfileInput = z
   .object({
     birthday: isoDate.nullable().optional(),
     gender: z.enum(GENDERS).nullable().optional(),
-    identities: z.array(z.enum(SPECIAL_IDENTITIES)).max(SPECIAL_IDENTITIES.length).optional(),
+    // 試算可以直接指定年齡組與性別（v1 的「進階篩選」），不必提供生日
+    identities: z.array(z.enum(IDENTITIES)).max(IDENTITIES.length).optional(),
   })
   .openapi('ProfileInput')
 

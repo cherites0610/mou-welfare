@@ -1,0 +1,1 @@
+ALTER TABLE "welfare_programs" ADD COLUMN "pinned_at" timestamp with time zone;

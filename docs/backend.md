@@ -1,7 +1,7 @@
 # 後端設計文件（v2）
 
 > 狀態：實作中（P2 資料流已上線；P1 核心 API、家庭與帳號管理已完成；前端個人設定相關頁面已上線，見第 12 節）
-> 最後更新：2026-11-23（個人設定頁、6 碼邀請碼、訂閱通知欄位、v1 資料庫連線異常）
+> 最後更新：2026-11-23（福利列表與詳情頁、置頂欄位、範例資料、個人設定頁、v1 資料庫連線異常）
 > 相關文件：[爬蟲設計](scraper.md)、[v1 文件](v1/)
 
 ---
@@ -165,6 +165,7 @@ welfare_programs(
   site_id text, source_fields jsonb,  -- 爬蟲站點；開放資料原本的結構化欄位
   structured_hash text, structured_by text, structured_at, structure_error,  -- 結構化時的 content_hash、llm | rules
   content_hash text,                -- 內容沒變就不重新交給 LLM
+  pinned_at timestamptz,            -- 置頂：搜尋結果排最前面（越晚置頂越前面）；目前用於開發用範例資料，之後給管理端
   embedding vector(768),            -- RAG 用
   created_at, updated_at
 )
@@ -210,7 +211,7 @@ welfare_sources(url pk, program_id, site_id, content_hash, first_seen_at, last_s
 | 個人 | `GET/PATCH /v1/me`（含 `isSubscribed` 訂閱通知、`createdAt`）、`DELETE /v1/me`（body 必須有 `"confirm":"DELETE"`；有密碼的帳號另需 `password`） | 登入 |
 | 收藏 | `GET /v1/me/favorites?familyId=`、`PUT/DELETE /v1/me/favorites/:programId` | 登入 |
 | 福利 | `GET /v1/welfare?q=&city=&category=&familyId=&page=`、`GET /v1/welfare/:id?familyId=` | 公開；**帶比對結果時以登入身分為準**，不再接受從前端傳 `userId`；帶 `familyId` 時必須登入（401）且為成員（403） |
-| 試算 | `POST /v1/welfare/simulate`（手動輸入身分試算） | 公開 |
+| 試算 | `POST /v1/welfare/simulate`（手動輸入身分試算；`identities` 可直接指定年齡組與性別，對應前端的「進階篩選」） | 公開 |
 | 家庭 | `GET/POST /v1/families`、`GET/PATCH/DELETE /v1/families/:id` | 登入；查看需為成員，修改或刪除需為 admin |
 | 成員 | `GET /v1/families/:id/members`、`PATCH/DELETE /v1/families/:id/members/:userId` | 成員 / admin |
 | 邀請 | `POST /v1/families/:id/invites`、`GET /v1/invites/:code`（加入前預覽：家庭名稱與人數）、`POST /v1/invites/:code/accept` | admin / 登入 |
@@ -276,7 +277,7 @@ await assertChatOwner(db, sessionId, user.id)
 
 - 先用 SQL 篩選：縣市、類別、身分重疊（`&&`）、關鍵字（pg_trgm 相似度）、`status = 'active'`。
 - 只對當頁的資料做資格比對，不再像 v1 一樣把所有資料載入記憶體再分頁。
-- 排序（全部在 SQL 完成）：有身分限制的福利優先 → 登入時，身分與使用者可能符合的（`identities && 使用者可滿足的身分`，含相容規則）優先 → 發布日期新到舊。精確的紅黃綠燈只對當頁計算。
+- 排序（全部在 SQL 完成）：置頂（`pinned_at`）優先 → 有身分限制的福利優先 → 登入時，身分與使用者可能符合的（`identities && 使用者可滿足的身分`，含相容規則）優先 → 發布日期新到舊。精確的紅黃綠燈只對當頁計算。
 - 存取類型 `optional`：搜尋與詳情不需登入；有登入時才附上比對結果與收藏狀態。
 
 ### 8.3 LLM（`lib/llm`）
@@ -378,11 +379,12 @@ export interface LLM {
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 5 個 migration（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
 | 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）與前端（Workers），再做正式環境煙霧測試；最近一次（`6a7ec4b`，2026-11-23）API 已套用新 migration、前端新頁面皆回 200 |
+| 範例資料 | 前端開發用 7 筆範例福利（`apps/api/scripts/seed-mock-welfare.ts`）：欄位照 LLM 結構化格式手寫，名稱加「【範例】」、`program_key` 以 `mock:` 開頭、全部置頂。寫入：`pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts`；刪除加 `--remove`。目前只寫入本機開發資料庫 |
 | 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,471 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,008 筆），見 `docs/scraper.md` §10.3 |
 | 結構化 | ⚠️ 目前全部由**關鍵字規則**結構化（`LLM_DRIVER=rules`），沒有 embedding。原因：Gemini 帳戶的預付額度用完（API 回 `402 RESOURCE_EXHAUSTED`，2026-11-22 實測）。儲值後把 `api.env` 的 `LLM_DRIVER` 刪除或改為 `gemini` 並重啟，啟動時的 backfill 會把規則結構化的福利全部重新排入 |
 | 爬蟲排程 | ⏸ 還沒有排程；目前在主機上手動執行（`~/.config/mou-welfare/scraper.env` 提供 `API_BASE`、`INGEST_HMAC_KEY`），見 `docs/scraper.md` §10.2 |
@@ -400,7 +402,7 @@ export interface LLM {
 | 呼叫 API | 環境變數 `NUXT_PUBLIC_API_BASE`（目前為 `https://api-v2.mou-welfare.com`）。瀏覽器以 `credentials: 'include'` 呼叫，API 以 CORS 只允許 `TRUSTED_ORIGINS` 帶 cookie。session cookie 屬於 API 網域，所以登入相關與個人頁面設為只在瀏覽器渲染（`routeRules` 的 `ssr: false`）；公開頁面（福利列表、詳情）維持 SSR |
 | 網域 | 過渡期為 `v2.mou-welfare.com`（Workers 自訂網域）；正式切換時改為 `mou-welfare.com`（目前仍由 Caddy 提供 v1） |
 | 目前狀態 | ✅ 2026-11-19 部署，2026-11-22 起由 GitHub Actions 自動部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 已加入 `https://v2.mou-welfare.com` |
-| 已完成頁面 | 登入註冊流程；福利列表與詳情（粗糙版，檢核爬蟲資料用）；2026-11-23 依 v1 介面完成：個人設定 `/profile`（家庭管理、邀請 QR Code、帳號管理）、編輯個人資料 `/profile/edit`、收藏 `/favorites`、常見問題 `/question`（SSR，含 FAQPage JSON-LD）、服務條款 `/terms`、隱私權政策 `/private` |
+| 已完成頁面 | 登入註冊流程；2026-11-23 依 v1 介面完成：福利列表 `/welfares`（搜尋、地區／服務／家庭篩選、自動篩選、進階篩選、無限捲動；第一頁 SSR）、福利詳情 `/welfares/:id`（資格分析、AI 摘要、申請條件、補助內容、附件、原文；SSR 含 JSON-LD；網址加 `?review=1` 顯示資料檢核）、個人設定 `/profile`（家庭管理、邀請 QR Code、帳號管理）、編輯個人資料 `/profile/edit`、收藏 `/favorites`、常見問題 `/question`（SSR，含 FAQPage JSON-LD）、服務條款 `/terms`、隱私權政策 `/private` |
 
 ### 10.3 從 v1 切換到 v2
 
@@ -466,7 +468,7 @@ export interface LLM {
 | **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（2026-11-22 正式環境 4 縣市 463 筆；Gemini 結構化待儲值後補做） |
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天未開始 |
 | **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | — |
-| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情仍是粗糙版） |
+| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天頁、LINE 分享待 P3 / P4） |
 
 ---
 

@@ -78,6 +78,14 @@ describe('GET /v1/welfare 排序與資格比對', () => {
     expect(names(await json(await get('/v1/welfare')))).toEqual(['有限制-舊', '無限制-新', '無限制-舊'])
   })
 
+  it('置頂的福利排最前面（越晚置頂越前面），但仍受篩選條件限制', async () => {
+    await createProgram(t.db, { name: '一般', identities: ['原住民'], publishedAt: '2026-10-01' })
+    await createProgram(t.db, { name: '置頂-早', pinnedAt: new Date('2026-01-01') })
+    await createProgram(t.db, { name: '置頂-晚', pinnedAt: new Date('2026-02-01'), city: '臺北市' })
+    expect(names(await json(await get('/v1/welfare')))).toEqual(['置頂-晚', '置頂-早', '一般'])
+    expect(names(await json(await get('/v1/welfare?city=金門縣')))).toEqual(['置頂-早', '一般'])
+  })
+
   it('未登入時沒有比對結果', async () => {
     await createProgram(t.db)
     expect((await json(await get('/v1/welfare'))).data[0].match).toBeNull()
@@ -134,6 +142,15 @@ describe('POST /v1/welfare/simulate', () => {
     await createProgram(t.db, { name: '身障補助', identities: ['身心障礙者'] })
     const body = await json(await simulate({ profile: { identities: ['身心障礙者'] } }))
     expect(body.data[0].match.light).toBe('GREEN')
+  })
+
+  it('可以直接指定年齡組與性別（不必提供生日）', async () => {
+    await createProgram(t.db, { name: '老人福利', identities: ['65歲以上'] })
+    await createProgram(t.db, { name: '婦女福利', identities: ['女性'] })
+    const body = await json(await simulate({ profile: { identities: ['65歲以上', '男性'] } }))
+    const light = (n: string) => body.data.find((x: { name: string }) => x.name === n).match.light
+    expect(light('老人福利')).toBe('GREEN')
+    expect(light('婦女福利')).toBe('RED')
   })
 
   it('身分不在白名單時回傳 400', async () => {

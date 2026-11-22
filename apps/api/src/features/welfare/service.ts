@@ -78,9 +78,9 @@ export async function searchPrograms(
   family: FamilyProfile[] | null = null,
 ): Promise<{ data: WelfareSummary[]; total: number }> {
   const where = filters(p)
-  // R4：有身分限制的福利排前面；登入時再把「使用者可能符合」的排前面；家庭模式再把「家人可能符合」的排前面
+  // 置頂（只在符合篩選條件的結果裡）→ R4：有身分限制的福利排前面；登入時再把「使用者可能符合」的排前面；家庭模式再把「家人可能符合」的排前面
   //（v1 的權重是「本人分數 × 1000 + 家人最高分」：本人優先，其次家人）
-  const order: SQL[] = [desc(sql`cardinality(${w.identities}) > 0`)]
+  const order: SQL[] = [sql`${w.pinnedAt} desc nulls last`, desc(sql`cardinality(${w.identities}) > 0`)]
   if (profile) {
     const mine = satisfiableIdentities(profile, today)
     if (mine.length) order.push(desc(arrayOverlaps(w.identities, mine)))

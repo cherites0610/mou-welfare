@@ -10,7 +10,12 @@ const api = useApi()
 const props = defineProps<{
   data: WelfareSummary
   favoritesWelfareIds: Set<string>
+  /** 家庭模式：進入詳情頁時一併帶上，詳情頁才會顯示家人的資格分析 */
+  familyId?: string | null
 }>()
+
+const goToDetail = () =>
+  router.push({ path: `/welfares/${props.data.id}`, query: props.familyId ? { familyId: props.familyId } : {} })
 
 const emit = defineEmits<{
   (e: 'update-favorites'): void
@@ -106,7 +111,7 @@ const handleCollect = async () => {
   <div class="flex w-full overflow-x-auto snap-x snap-mandatory no-scrollbar bg-white">
     <div
       class="w-full min-w-full snap-center group flex items-start md:items-center gap-4 pt-4 pb-4 px-4 transition-all duration-300 cursor-pointer hover:shadow-md"
-      @click="router.push(`/welfares/${data.id}`)">
+      @click="goToDetail">
 
       <div v-if="data.match?.light"
         class="w-4 h-4 rounded-full shrink-0 shadow-sm order-last md:order-first mt-5 md:mt-0" :class="statusColor">
