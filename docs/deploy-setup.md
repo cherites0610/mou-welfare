@@ -1,5 +1,7 @@
 # 自動部署設定（GitHub Actions）
 
+> 2026-11-22 已全部設定完成：部署金鑰在 `~/.ssh/mou-welfare-deploy`（authorized_keys 限定 `deploy-api.sh --from-ssh`），5 個 secrets 已透過 GitHub API 寫入。以下保留作為重建時的參考。
+
 `.github/workflows/deploy.yml`：`main` 的 CI 通過後，部署**通過 CI 的那個 commit**；也可在 Actions 頁面手動執行。
 未設定 secrets 的 job 會顯示提示並略過，不會失敗。
 

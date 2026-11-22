@@ -90,6 +90,17 @@ export async function structureProgram(
  * 啟動時補送工作：內容和結構化結果不一致的（工作遺失），以及改用 LLM 後、之前由規則結構化的。
  * 一次最多送 limit 筆，其餘下次啟動再補。
  */
+/** 佇列裡已經有等待、重試或執行中的工作的福利（pg-boss 還沒建立時回傳空集合） */
+async function alreadyQueued(db: Db): Promise<Set<string>> {
+  const [exists] = await db.execute<{ ok: boolean }>(sql`select to_regclass('pgboss.job') is not null as ok`)
+  if (!exists?.ok) return new Set()
+  const rows = await db.execute<{ id: string }>(
+    sql`select distinct data->>'programId' as id from pgboss.job
+        where name = 'welfare-structure' and state in ('created', 'retry', 'active')`,
+  )
+  return new Set(rows.map((r) => r.id))
+}
+
 export async function backfill(db: Db, queue: Queue, structurer: Structurer, limit = 1000): Promise<number> {
   const stale = or(
     isNull(w.structuredHash),
@@ -102,6 +113,9 @@ export async function backfill(db: Db, queue: Queue, structurer: Structurer, lim
     .where(and(notInArray(w.status, ['removed']), stale))
     .orderBy(w.updatedAt)
     .limit(limit)
-  for (const r of rows) await queue.send('welfare-structure', { programId: r.id })
-  return rows.length
+  // 每次重啟都會執行；已經在佇列裡的不重複送（2026-11-22 曾因多次重啟累積約 2,200 個重複工作）
+  const queued = await alreadyQueued(db)
+  const todo = rows.filter((r) => !queued.has(r.id))
+  for (const r of todo) await queue.send('welfare-structure', { programId: r.id })
+  return todo.length
 }

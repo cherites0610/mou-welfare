@@ -292,6 +292,21 @@ describe('welfare-structure 工作', () => {
     const llm = new FakeLLM({ generate: () => LLM_OUTPUT })
     expect(await backfill(t.db, q2, new LLMStructurer(llm))).toBe(2)
   })
+
+  it('backfill：佇列裡已經有工作的不重複送', async () => {
+    const id = await ingestOne()
+    const { createBoss } = await import('../src/lib/queue.ts')
+    const boss = await createBoss(t.env.DATABASE_URL)
+    try {
+      await boss.send('welfare-structure', { programId: id })
+      const q = new MemoryQueue()
+      expect(await backfill(t.db, q, new RuleStructurer())).toBe(0)
+      await boss.deleteAllJobs('welfare-structure')
+      expect(await backfill(t.db, q, new RuleStructurer())).toBe(1)
+    } finally {
+      await boss.stop({ graceful: false })
+    }
+  })
 })
 
 describe('RuleStructurer（沒有 LLM 金鑰時）', () => {
