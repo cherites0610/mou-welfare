@@ -146,7 +146,7 @@ mou-welfare/
 ```
 families(id uuid pk, name, created_by → user, created_at)
 family_members(family_id → families, user_id → user, role 'admin'|'member', joined_at, pk(family_id, user_id))
-family_invites(code text pk, family_id, created_by, expires_at, used_at, used_by, created_at)  -- 取代 v1 存在 Redis 的邀請碼；一次性，3 天內有效
+family_invites(code text pk, family_id, created_by, expires_at, used_at, used_by, created_at)  -- 取代 v1 存在 Redis 的邀請碼；6 碼、一次性，3 天內有效
 ```
 
 **福利**
@@ -207,7 +207,7 @@ welfare_sources(url pk, program_id, site_id, content_hash, first_seen_at, last_s
 | 群組 | 端點 | 權限 |
 |---|---|---|
 | 登入 | `/v1/auth/*`（由 Better Auth 處理：Email 密碼、Google、LINE、LIFF ID Token、驗證信、重設密碼） | 公開 |
-| 個人 | `GET/PATCH /v1/me`、`DELETE /v1/me`（body 必須是 `{"confirm":"DELETE"}`） | 登入 |
+| 個人 | `GET/PATCH /v1/me`（含 `isSubscribed` 訂閱通知、`createdAt`）、`DELETE /v1/me`（body 必須有 `"confirm":"DELETE"`；有密碼的帳號另需 `password`） | 登入 |
 | 收藏 | `GET /v1/me/favorites?familyId=`、`PUT/DELETE /v1/me/favorites/:programId` | 登入 |
 | 福利 | `GET /v1/welfare?q=&city=&category=&familyId=&page=`、`GET /v1/welfare/:id?familyId=` | 公開；**帶比對結果時以登入身分為準**，不再接受從前端傳 `userId`；帶 `familyId` 時必須登入（401）且為成員（403） |
 | 試算 | `POST /v1/welfare/simulate`（手動輸入身分試算） | 公開 |
@@ -266,11 +266,11 @@ await assertChatOwner(db, sessionId, user.id)
 ### 8.1.1 家庭
 
 - 建立者成為管理者（`admin`）。管理者可以改名、刪除家庭、產生邀請碼、修改角色、移除成員；一般成員只能查看與退出。
-- **只能透過邀請碼加入**（R9）：8 碼（去掉 0/O、1/I/L，不分大小寫），一次性，3 天內有效。已是成員時回 409 且不消耗邀請碼；已使用或過期回 410；同一碼同時被兩人使用時只有一人成功（條件式更新）。
+- **只能透過邀請碼加入**（R9）：6 碼英數字（與 v1 介面相同；去掉 0/O、1/I/L，不分大小寫），一次性，3 天內有效。已是成員時回 409 且不消耗邀請碼；已使用或過期回 410；同一碼同時被兩人使用時只有一人成功（條件式更新）。
 - 家庭**至少保留一位管理者**：最後一位管理者不能降級或退出（409），要先指定其他管理者；最後一位成員退出時刪除家庭。
 - 上限：每人最多 10 個家庭，每個家庭最多 20 人。
-- 成員資料只回傳姓名、頭像、角色、加入時間；家庭模式的比對結果只回傳家人的姓名、頭像與紅黃綠燈，**不回傳生日、身分**。
-- 刪除帳號（`DELETE /v1/me`）：自己是唯一管理者的家庭，由最早加入的成員接任管理者；只剩自己的家庭直接刪除；登入方式、session、收藏由外鍵一併刪除；上傳的頭像從 R2 刪除。重新上傳頭像時也會刪除舊的。
+- 成員資料回傳姓名、頭像、性別、特殊身分標籤、角色、加入時間（與 v1 個人設定頁相同，家人之間看得到彼此的標籤），**不回傳生日與 email**；家庭模式的比對結果只回傳家人的姓名、頭像與紅黃綠燈。
+- 刪除帳號（`DELETE /v1/me`）：Email 註冊的帳號要輸入密碼（與 v1 相同），只用 LINE / Google 登入的帳號只需確認；自己是唯一管理者的家庭，由最早加入的成員接任管理者；只剩自己的家庭直接刪除；登入方式、session、收藏由外鍵一併刪除；上傳的頭像從 R2 刪除。重新上傳頭像時也會刪除舊的。
 
 ### 8.2 搜尋
 

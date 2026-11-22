@@ -75,6 +75,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "isSubscribed": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
           }
         },
         "required": [
@@ -85,7 +91,9 @@
           "birthday",
           "gender",
           "city",
-          "identities"
+          "identities",
+          "isSubscribed",
+          "createdAt"
         ]
       },
       "UpdateMe": {
@@ -160,6 +168,10 @@
             },
             "maxItems": 6,
             "description": "只接受特殊身分；年齡與性別由生日、性別欄位推得"
+          },
+          "isSubscribed": {
+            "type": "boolean",
+            "description": "是否接收福利資訊通知"
           }
         },
         "additionalProperties": false
@@ -172,6 +184,11 @@
             "enum": [
               "DELETE"
             ]
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           }
         },
         "required": [
@@ -353,6 +370,18 @@
               "null"
             ]
           },
+          "gender": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "identities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "role": {
             "type": "string",
             "enum": [
@@ -368,6 +397,8 @@
           "userId",
           "name",
           "image",
+          "gender",
+          "identities",
           "role",
           "joinedAt"
         ]
@@ -848,6 +879,36 @@
         "responses": {
           "204": {
             "description": "已刪除"
+          },
+          "403": {
+            "description": "密碼錯誤",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -1646,7 +1707,7 @@
         "tags": [
           "family"
         ],
-        "summary": "產生一次性邀請碼（需為管理者，3 天內有效）",
+        "summary": "產生一次性 6 碼邀請碼（需為管理者，3 天內有效）",
         "parameters": [
           {
             "schema": {

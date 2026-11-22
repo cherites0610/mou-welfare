@@ -68,6 +68,16 @@ describe('GET /v1/me', () => {
     const { cookie } = await signUp(t, 'me@example.com')
     const body = await json(await t.app.request('/v1/me', { headers: { cookie } }))
     expect(body.data).toMatchObject({ email: 'me@example.com', name: '測試使用者', identities: [], birthday: null })
+    expect(body.data.isSubscribed).toBe(false)
+    expect(new Date(body.data.createdAt).getTime()).toBeGreaterThan(Date.now() - 60_000)
+  })
+
+  it('可以開關訂閱通知', async () => {
+    const { cookie } = await signUp(t, 'me@example.com')
+    const headers = { cookie, 'content-type': 'application/json' }
+    const res = await t.app.request('/v1/me', { method: 'PATCH', headers, body: JSON.stringify({ isSubscribed: true }) })
+    expect((await json(res)).data.isSubscribed).toBe(true)
+    expect((await json(await t.app.request('/v1/me', { headers: { cookie } }))).data.isSubscribed).toBe(true)
   })
 })
 

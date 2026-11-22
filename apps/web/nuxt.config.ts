@@ -22,7 +22,9 @@ export default defineNuxtConfig({
     '/verify': { ssr: false },
     '/forgot-password': { ssr: false },
     '/reset-password': { ssr: false },
+    '/profile': { ssr: false },
     '/profile/**': { ssr: false },
+    '/favorites': { ssr: false },
     '/chat': { ssr: false },
   },
   app: {

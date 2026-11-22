@@ -28,6 +28,8 @@ const Member = z
     userId: z.string(),
     name: z.string(),
     image: z.string().nullable(),
+    gender: z.string().nullable(),
+    identities: z.array(z.string()),
     role: z.enum(FAMILY_ROLES),
     joinedAt: z.string(),
   })
@@ -148,7 +150,7 @@ const invite = createRoute({
   method: 'post',
   path: '/v1/families/{id}/invites',
   tags,
-  summary: '產生一次性邀請碼（需為管理者，3 天內有效）',
+  summary: '產生一次性 6 碼邀請碼（需為管理者，3 天內有效）',
   request: { params: FamilyParams },
   responses: { 201: json(z.object({ data: Invite }), '邀請碼'), 403: err('不是管理者') },
 })

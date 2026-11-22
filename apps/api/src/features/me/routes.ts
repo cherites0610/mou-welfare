@@ -1,8 +1,8 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { CITIES, GENDERS, SPECIAL_IDENTITIES } from '@mou-welfare/shared'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { AppEnv } from '../../app.ts'
-import { user } from '../../db/schema/index.ts'
+import { account, user } from '../../db/schema/index.ts'
 import { handOverFamilies } from '../family/service.ts'
 
 const Me = z
@@ -15,6 +15,8 @@ const Me = z
     gender: z.string().nullable(),
     city: z.string().nullable(),
     identities: z.array(z.string()),
+    isSubscribed: z.boolean(),
+    createdAt: z.string(),
   })
   .openapi('Me')
 
@@ -37,12 +39,19 @@ const UpdateMe = z
       .refine((xs) => new Set(xs).size === xs.length, { message: '身分不可重複' })
       .optional()
       .openapi({ description: '只接受特殊身分；年齡與性別由生日、性別欄位推得' }),
+    isSubscribed: z.boolean().optional().openapi({ description: '是否接收福利資訊通知' }),
   })
   .strict()
   .openapi('UpdateMe')
 
-// 要求明確的確認字串：避免前端誤觸或被其他程式誤呼叫就刪掉整個帳號
-const DeleteMe = z.object({ confirm: z.literal('DELETE') }).strict().openapi('DeleteMe')
+// 要求明確的確認字串：避免前端誤觸或被其他程式誤呼叫就刪掉整個帳號。
+// 有設定密碼（Email 註冊）的帳號還要輸入密碼；只用 LINE / Google 登入的帳號沒有密碼可驗證
+const DeleteMe = z
+  .object({ confirm: z.literal('DELETE'), password: z.string().min(1).max(200).optional() })
+  .strict()
+  .openapi('DeleteMe')
+
+const ErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) })
 
 const ok = { description: '目前登入的使用者', content: { 'application/json': { schema: z.object({ data: Me }) } } }
 
@@ -58,7 +67,18 @@ const patch = createRoute({
   responses: { 200: ok },
 })
 
-type Row = { id: string; name: string; email: string; image?: string | null; birthday?: string | null; gender?: string | null; city?: string | null; identities?: string[] | null }
+type Row = {
+  id: string
+  name: string
+  email: string
+  image?: string | null
+  birthday?: string | null
+  gender?: string | null
+  city?: string | null
+  identities?: string[] | null
+  isSubscribed?: boolean | null
+  createdAt: Date
+}
 const toMe = (u: Row) => ({
   id: u.id,
   name: u.name,
@@ -68,6 +88,8 @@ const toMe = (u: Row) => ({
   gender: u.gender ?? null,
   city: u.city ?? null,
   identities: u.identities ?? [],
+  isSubscribed: u.isSubscribed ?? false,
+  createdAt: new Date(u.createdAt).toISOString(),
 })
 
 const remove = createRoute({
@@ -77,7 +99,10 @@ const remove = createRoute({
   summary: '刪除帳號（含登入方式、收藏、家庭成員身分與頭像；無法復原）',
   security: [{ cookieAuth: [] }],
   request: { body: { content: { 'application/json': { schema: DeleteMe } }, required: true } },
-  responses: { 204: { description: '已刪除' } },
+  responses: {
+    204: { description: '已刪除' },
+    403: { description: '密碼錯誤', content: { 'application/json': { schema: ErrorSchema } } },
+  },
 })
 
 export const meRoutes = new OpenAPIHono<AppEnv>()
@@ -90,8 +115,19 @@ export const meRoutes = new OpenAPIHono<AppEnv>()
     return c.json({ data: toMe(row!) }, 200)
   })
   .openapi(remove, async (c) => {
-    const { db, storage } = c.var.deps
+    const { db, storage, auth } = c.var.deps
     const u = c.var.user!
+    const [credential] = await db
+      .select({ hash: account.password })
+      .from(account)
+      .where(and(eq(account.userId, u.id), eq(account.providerId, 'credential')))
+    if (credential?.hash) {
+      const { password } = c.req.valid('json')
+      const ctx = await auth.$context
+      if (!password || !(await ctx.password.verify({ hash: credential.hash, password }))) {
+        return c.json({ error: { code: 'forbidden', message: '密碼錯誤' } }, 403)
+      }
+    }
     await db.transaction(async (tx) => {
       // 自己是唯一管理者的家庭交給其他成員；只剩自己的家庭直接刪除。其餘資料由外鍵 cascade 刪除
       await handOverFamilies(tx, u.id)

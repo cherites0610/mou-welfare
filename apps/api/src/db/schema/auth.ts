@@ -22,6 +22,8 @@ export const user = pgTable('user', {
   city: text('city'),
   identities: text('identities').array().notNull().default([]),
   role: text('role').notNull().default('user'),
+  /** 是否接收福利資訊通知（P4 的 Email / LINE 通知使用） */
+  isSubscribed: boolean('is_subscribed').notNull().default(false),
   ...timestamps,
 })
 

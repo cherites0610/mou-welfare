@@ -29,6 +29,13 @@
       "when": 1795355218804,
       "tag": "0003_family",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795385677216,
+      "tag": "0004_subscribed",
+      "breakpoints": true
     }
   ]
 }

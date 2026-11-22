@@ -11,14 +11,22 @@ import { ApiError } from '../../lib/errors.ts'
 export const MAX_FAMILIES_PER_USER = 10
 export const MAX_MEMBERS_PER_FAMILY = 20
 export const INVITE_TTL_MS = 3 * 24 * 60 * 60 * 1000
-/** 去掉容易看錯的 0/O、1/I/L；8 碼約 40 bits，足以抵擋猜碼 */
+/** 去掉容易看錯的 0/O、1/I/L；6 碼（與 v1 介面相同）約 8.9 億種組合，加上一次性、3 天過期，猜中的機會極低 */
 const INVITE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
-const INVITE_LENGTH = 8
+const INVITE_LENGTH = 6
 
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 type Conn = Db | Tx
 
-export type Member = { userId: string; name: string; image: string | null; role: FamilyRole; joinedAt: Date }
+export type Member = {
+  userId: string
+  name: string
+  image: string | null
+  gender: string | null
+  identities: string[]
+  role: FamilyRole
+  joinedAt: Date
+}
 
 const notFound = () => new ApiError(404, 'not_found', '找不到這個家庭')
 
@@ -44,6 +52,9 @@ export async function listMembers(db: Conn, familyId: string): Promise<Member[]>
       userId: familyMembers.userId,
       name: user.name,
       image: user.image,
+      // 與 v1 相同，家人之間看得到彼此的性別與特殊身分標籤（不含生日與 email）
+      gender: user.gender,
+      identities: user.identities,
       role: familyMembers.role,
       joinedAt: familyMembers.joinedAt,
     })

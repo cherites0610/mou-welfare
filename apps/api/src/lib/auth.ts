@@ -57,6 +57,7 @@ export function createAuth(db: Db, env: Env, mailer: Mailer) {
         city: { type: 'string', required: false, input: false },
         identities: { type: 'string[]', required: false, input: false, defaultValue: [] },
         role: { type: 'string', required: false, input: false, defaultValue: 'user' },
+        isSubscribed: { type: 'boolean', required: false, input: false, defaultValue: false },
       },
     },
     advanced: {

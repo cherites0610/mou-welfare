@@ -1,11 +1,11 @@
 // 家庭、成員、邀請碼、家庭模式的資格比對（docs/testing.md §4.2 權限矩陣、§4.3 R6 / R8 / R9）
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { familyInvites, user } from '../src/db/schema/index.ts'
+import { account, familyInvites, user } from '../src/db/schema/index.ts'
 import { MAX_MEMBERS_PER_FAMILY } from '../src/features/family/service.ts'
 import type { MemoryStorage } from '../src/lib/storage.ts'
 import { createProgram } from './factories.ts'
-import { resetDb, setupApp, signUp } from './helpers.ts'
+import { PASSWORD, resetDb, setupApp, signUp } from './helpers.ts'
 
 type Json = any
 const json = async (res: Response): Promise<Json> => res.json()
@@ -111,12 +111,16 @@ describe('建立與查看家庭', () => {
     expect(body.data[0].members).toEqual([expect.objectContaining({ userId: a.id, role: 'admin', name: '測試使用者' })])
   })
 
-  it('成員資料只有姓名、頭像與角色，不含生日、身分、email', async () => {
+  it('成員資料有姓名、頭像、性別與身分標籤（與 v1 相同），不含生日與 email', async () => {
     const h = await household()
-    await call('PATCH', '/v1/me', h.admin.cookie, { birthday: '1950-01-01', identities: ['低收入戶'] })
+    await call('PATCH', '/v1/me', h.admin.cookie, { birthday: '1950-01-01', gender: '女性', identities: ['低收入戶'] })
     const body = await json(await call('GET', `/v1/families/${h.familyId}`, h.member.cookie))
-    expect(Object.keys(body.data.members[0]).sort()).toEqual(['image', 'joinedAt', 'name', 'role', 'userId'])
-    expect(JSON.stringify(body)).not.toContain('admin@example.com')
+    const keys = ['gender', 'identities', 'image', 'joinedAt', 'name', 'role', 'userId']
+    expect(Object.keys(body.data.members[0]).sort()).toEqual(keys)
+    expect(body.data.members[0]).toEqual(expect.objectContaining({ gender: '女性', identities: ['低收入戶'] }))
+    const text = JSON.stringify(body)
+    expect(text).not.toContain('admin@example.com')
+    expect(text).not.toContain('1950-01-01')
   })
 
   it('名稱空白、過長或帶多餘欄位回傳 400', async () => {
@@ -151,15 +155,15 @@ describe('R9 只能透過有效邀請碼加入家庭', () => {
     const b = await person('b@example.com')
     const familyId = await createFamily(admin)
     const code = await invite(admin, familyId)
-    expect(code).toMatch(/^[A-Z2-9]{8}$/)
-    const typed = `${code.slice(0, 4).toLowerCase()}-${code.slice(4)}`
+    expect(code).toMatch(/^[A-Z2-9]{6}$/)
+    const typed = `${code.slice(0, 3).toLowerCase()}-${code.slice(3)}`
     expect((await join(b, encodeURIComponent(typed))).status).toBe(200)
   })
 
   it('邀請碼不存在回傳 404', async () => {
     const b = await person('b@example.com')
-    expect((await join(b, 'ZZZZZZZZ')).status).toBe(404)
-    expect((await call('GET', '/v1/invites/ZZZZZZZZ', b.cookie)).status).toBe(404)
+    expect((await join(b, 'ZZZZZZ')).status).toBe(404)
+    expect((await call('GET', '/v1/invites/ZZZZZZ', b.cookie)).status).toBe(404)
   })
 
   it('邀請碼只能使用一次：第二個人回傳 410', async () => {
@@ -327,13 +331,26 @@ describe('R6 家庭模式的資格比對', () => {
 })
 
 describe('DELETE /v1/me 刪除帳號', () => {
-  const confirm = { confirm: 'DELETE' }
+  const confirm = { confirm: 'DELETE', password: PASSWORD }
 
   it('沒有確認字串時回傳 400，帳號不受影響', async () => {
     const a = await person('a@example.com')
     expect((await call('DELETE', '/v1/me', a.cookie)).status).toBe(400)
-    expect((await call('DELETE', '/v1/me', a.cookie, { confirm: 'yes' })).status).toBe(400)
+    expect((await call('DELETE', '/v1/me', a.cookie, { confirm: 'yes', password: PASSWORD })).status).toBe(400)
     expect((await call('GET', '/v1/me', a.cookie)).status).toBe(200)
+  })
+
+  it('有密碼的帳號：沒帶密碼或密碼錯誤回傳 403，帳號不受影響', async () => {
+    const a = await person('a@example.com')
+    expect((await call('DELETE', '/v1/me', a.cookie, { confirm: 'DELETE' })).status).toBe(403)
+    expect((await call('DELETE', '/v1/me', a.cookie, { confirm: 'DELETE', password: 'wrong-password' })).status).toBe(403)
+    expect((await call('GET', '/v1/me', a.cookie)).status).toBe(200)
+  })
+
+  it('沒有密碼的帳號（只用 LINE / Google 登入）只需確認字串', async () => {
+    const a = await person('a@example.com')
+    await t.db.delete(account).where(eq(account.userId, a.id))
+    expect((await call('DELETE', '/v1/me', a.cookie, { confirm: 'DELETE' })).status).toBe(204)
   })
 
   it('刪除後 session 失效、無法再登入，收藏也一併刪除', async () => {
