@@ -438,6 +438,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 - **登入後去哪裡**：`/oauth-callback` 讀 `/v1/me`，生日、性別、縣市都沒填過就導到「填寫個人資料」（預先帶入 LINE / Google 的名稱與頭像），否則回到原頁面（`redirect` 只接受站內路徑）。
 - **合併既有帳號**：第三方的 email 和既有帳號相同時自動合併，但兩邊的 email 都必須已驗證（Better Auth 的 `requireLocalEmailVerified`）。避免有人先用別人的 email 註冊、等對方用 Google 登入時被合併。Google 依 `email_verified`；LINE 回傳的 email 視為已驗證（LINE 登錄 email 時需要驗證碼）。不符合時回 `account_not_linked`，前端提示「先用原本的方式登入，再到個人設定綁定」。
 - **主動綁定**：個人設定的「帳號管理」可以綁定或解除 Google / LINE（`linkSocial`，允許 email 不同）；Better Auth 不允許解除最後一種登入方式。
+- **設定密碼**：只用 LINE / Google 登入的帳號，可以在個人設定按「設定密碼」，寄信到自己的信箱，沿用重設密碼的流程（Better Auth 重設時若沒有密碼會建立一組；信件主旨與頁面文字改為「設定」）。要能收信才能設定，避免 session 被盜時直接被設定密碼。替代地址的帳號不顯示這個選項。
 - **LINE 沒有 email**（channel 沒申請 email 權限，或使用者沒登錄 email）：改用 `<LINE user ID>@line.invalid`（RFC 2606 保留網域），不寄任何信，畫面上不顯示。
 - `callbackURL` 必須在 `TRUSTED_ORIGINS` 內（Better Auth 在測試環境預設不檢查，`advanced.disableOriginCheck: false` 讓測試也檢查）。`/sign-in/social` 每 IP 每分鐘 10 次。
 - **需要的設定**：

@@ -1,12 +1,14 @@
-<!-- 沿用 v1 web/src/views/reset-password/index.vue；token 由重設密碼信的連結帶入（?token=） -->
+<!-- 沿用 v1 web/src/views/reset-password/index.vue；token 由重設密碼信的連結帶入（?token=）。
+     ?mode=set：第三方登入的帳號第一次設定密碼（個人設定頁發出），只改文字 -->
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 
 definePageMeta({ layout: false })
-useHead({ title: '密碼重設 | 哞福利', meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
-
 const router = useRouter()
 const route = useRoute()
+const isSet = computed(() => route.query.mode === 'set')
+const verb = computed(() => (isSet.value ? '設定' : '重設'))
+useHead({ title: () => `密碼${verb.value} | 哞福利`, meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
 
 const token = computed(() => (route.query.token as string | undefined) ?? '')
 const linkError = computed(() => route.query.error === 'INVALID_TOKEN' || !token.value)
@@ -37,10 +39,10 @@ const handleSubmit = async () => {
   const { error } = await useAuth().resetPassword({ newPassword: form.newPassword, token: token.value })
   loading.value = false
   if (error) {
-    errorMsg.value = authErrorMessage(error, '重設失敗，連結可能已過期')
+    errorMsg.value = authErrorMessage(error, `${verb.value}失敗，連結可能已過期`)
     return
   }
-  ElMessage.success('密碼已重設成功，請重新登入')
+  ElMessage.success(`密碼已${verb.value}成功，請重新登入`)
   router.push('/login')
 }
 </script>
@@ -51,11 +53,11 @@ const handleSubmit = async () => {
       <button @click="router.back()" class="text-gray-400 hover:text-gray-600 transition-colors">
         <Icon icon="mingcute:arrow-left-line" class="text-xl" />
       </button>
-      <h2 class="text-xl font-bold text-gray-800">密碼重設</h2>
+      <h2 class="text-xl font-bold text-gray-800">密碼{{ verb }}</h2>
     </div>
 
     <div v-if="linkError" class="space-y-4 text-center">
-      <p class="text-sm text-gray-600">重設連結無效或已過期，請重新申請。</p>
+      <p class="text-sm text-gray-600">{{ verb }}連結無效或已過期，請重新申請。</p>
       <button @click="router.push('/forgot-password')"
         class="w-full py-3 bg-mygreen hover:bg-[#7dab00] text-white font-bold rounded-full transition-colors">
         重新申請

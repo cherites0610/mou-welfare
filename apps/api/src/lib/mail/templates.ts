@@ -24,7 +24,19 @@ export function verificationMail(to: string, name: string, url: string): Mail {
   }
 }
 
-export function resetPasswordMail(to: string, name: string, url: string): Mail {
+/** hasPassword=false：第三方登入的帳號第一次設定密碼（同一個重設流程，Better Auth 會建立密碼） */
+export function resetPasswordMail(to: string, name: string, url: string, hasPassword = true): Mail {
+  if (!hasPassword) {
+    return {
+      to,
+      subject: '【哞福利】設定密碼',
+      html: layout('設定你的密碼', `${escape(name)} 你好，請點擊下方按鈕設定密碼，設定後也可以用信箱和密碼登入。連結 1 小時內有效。`, {
+        label: '設定密碼',
+        url,
+      }),
+      text: `${name} 你好，請開啟以下連結設定密碼（1 小時內有效），設定後也可以用信箱和密碼登入：\n${url}\n\n如果你沒有提出這個要求，請忽略這封信。`,
+    }
+  }
   return {
     to,
     subject: '【哞福利】重設密碼',

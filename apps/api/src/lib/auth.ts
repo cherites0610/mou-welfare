@@ -1,3 +1,4 @@
+import { and, eq, isNotNull } from 'drizzle-orm'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import type { Db } from '../db/client.ts'
@@ -55,7 +56,13 @@ export function createAuth(db: Db, env: Env, mailer: Mailer) {
       // R14：Better Auth 對不存在的 email 也回傳相同結果，只是不寄信
       sendResetPassword: async ({ user, url }) => {
         if (isPlaceholderEmail(user.email)) return
-        await mailer.send(resetPasswordMail(user.email, user.name, url))
+        // 只用 LINE / Google 登入的帳號走同一個流程「設定」密碼（Better Auth 重設時會建立 credential 帳號）
+        const [pw] = await db
+          .select({ id: schema.account.id })
+          .from(schema.account)
+          .where(and(eq(schema.account.userId, user.id), eq(schema.account.providerId, 'credential'), isNotNull(schema.account.password)))
+          .limit(1)
+        await mailer.send(resetPasswordMail(user.email, user.name, url, !!pw))
       },
     },
     emailVerification: {

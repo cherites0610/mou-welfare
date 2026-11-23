@@ -141,3 +141,22 @@ describe('LINE（LIFF ID Token）', () => {
     expect(await t.db.select().from(account).where(eq(account.providerId, 'line'))).toHaveLength(0)
   })
 })
+
+describe('第三方登入的帳號設定密碼（沿用重設密碼的寄信流程）', () => {
+  const tokenIn = (text: string) => new URL(text.match(/https?:\/\/\S+/)![0]).pathname.split('/').pop()!
+
+  it('沒有密碼的 LINE 帳號：收信設定密碼後，可以用 email 和密碼登入', async () => {
+    await liffLogin({ sub: 'U-pw', email: 'pw@example.com' })
+    await authPost(t.app, '/request-password-reset', { email: 'pw@example.com', redirectTo: 'http://localhost:3000/reset-password' })
+    const mail = t.mailer.last('pw@example.com')
+    expect(mail?.subject).toBe('【哞福利】設定密碼')
+
+    const res = await authPost(t.app, '/reset-password', { token: tokenIn(mail!.text), newPassword: 'brand-new-password' })
+    expect(res.status).toBe(200)
+    const login = await authPost(t.app, '/sign-in/email', { email: 'pw@example.com', password: 'brand-new-password' })
+    expect(login.status).toBe(200)
+    const [u] = await t.db.select().from(user)
+    const providers = (await t.db.select().from(account).where(eq(account.userId, u!.id))).map((a) => a.providerId)
+    expect(providers.sort()).toEqual(['credential', 'line'])
+  })
+})

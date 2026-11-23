@@ -1,6 +1,6 @@
 # 測試規範（v2）
 
-> 狀態：規範定案；CI 與自動部署已運作（API 測試 206 個、爬蟲測試 110 個；2026-11-23）
+> 狀態：規範定案；CI 與自動部署已運作（API 測試 207 個、爬蟲測試 110 個；2026-11-23）
 > 最後更新：2026-11-23
 > 適用範圍：`apps/api`、`apps/web`、`apps/admin`、`packages/shared`、`services/scraper`
 > 相關文件：[後端設計](backend.md)、[爬蟲設計](scraper.md)
@@ -116,7 +116,7 @@ const matrix = [
   - 身分判斷：`sanitizeIdentities`（兩個年齡層或兩個性別整類拿掉）、`hasEvidence`（依據句子要有關鍵字）。
   - 用量紀錄：每次呼叫寫入 `llm_calls`（用途、福利、模型、prompt 版本、token、費用），失敗的呼叫也記錄；結構化結果記下 `structured_model`、`structured_prompt_version`。
   - 額度不足（`tests/jobs.test.ts`）：402／429 歸類為 `quota`；結構化遇到 402 → 暫停並寄一次通知、`/health` 顯示暫停但 `status` 仍為 ok、探測失敗時維持暫停且不重複寄信、恢復後寄恢復通知；重啟時已在暫停 → 立刻探測並恢復。
-- **第三方登入**（`tests/social.test.ts`，LINE 的 `/verify` 以 stub 的 fetch 取代）：未設定金鑰回 404、ID 與 secret 必須成對；Google 授權網址的 `redirect_uri`、`callbackURL` 不在 `TRUSTED_ORIGINS` 時 403；LIFF ID Token 建立新帳號、重複登入不重建、沒有 email 時用 `.invalid` 替代地址且不寄信、`aud` 不符拒絕、與已驗證帳號合併、與**未驗證**帳號不合併（docs/backend.md §8.5.1）。
+- **第三方登入**（`tests/social.test.ts`，LINE 的 `/verify` 以 stub 的 fetch 取代）：未設定金鑰回 404、ID 與 secret 必須成對；Google 授權網址的 `redirect_uri`、`callbackURL` 不在 `TRUSTED_ORIGINS` 時 403；LIFF ID Token 建立新帳號、重複登入不重建、沒有 email 時用 `.invalid` 替代地址且不寄信、`aud` 不符拒絕、與已驗證帳號合併、與**未驗證**帳號不合併、沒有密碼的帳號收信設定密碼後可用密碼登入（docs/backend.md §8.5.1）。
 - **管理端**（`tests/admin.test.ts`）：人工判定立即生效並寫入稽核紀錄；已過截止日的判為福利仍為 `expired`；取消判定會排入重新結構化；列表篩選；使用者列表不含生日與身分、查看詳情寫入 `user.view`；總覽與用量的統計。
 - **結構化回測**（不在 CI，會呼叫真實的 Gemini）：`pnpm --filter @mou-welfare/api eval:structure`，98 筆評測集與門檻見 `docs/backend.md` §8.3.1。改 prompt、換模型、改 schema 或 `buildInput` 時必須跑，結果附在 PR。
 - **環境變數**：缺少必要的變數時，應用程式拒絕啟動，並在錯誤訊息裡列出缺少的變數名稱。

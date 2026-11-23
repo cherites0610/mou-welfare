@@ -286,6 +286,17 @@ const confirmUnlink = async () => {
   }
 }
 
+// 只用 LINE / Google 登入的帳號：寄信到自己的信箱設定密碼（沿用重設密碼流程，要能收信才能設定）
+const isSendingSetPassword = ref(false)
+const sendSetPasswordMail = async () => {
+  if (!me.value) return
+  isSendingSetPassword.value = true
+  const { error } = await auth.requestPasswordReset({ email: me.value.email, redirectTo: absoluteUrl('/reset-password?mode=set') })
+  isSendingSetPassword.value = false
+  if (error) ElMessage.error(authErrorMessage(error, '寄送失敗，請稍後再試'))
+  else ElMessage.success(`已寄出設定密碼的信到 ${me.value.email}，請在 1 小時內開啟`)
+}
+
 const confirmDeleteAccount = async () => {
   isDeletingAccount.value = true
   try {
@@ -584,6 +595,17 @@ const confirmDeleteAccount = async () => {
           <h2 class="text-gray-800 font-bold text-lg px-2 md:px-0">帳號管理</h2>
 
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+
+            <button v-if="!hasPassword && displayEmail(me?.email)" @click="sendSetPasswordMail" :disabled="isSendingSetPassword"
+              class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group disabled:opacity-50">
+              <Icon icon="mingcute:lock-line"
+                class="text-xl text-gray-500 group-hover:scale-110 transition-transform" />
+              <div class="flex-1">
+                <span class="font-bold text-gray-800">設定密碼</span>
+                <p class="text-xs text-gray-400 mt-0.5">寄信到 {{ me?.email }}，設定後也可以用信箱和密碼登入</p>
+              </div>
+              <Icon :icon="isSendingSetPassword ? 'line-md:loading-loop' : 'mingcute:right-line'" class="text-gray-300" />
+            </button>
 
             <button v-if="!hasLine" @click="linkSocial('line')"
               class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group">
