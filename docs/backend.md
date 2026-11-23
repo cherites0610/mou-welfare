@@ -202,6 +202,9 @@ llm_calls(id, created_at, purpose, program_id, model, prompt_version, attempt, i
 llm_pause(name pk, reason, paused_at, probed_at)                      -- 額度不足暫停中（§8.4.1）
 admin_audit(id, at, admin_id, admin_email, action, target_type, target_id, detail jsonb, ip)  -- 管理端稽核（admin.md §5）
 worker_heartbeat(name pk, beat_at)                                    -- 背景工作心跳（/health）
+scrape_runs(id pk, trigger, status, interval_days, planned, current, sites jsonb, started_at, finished_at, updated_at)
+                                                                      -- 爬蟲每次執行的回報（admin.md §4.6）
+alert_state(key pk, value, sent_at)                                   -- 系統通知的去重（§8.4.2）
 ```
 
 `chat_sessions`、`chat_messages`、`notification_log` 為 P3／P4 預定，尚未建立。
@@ -240,8 +243,8 @@ worker_heartbeat(name pk, beat_at)                                    -- 背景�
 | FAQ | `GET /v1/faq` | 公開。2026-11-23 起前端常見問題直接寫死在 `apps/web/app/utils/faqs.ts`（v1 的 10 題原文），不呼叫這個端點，也不做管理端點；端點保留給部署煙霧測試使用，資料表目前是空的 |
 | 上傳 | `POST /v1/uploads/avatar`（multipart；以內容判斷格式，只收 JPEG/PNG/WebP/GIF，上限 5 MB；壓縮為 512×512 WebP 並移除 EXIF 後存到 R2） | 登入 |
 | LINE | `POST /v1/line/webhook` | **驗證 `x-line-signature`**（HMAC-SHA256，用原始 body 計算） |
-| 爬蟲 | `POST /internal/ingest`、`POST /internal/remove` | **HMAC 簽章加時間戳**，金鑰未設定時一律拒絕 |
-| 管理 | `GET /v1/admin/overview`、`GET /v1/admin/welfare`、`GET/PATCH /v1/admin/welfare/:id`、`POST /v1/admin/welfare/:id/restructure`、`GET /v1/admin/llm-usage`、`GET /v1/admin/users`、`GET /v1/admin/users/:id`、`GET /v1/admin/audit`（[admin.md](admin.md) §4） | admin（登入、Email 已驗證、`role = 'admin'`） |
+| 爬蟲 | `POST /internal/ingest`、`POST /internal/remove`、`POST /internal/scrape-runs`（執行進度回報） | **HMAC 簽章加時間戳**，金鑰未設定時一律拒絕 |
+| 管理 | `GET /v1/admin/overview`、`GET /v1/admin/welfare`、`GET/PATCH /v1/admin/welfare/:id`、`POST /v1/admin/welfare/:id/restructure`、`GET /v1/admin/llm-usage`、`GET /v1/admin/users`、`GET /v1/admin/users/:id`、`GET /v1/admin/audit`、`GET /v1/admin/scraper`、`GET /v1/admin/scraper/runs/:id`（[admin.md](admin.md) §4） | admin（登入、Email 已驗證、`role = 'admin'`） |
 | 系統 | `GET /health`（資料庫、migration、背景工作心跳、LLM 暫停狀態）、`GET /openapi.json` | 公開 |
 
 ---
@@ -389,6 +392,9 @@ cd ~/apps/mou-welfare-v2/apps/api
 | `deadline-reminder` | pg-boss cron（每日） | 通知收藏的福利即將截止 |
 | `expire` | pg-boss cron（每日） | 把超過截止日的福利標為 `expired` |
 | `cleanup` | pg-boss cron（每週） | 清除過期的邀請碼、session、verification |
+| 系統檢查 | 程序內計時器（每小時） | 爬蟲中斷與逾期、結構化錯誤增加 → 寄信，見 §8.4.2 |
+
+`notify`、`deadline-reminder`、`expire`、`cleanup` 是 P4 預定，尚未實作。
 
 #### 8.4.1 LLM 費用與額度的保護
 
@@ -417,6 +423,19 @@ cd ~/apps/mou-welfare-v2/apps/api
 - **第一次全量**不需要這支腳本：把 `api.env` 的 `LLM_DRIVER=rules` 拿掉並重啟，backfill 會把規則版的福利全部排入（每次最多 1,000 筆，其餘在恢復或下次重啟時補排）。2026-11-23 就是這樣完成的：實際約 3.52 美元、37 分鐘（預估 4.3 美元）。
 - 爬蟲的 hash 會去掉「下載 N 次」這類計數器，避免每次爬取都重做（docs/scraper.md §6.4）。
 - 最後一道限制是 AI Studio 的用量上限（目前每月新台幣 300 元）。
+
+#### 8.4.2 監控與通知
+
+通知一律寄到 `ALERT_EMAIL`（目前 `cherites0610@gmail.com`；未設定時只記 log），以 `alert_state` 去重，同一個狀況不會一直寄。
+
+| 檢查 | 位置 | 何時通知 |
+|---|---|---|
+| Gemini 額度不足 | `jobs/llm-pause.ts` | 暫停時、恢復時（§8.4.1） |
+| 爬蟲有站點不正常 | `POST /internal/scrape-runs` | 一次執行結束時有站點不是正常（附各站狀況與前幾個錯誤）；全部正常不寄 |
+| 爬蟲中斷 | `jobs/monitor.ts`（每小時） | 執行中超過 4 小時沒有回報（單站最久約 90 分鐘），改為 `interrupted` |
+| 爬蟲排程逾期 | 同上 | 超過預定時間（上次開始＋間隔）一天還沒有新的執行；之後每 24 小時再寄一次，直到恢復 |
+| 結構化錯誤增加 | 同上 | 有 `structure_error` 的福利數比上次通知時多 |
+| API、前端、後台無法連線 | GitHub Actions `uptime.yml`（每 30 分鐘） | `/health` 連續 3 次不是 `ok`，或前端、後台打不開。由 GitHub 寄出 workflow 失敗通知（API 掛掉時主機上的檢查也會停，所以要從外部看） |
 
 ### 8.5 帳號信件與限流
 
@@ -509,7 +528,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
 | 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
 | HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
-| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（Gemini 額度不足暫停時寄信，§8.4.1；已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定；2026-11-23 起已移除 `LLM_DRIVER=rules`，用 Gemini 結構化）；`TRUSTED_ORIGINS=https://mou-welfare.com,https://v2.mou-welfare.com,https://admin.mou-welfare.com`（CORS 與 Better Auth 共用）。完整定義見 `apps/api/src/env.ts` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（額度不足、爬蟲異常、結構化錯誤等，§8.4.2；已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定；2026-11-23 起已移除 `LLM_DRIVER=rules`，用 Gemini 結構化）；`TRUSTED_ORIGINS=https://mou-welfare.com,https://v2.mou-welfare.com,https://admin.mou-welfare.com`（CORS 與 Better Auth 共用）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
 | 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。GitHub Actions（`deploy.yml`）在 CI 通過後透過 SSH 傳入 commit SHA 觸發：authorized_keys 以 `command="…/deploy-api.sh --from-ssh"` 限定這把金鑰只能執行部署，`--from-ssh` 模式只接受完整的 40 碼 SHA（其他內容、包括空白一律拒絕）。設定見 `docs/deploy-setup.md` |
@@ -521,7 +540,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 9 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 10 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`；`0009_scraper_runs`：`scrape_runs`、`alert_state`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
@@ -530,7 +549,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,471 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,008 筆），見 `docs/scraper.md` §10.3 |
 | 結構化 | ✅ 2026-11-23 全部 1,471 筆以 Gemini（`gemini-3.5-flash-lite`、prompt `3ff526b52226`）完成結構化與 embedding：active 985、rejected 455、expired 31。共 1,476 次結構化呼叫（3 次 schema 重試、2 筆因重試做了兩次）、輸入 8.04M／輸出 0.44M tokens、約 3.52 美元，實際處理約 37 分鐘。中途預付額度用完一次，**自動暫停與恢復皆已在正式環境驗證**（§8.4.1）。被判為非個人福利的比例：屏東縣 63%、新北市 45%、花蓮縣 38%，待在管理後台人工檢核（[admin.md](admin.md) §4.3） |
 | 管理後台 | ✅ 2026-11-23 上線 `admin.mou-welfare.com`，管理者 cherites0610@gmail.com（[admin.md](admin.md)） |
-| 爬蟲排程 | ⏸ 還沒有排程；目前在主機上手動執行（`~/.config/mou-welfare/scraper.env` 提供 `API_BASE`、`INGEST_HMAC_KEY`），見 `docs/scraper.md` §10.2 |
+| 爬蟲排程 | ✅ 2026-11-23 起每 3 天執行一次（crontab 每天 02:23 觸發 `ops/scrape-scheduled.sh`），進度回報到管理後台的「爬蟲」頁，見 `docs/scraper.md` §10.4 |
 
 **事故紀錄**
 
@@ -599,8 +618,9 @@ cd ~/apps/mou-welfare-v2/apps/api
 - [ ] 關閉 5432 對外開放：API 和資料庫在同一台，爬蟲也透過 API 推資料，所以資料庫只需要聽 localhost（另外兩個專案若需要遠端連線，可改用 Tailscale，主機上已有）。
 - [ ] pgvector 要不要升級：改用 PostgreSQL 官方的 PGDG 套件庫，可以裝到較新的版本（目前 0.6.0 已夠用）。
 - [ ] v1 前端的 `VITE_LIFF_ID`（知道的話可以重新 build v1，讓 LINE 內自動登入恢復）。
-- [ ] 外部監控：定時檢查 `/health`，並在結構化工作持續失敗（`structure_error` 增加）時通知。（Gemini 額度不足已會寄信到 `ALERT_EMAIL`，§8.4.1）
-- [ ] 爬蟲排程：目前手動執行（`docs/scraper.md` §10）。
+- [x] ~~外部監控~~：2026-11-23 GitHub Actions `uptime.yml` 每 30 分鐘檢查；結構化錯誤增加、爬蟲中斷與逾期由 API 每小時檢查並寄信（§8.4.2）。
+- [x] ~~爬蟲排程~~：2026-11-23 起每 3 天（`docs/scraper.md` §10.4）。
+- [ ] 台灣 IP 的爬蟲執行環境：其餘 10 縣市從東京連不到（`docs/scraper.md` §10.3）。
 - [ ] 清理 pg-boss 舊工作：`completed` 預設保留 7 天，目前不需要處理；若改為長期保留，要加上 `cleanup` cron。
 
 **P0 原型必須驗證**

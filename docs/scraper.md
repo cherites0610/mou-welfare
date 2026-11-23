@@ -156,6 +156,7 @@ v1 的其他問題：
 - **地點**：必須是台灣 IP。從東京測試時，有 6 個社會局（處）網站逾時：臺中、高雄、新竹縣、嘉義縣、臺東、澎湖；另有 6 個福利平台逾時：雲林、花蓮、彰化、屏東、臺中、澎湖。
 - **建議**：GCP Cloud Run Jobs 放在 `asia-east1`，由 Cloud Scheduler 每天凌晨觸發；各站平行，站內依序。
 - **替代方案**：台灣的 VPS，或在後端主機上用 cron 執行。
+- **目前**（2026-11-23）：在東京的後端主機上以 crontab 執行，每 3 天一次（§10.4），只能爬得到 12 縣市。台灣 IP 的環境之後再加。
 - **執行模式**：
   - 每日增量：抓列表頁，只對新增或變動的網址抓內文。
   - 每週全量：重新檢查所有已知網址，偵測下架。
@@ -287,7 +288,7 @@ CREATE TABLE pages (
 
 ### 6.7 執行報告
 
-每次執行產生 `reports/{date}.json` 和一份 Markdown 摘要，並在異常時通知（Email、Slack 或 LINE 官方帳號推播）：
+每次執行產生 `reports/{run_id}.json` 和一份 Markdown 摘要。以 `--push` 執行時，另外在開始、每站結束、全部結束時回報給 API（`POST /internal/scrape-runs`），在管理後台的「爬蟲」頁查看（`docs/admin.md` §4.6）；有站點不正常時由 API 寄信到 `ALERT_EMAIL`（`docs/backend.md` §8.4.2）。一站整個失敗（程式丟出例外）時記為 `failed`，其他站照常執行。
 
 ```
 site     seen  new  upd  removed  filtered  quarantined  pushed  health
@@ -395,7 +396,7 @@ services/scraper/
 | **P0 原型** | 3 站各代表一族：**金門（A）、新北（B）、基隆（C）**；再加臺中開放資料（L1）。只做抓取、抽取、狀態、規則過濾，不做 AI 產生設定 | 3 站都能穩定跑完；人工檢查 50 篇，抽取品質可接受 |
 | **P1 去雜訊** | LLM 分類加上 200 篇驗證集 | 準確率 ≥ 95%、召回率 ≥ 90% |
 | **P2 A 族擴展** | 其餘 10 個 A 族縣市（用 `scrape init` 產生設定） | 11 站上線；記錄 AI 產生設定第一次就成功的比例 |
-| **P3 部署** | Cloud Run Jobs（`asia-east1`）、排程、執行報告與警告（後端 ingest upsert 已在 2026-11-19 完成） | 每日自動執行 7 天，沒有人工介入 |
+| **P3 部署** | 排程、執行報告與警告（後端 ingest upsert 已在 2026-11-19 完成） | 2026-11-23 先在東京主機以 crontab 每 3 天執行，回報到管理後台（§10.4）；台灣 IP 的環境（Cloud Run Jobs `asia-east1` 或台灣 VPS）待定 |
 | **P4 B、C 族與平台** | 新竹市、澎湖（B）；高雄、彰化、南投、花蓮、臺東、連江（C）；雲林、彰化 L2 平台 | 22 縣市全數上線 |
 | **P5 自動修復** | 健康檢查觸發重新產生設定 | 模擬改版能被偵測並產生修復建議 |
 
@@ -508,6 +509,33 @@ services/scraper/
 | 宜蘭（附件） | 附件主機 `www-ws.e-land.gov.tw` 從海外連不上，內容只在附件裡的頁面被隔離 |
 
 ---
+
+### 10.4 排程與監控（2026-11-23）
+
+**排程**：主機的 crontab 每天 02:23（主機時區 UTC+8）執行 `~/apps/mou-welfare-v2/ops/scrape-scheduled.sh`，距離上次開始滿 `SCRAPE_INTERVAL_DAYS` 天（預設 3，可寫在 `scraper.env`）才真的爬。全部跑完約 6～7 小時；上一次還沒結束時不會重複啟動（`flock`）。
+
+```
+23 2 * * * $HOME/apps/mou-welfare-v2/ops/scrape-scheduled.sh >> $HOME/.local/state/mou-welfare-scraper/cron.log 2>&1
+```
+
+| 項目 | 位置 |
+|---|---|
+| 程式碼 | 部署目錄 `~/apps/mou-welfare-v2/services/scraper`（每次部署 API 時更新為 main 的最新版） |
+| 設定 | `~/.config/mou-welfare/scraper.env`：`API_BASE`、`INGEST_HMAC_KEY`，可加 `SCRAPE_INTERVAL_DAYS` |
+| 狀態檔與報告 | `~/.local/share/mou-welfare-scraper/`：`state.db`（各網址的 hash、下架判定）、`out/reports/`、`last-start`（上次開始時間）。放在部署目錄之外，部署時不會被清掉 |
+| 紀錄 | `~/.local/state/mou-welfare-scraper/`：每次一個 `.log`、`cron.log`。紀錄與報告保留 60 天 |
+
+```bash
+~/apps/mou-welfare-v2/ops/scrape-scheduled.sh --now    # 立刻執行一次（後台顯示為「手動」，下一次排程從這次起算）
+```
+
+**監控**：`scrape run --push` 會回報進度給 API，在管理後台的「爬蟲」頁看各站狀態、錯誤與隔離清單（`docs/admin.md` §4.6）。以下情況寄信到 `ALERT_EMAIL`（`docs/backend.md` §8.4.2）：
+
+- 一次執行結束時有站點不正常（數量異常、無法連線、程式錯誤）。
+- 執行中超過 4 小時沒有回報（程序被中斷）。
+- 超過預定時間一天還沒有新的執行（crontab 被移除、主機重開後沒有恢復）。
+
+**第一次排程執行**：之前的資料是用 `scrape replay` 推送的，不會寫入狀態檔，所以第一次執行時所有網址都當成新增再送一次。後端比對 `content_hash`，內容沒變的判為 `unchanged`，不會重新結構化；hash 規則改過的頁面（例如去掉「下載 N 次」）會重新結構化一次。下架判定要連續 2 次沒看到，所以最早在第二次執行才會發生。
 
 ## 11. 待確認事項
 

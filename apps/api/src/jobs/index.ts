@@ -8,7 +8,9 @@ import type { Structurer } from '../features/welfare/structure.ts'
 import { type LLM, LLMError } from '../lib/llm/index.ts'
 import type { Mailer } from '../lib/mail/index.ts'
 import { type Boss, BossQueue } from '../lib/queue.ts'
+import { createNotify } from '../lib/notify.ts'
 import { LLMPause, PROBE_MS } from './llm-pause.ts'
+import { MONITOR_MS, runMonitor } from './monitor.ts'
 import { backfill, structureProgram } from './structure.ts'
 
 export const HEARTBEAT_NAME = 'jobs'
@@ -26,8 +28,11 @@ export async function startJobs(opts: {
   alertTo?: string
   heartbeatMs?: number
   probeMs?: number
+  /** 系統檢查（jobs/monitor.ts）的間隔；0＝不執行（測試用） */
+  monitorMs?: number
 }): Promise<Jobs> {
   const { db, boss, structurer, llm } = opts
+  const notify = createNotify(opts.mailer, opts.alertTo)
   const queue = new BossQueue(boss)
 
   const queueBackfill = async () => {
@@ -61,10 +66,7 @@ export async function startJobs(opts: {
           await work()
           await queueBackfill()
         },
-        notify: async (subject, text) => {
-          if (opts.mailer && opts.alertTo) await opts.mailer.send({ to: opts.alertTo, subject, text, html: `<pre>${escapeHtml(text)}</pre>` })
-          else console.warn(`[llm] ${subject}`)
-        },
+        notify,
       })
     : null
 
@@ -80,6 +82,11 @@ export async function startJobs(opts: {
     ? setInterval(() => pause.probe().catch((e) => console.error('[llm probe]', e)), opts.probeMs ?? PROBE_MS)
     : null
 
+  // 系統檢查：啟動 1 分鐘後跑一次，之後每小時（多個程序同時跑也安全：通知有去重）
+  const monitor = () => runMonitor(db, notify).catch((e) => console.error('[monitor]', e))
+  const monitorMs = opts.monitorMs ?? MONITOR_MS
+  const monitorTimers = monitorMs > 0 ? [setTimeout(monitor, 60_000), setInterval(monitor, monitorMs)] : []
+
   // TODO(P4)：notify、deadline-reminder、expire、cleanup 等 cron
 
   const beat = () =>
@@ -94,11 +101,9 @@ export async function startJobs(opts: {
     stop: async () => {
       clearInterval(timer)
       if (probeTimer) clearInterval(probeTimer)
+      for (const t of monitorTimers) clearTimeout(t)
       await boss.offWork('welfare-structure')
     },
   }
 }
 
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
-}

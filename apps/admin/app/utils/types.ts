@@ -58,3 +58,24 @@ export type UserDetail = {
   families: { id: string; name: string; role: string; joinedAt: string; memberCount: number }[]
   favorites: number; activeSessions: number; lastActiveAt: string | null
 }
+
+// GET /v1/admin/scraper（apps/api/src/features/scraper/routes.ts）
+export type ScrapeHealth = 'ok' | 'degraded' | 'blocked' | 'failed'
+export type ScrapeSiteCounts = {
+  siteId: string; city: string | null; seen: number; new: number; updated: number; unchanged: number; removed: number
+  filtered: number; quarantined: number; pushed: number; pushFailed: number; pages: number; health: ScrapeHealth
+  healthDetail: string; errorCount: number; startedAt: string; finishedAt: string
+}
+export type ScrapeRunSummary = {
+  id: string; trigger: string; status: 'running' | 'ok' | 'warning' | 'interrupted'; startedAt: string; finishedAt: string | null
+  updatedAt: string; planned: number; done: number; current: string | null
+  totals: { seen: number; new: number; updated: number; removed: number; pushed: number; quarantined: number; errors: number; notOk: number }
+}
+export type ScraperStatus = {
+  intervalDays: number; nextDueAt: string | null; overdue: boolean; latest: ScrapeRunSummary | null; runs: ScrapeRunSummary[]
+  sites: { siteId: string; city: string | null; runId: string | null; last: ScrapeSiteCounts | null; lastOkAt: string | null; programs: { active: number; total: number } }[]
+}
+export type ScrapeRun = ScrapeRunSummary & {
+  intervalDays: number | null; plannedSites: string[]
+  sites: (ScrapeSiteCounts & { errors: string[]; quarantine: { title: string; url: string; issues: string[] }[] })[]
+}

@@ -32,6 +32,58 @@ def to_markdown(run_id: str, results: list[SiteResult]) -> str:
     return "\n".join(parts) + "\n"
 
 
+MAX_ERRORS = 50
+MAX_QUARANTINE = 100
+
+
+def _quarantine(q: dict[str, object]) -> dict[str, object]:
+    issues = q.get("issues")
+    return {
+        "title": str(q.get("title") or "")[:300],
+        "url": str(q.get("url") or "")[:2000],
+        "issues": [str(i)[:100] for i in issues][:10] if isinstance(issues, list) else [],
+    }
+
+
+def site_payload(r: SiteResult) -> dict[str, object]:
+    """POST /internal/scrape-runs 的每站結果（apps/api/src/features/scraper/schema.ts）。錯誤與隔離清單只送前幾筆。"""
+    return {
+        "site_id": r.site_id,
+        "city": r.city or None,
+        **{c: getattr(r, c) for c in (*COLUMNS, "push_failed", "pages")},
+        "health": r.health,
+        "health_detail": r.health_detail[:500],
+        "errors": [e[:500] for e in r.errors[:MAX_ERRORS]],
+        "error_count": len(r.errors),
+        "quarantine": [_quarantine(q) for q in r.quarantine[:MAX_QUARANTINE]],
+        "started_at": r.started_at,
+        "finished_at": r.finished_at,
+    }
+
+
+def run_payload(
+    run_id: str,
+    *,
+    trigger: str,
+    interval_days: int | None,
+    started_at: str,
+    planned: list[str],
+    results: list[SiteResult],
+    current: str | None,
+    finished: bool,
+) -> dict[str, object]:
+    return {
+        "run_id": run_id,
+        "trigger": trigger,
+        "interval_days": interval_days,
+        "started_at": started_at,
+        "finished": finished,
+        "planned": planned,
+        "current": current,
+        "sites": [site_payload(r) for r in results],
+    }
+
+
 def write_report(directory: Path, run_id: str, results: list[SiteResult]) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
     data = {"run_id": run_id, "sites": [asdict(r) for r in results]}

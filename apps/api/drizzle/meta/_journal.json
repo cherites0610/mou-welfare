@@ -64,6 +64,13 @@
       "when": 1795402837196,
       "tag": "0008_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795419646822,
+      "tag": "0009_scraper_runs",
+      "breakpoints": true
     }
   ]
 }

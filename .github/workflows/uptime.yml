@@ -1,0 +1,32 @@
+# 外部監控（docs/backend.md §8.4.2）：每 30 分鐘從 GitHub 檢查一次正式環境。
+# 失敗時 GitHub 會寄信給 repo 擁有者（GitHub 帳號的 Notifications → Actions 設定）。
+# 主機上的系統檢查（apps/api/src/jobs/monitor.ts）在 API 掛掉時也會停，所以需要從外部看。
+name: uptime
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: API /health
+        run: |
+          for i in 1 2 3; do
+            body="$(curl -fsS -m 10 https://api-v2.mou-welfare.com/health || true)"
+            echo "$body"
+            # status 只在資料庫、migration、背景工作心跳都正常時才是 ok（LLM 額度暫停不影響）
+            echo "$body" | grep -q '"status":"ok"' && exit 0
+            sleep 20
+          done
+          echo "::error::API /health 連續 3 次異常"
+          exit 1
+      - name: 前端與管理後台
+        run: |
+          curl -fsS -m 15 -o /dev/null https://v2.mou-welfare.com/welfares
+          curl -fsSL -m 15 -o /dev/null https://admin.mou-welfare.com/login

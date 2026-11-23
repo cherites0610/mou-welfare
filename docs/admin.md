@@ -72,9 +72,10 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 福利詳情 | `/welfare/:id` | `GET`、`PATCH /v1/admin/welfare/:id`、`POST /v1/admin/welfare/:id/restructure` | 原文對照與人工判定，見 §4.3 |
 | LLM 用量 | `/llm` | `GET /v1/admin/llm-usage?days=` | 見 §4.4 |
 | 使用者 | `/users`、`/users/:id` | `GET /v1/admin/users`、`GET /v1/admin/users/:id` | 唯讀，見 §4.5 |
+| 爬蟲 | `/scraper`、`/scraper/:runId` | `GET /v1/admin/scraper`、`GET /v1/admin/scraper/runs/:id` | 排程與各站狀態，見 §4.6 |
 | 稽核紀錄 | `/audit` | `GET /v1/admin/audit` | 見 §5 |
 
-API 定義在 `apps/api/src/features/admin/routes.ts`，也有 OpenAPI 文件（`/openapi.json` 的 `admin` 標籤）。前端的型別寫在 `apps/admin/app/utils/types.ts`，改 API 時要一起改。
+API 定義在 `apps/api/src/features/admin/routes.ts`（爬蟲在 `features/scraper/routes.ts`），也有 OpenAPI 文件（`/openapi.json` 的 `admin` 標籤）。前端的型別寫在 `apps/admin/app/utils/types.ts`，改 API 時要一起改。
 
 ### 4.1 總覽
 
@@ -151,6 +152,27 @@ API 定義在 `apps/api/src/features/admin/routes.ts`，也有 OpenAPI 文件（
 - **詳情**：生日、性別、居住縣市、身分、訂閱通知、登入方式與綁定時間、收藏數、有效登入數與最近活動、所屬家庭（名稱、角色、人數、加入時間）。**每次開啟都寫一筆 `user.view` 稽核紀錄**，頁面上方也會提示。
 - 不顯示密碼雜湊、OAuth token、session token 等敏感資料。
 
+### 4.6 爬蟲
+
+爬蟲每 3 天在主機上執行一次（docs/scraper.md §10.4），在開始、每站結束、全部結束時回報給 API（`POST /internal/scrape-runs`，HMAC），存在 `scrape_runs`。
+
+- **提示列**：排程逾期（預定時間過了一天還沒開始）、最近一次中斷（執行中超過 4 小時沒有回報）、有站點不正常，三者擇一顯示。
+- **數字卡**：最近一次的狀態與開始時間（排程／手動）、進度（已完成站數，執行中顯示正在跑的站）、下一次預定時間、最近一次的推送數（新增、更新、下架）。執行中每 30 秒自動更新。
+- **各站最近一次的結果**：狀態（正常、數量異常、無法連線、程式錯誤；滑過看原因）、看到、新增、更新、下架、推送、隔離、錯誤數、資料庫中可搜尋／全部的福利數、最後一次正常的時間。點一列開那次執行並展開該站。
+- **最近的執行**（30 次）：開始時間、狀態（執行中、正常、有異常、中斷）、方式、站點數、耗時與合計。點一列看詳情。
+- **執行詳情**：各站一列，展開看抓取頁數、標題規則排除數、錯誤（前 50 筆）與隔離清單（前 100 筆，附原網址與原因）。不正常的站點預設展開。
+
+站點狀態的意思（爬蟲端的健康檢查，docs/scraper.md §6.7）：
+
+| 狀態 | 條件 | 影響 |
+|---|---|---|
+| 正常 | — | 推送新增與更新；完整執行時判定下架 |
+| 數量異常（`degraded`） | 看到的數量不到上次正常時的一半，或隔離比例過高 | **不推送、不判定下架**，避免網站改版時把福利全部下架 |
+| 無法連線（`blocked`） | 一筆都沒看到（逾時、403、Cloudflare 驗證頁） | 同上 |
+| 程式錯誤（`failed`） | 這一站的程式丟出例外（設定錯誤、網站結構改變） | 同上；其他站照常執行 |
+
+**通知**（寄到 `ALERT_EMAIL`，backend.md §8.4.2）：一次執行結束時有站點不正常、執行中斷、排程逾期。全部正常不寄信。
+
 ---
 
 ## 5. 稽核紀錄與個資
@@ -181,6 +203,11 @@ welfare_programs（新增欄位，0008_admin）
 
 admin_audit(id bigserial pk, at, admin_id, admin_email, action, target_type, target_id, detail jsonb, ip)
   index (at)、(target_type, target_id)
+
+scrape_runs(id pk, trigger, status, interval_days, planned text[], current, sites jsonb,   -- 0009_scraper_runs
+            started_at, finished_at, updated_at)
+  -- id 是爬蟲的 run_id（YYYYMMDD-HHMMSS，臺北時間）；sites 是每站的結果（含前 50 筆錯誤、前 100 筆隔離）
+alert_state(key pk, value, sent_at)   -- 系統通知的去重（backend.md §8.4.2）
 ```
 
 `user.role`（`user` / `admin`）是原本就有的欄位。
@@ -236,4 +263,5 @@ cd apps/api && ./node_modules/.bin/tsx --env-file=.env scripts/set-role.ts <本�
 - [ ] 把人工判定的結果匯出成評測集的補充案例。
 - [ ] 福利結構化欄位的人工修正（目前只能改狀態），需要先設計「人工修正的欄位不被結構化覆蓋」。
 - [ ] 批次操作（一次判定多筆）。
+- [ ] 在後台手動觸發爬蟲（目前要在主機上執行 `ops/scrape-scheduled.sh --now`）。
 - [ ] 管理者登入加上第二道驗證（例如 Better Auth 的 two-factor plugin），或限制來源 IP。

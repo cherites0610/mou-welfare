@@ -58,6 +58,9 @@ class JsonlSink:
 @dataclass
 class SiteResult:
     site_id: str
+    city: str = ""
+    started_at: str = ""
+    finished_at: str = ""
     seen: int = 0
     new: int = 0
     updated: int = 0

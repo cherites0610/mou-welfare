@@ -61,6 +61,8 @@ uv run scrape run --site kinmen --limit 10   # 試跑 10 筆
 uv run scrape run --push                     # 推送到 API（需要 API_BASE、INGEST_HMAC_KEY；主機上在 ~/.config/mou-welfare/scraper.env）
 uv run scrape replay out/<run_id>            # 推送人工檢查過的 dry-run 結果
 uv run scrape sample out/<run_id>            # 產生抽查清單
+# 正式環境每 3 天自動執行（主機 crontab，docs/scraper.md §10.4）；要立刻跑一次：
+~/apps/mou-welfare-v2/ops/scrape-scheduled.sh --now
 ```
 
 API 整合測試需要測試資料庫：CI 使用 `TEST_DATABASE_URL` 環境變數，本機則讀取 `apps/api/.env.test`（不進版控）。

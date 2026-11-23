@@ -69,3 +69,41 @@ def test_replay_把dry_run結果推送(tmp_path: pytest.TempPathFactory, monkeyp
     assert result.exit_code == 0, result.output
     assert "kinmen     pushed 1" in result.output
     assert [str(r.url) for r in seen] == ["https://api.example/internal/ingest"]
+
+
+def test_run_push_回報進度_一站失敗不影響其他站(
+    tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from scraper import cli
+
+    seen: list[httpx.Request] = []
+    real_client = httpx.Client
+
+    def fake_client(**kw: object) -> httpx.Client:
+        return real_client(transport=httpx.MockTransport(lambda r: seen.append(r) or httpx.Response(200)))
+
+    def broken_adapter(cfg: object, fetcher: object) -> object:
+        raise RuntimeError("設定錯誤")
+
+    monkeypatch.setattr(httpx, "Client", fake_client)
+    monkeypatch.setattr(cli, "get_adapter", broken_adapter)
+    monkeypatch.setenv("API_BASE", "https://api.example")
+    monkeypatch.setenv("INGEST_HMAC_KEY", KEY)
+    out = tmp_path  # type: ignore[assignment]
+    args = ["run", "--push", "--site", "kinmen", "--site", "klcg", "--trigger", "schedule", "--interval-days", "3"]
+    result = CliRunner().invoke(cli.app, [*args, "--state", str(out / "s.db"), "--out", str(out)])  # type: ignore[operator]
+    assert result.exit_code == 1  # 有站點不是 ok
+
+    reports = [json.loads(r.content) for r in seen if r.url.path == "/internal/scrape-runs"]
+    assert [(r["current"], len(r["sites"]), r["finished"]) for r in reports] == [
+        ("kinmen", 0, False),
+        ("klcg", 1, False),
+        (None, 2, True),
+    ]
+    last = reports[-1]
+    assert last["trigger"] == "schedule" and last["interval_days"] == 3 and last["planned"] == ["kinmen", "klcg"]
+    s = last["sites"][0]
+    assert s["site_id"] == "kinmen" and s["city"] == "金門縣" and s["health"] == "failed"
+    assert s["health_detail"] == "RuntimeError: 設定錯誤" and s["started_at"] and s["finished_at"]

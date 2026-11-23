@@ -20,7 +20,7 @@ from scraper.adapters import get_adapter
 from scraper.fetch import Fetcher
 from scraper.pipeline import JsonlSink, Sink, SiteResult, SiteRun
 from scraper.push import Pusher
-from scraper.report import summary_table, write_report
+from scraper.report import run_payload, summary_table, write_report
 from scraper.sites import load_sites
 from scraper.state import State
 
@@ -46,10 +46,14 @@ def run(
     delay: Annotated[float, typer.Option(help="同一主機的請求間隔（秒），不得低於 2")] = 2.0,
     state_path: Annotated[Path | None, typer.Option("--state", help="狀態檔（SQLite）")] = None,
     out: Annotated[Path, typer.Option(help="dry-run 輸出與報告的目錄")] = ROOT / "out",
+    trigger: Annotated[str, typer.Option(help="回報給管理後台的觸發方式：manual／schedule")] = "manual",
+    interval_days: Annotated[int | None, typer.Option(help="排程間隔（天），後台據此判斷逾期")] = None,
     verbose: Annotated[bool, typer.Option("-v")] = False,
 ) -> None:
-    """執行爬取。"""
+    """執行爬取。--push 時會把進度回報給 API（管理後台的爬蟲頁）。"""
     logging.basicConfig(level=logging.INFO if verbose else logging.WARNING, format="%(levelname)s %(message)s")
+    if trigger not in ("manual", "schedule"):
+        raise typer.BadParameter("manual 或 schedule", param_hint="--trigger")
     if delay < 2.0:
         raise typer.BadParameter("禮貌爬取規則：同一主機的請求間隔至少 2 秒", param_hint="--delay")
     site = site or []
@@ -62,23 +66,58 @@ def run(
     now = datetime.now(TZ)
     run_id = now.strftime("%Y%m%d-%H%M%S")
     sink: Sink
+    pusher: Pusher | None = None
     if push:
         api_base, key = os.environ.get("API_BASE"), os.environ.get("INGEST_HMAC_KEY")
         if not api_base or not key:
             raise typer.BadParameter("--push 需要環境變數 API_BASE 與 INGEST_HMAC_KEY")
-        sink = Pusher(api_base, key)
+        sink = pusher = Pusher(api_base, key)
     else:
         sink = JsonlSink(out / run_id)
     state = State(state_path or ROOT / ".state" / ("state.db" if push else "dry-run.db"))
 
     results: list[SiteResult] = []
+    planned = [c.id for c in targets]
+
+    def progress(current: str | None, finished: bool = False) -> None:
+        # 回報失敗不影響爬取（API 暫時不通時，後台會在 4 小時後顯示為中斷）
+        if not pusher:
+            return
+        payload = run_payload(
+            run_id,
+            trigger=trigger,
+            interval_days=interval_days,
+            started_at=now.isoformat(),
+            planned=planned,
+            results=results,
+            current=current,
+            finished=finished,
+        )
+        try:
+            pusher.report_run(payload)
+        except Exception as e:
+            typer.echo(f"report failed: {e}", err=True)
+
+    progress(planned[0] if planned else None)
     with Fetcher(delay=delay) as fetcher:
-        for cfg in targets:
+        for i, cfg in enumerate(targets):
             typer.echo(f"→ {cfg.id}", err=True)
-            adapter = get_adapter(cfg, fetcher)
-            runner = SiteRun(cfg, adapter, fetcher, state, run_id=run_id, today=now.date(), limit=limit)
-            results.append(runner.run(sink))
+            started = datetime.now(TZ)
+            try:
+                adapter = get_adapter(cfg, fetcher)
+                runner = SiteRun(cfg, adapter, fetcher, state, run_id=run_id, today=now.date(), limit=limit)
+                result = runner.run(sink)
+            except Exception as e:  # 一站整個失敗（設定錯誤、程式錯誤）不影響其他站
+                logging.exception("site %s", cfg.id)
+                result = SiteResult(cfg.id, health="failed", health_detail=f"{type(e).__name__}: {e}"[:500])
+            result.city = cfg.city
+            result.started_at = started.isoformat()
+            result.finished_at = datetime.now(TZ).isoformat()
+            results.append(result)
+            if i + 1 < len(targets):
+                progress(targets[i + 1].id)
     state.close()
+    progress(None, finished=True)
 
     typer.echo(summary_table(results))
     report = write_report(out / "reports", run_id, results)

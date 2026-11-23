@@ -66,6 +66,10 @@ class Pusher:
     def ingest(self, item: IngestItem) -> None:
         self._post("/internal/ingest", item.to_payload())
 
+    def report_run(self, payload: dict[str, Any]) -> None:
+        """執行進度回報（管理後台的爬蟲頁，docs/admin.md §4.6）。"""
+        self._post("/internal/scrape-runs", payload)
+
     def remove(self, site_id: str, urls: list[str]) -> None:
         if urls:
             self._post("/internal/remove", {"site_id": site_id, "urls": urls})

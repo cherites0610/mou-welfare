@@ -10,6 +10,7 @@ import { familyRoutes } from './features/family/routes.ts'
 import { favoriteRoutes } from './features/favorite/routes.ts'
 import { healthRoutes } from './features/health/routes.ts'
 import { ingestRoutes } from './features/ingest/routes.ts'
+import { scraperAdminRoutes, scraperInternalRoutes } from './features/scraper/routes.ts'
 import { meRoutes } from './features/me/routes.ts'
 import { uploadRoutes } from './features/upload/routes.ts'
 import { welfareRoutes } from './features/welfare/routes.ts'
@@ -63,9 +64,11 @@ export function createApp(deps: Deps) {
   app.route('/', favoriteRoutes)
   app.route('/', familyRoutes)
   app.route('/', adminRoutes)
+  app.route('/', scraperAdminRoutes)
   app.route('/', welfareRoutes)
   app.route('/', uploadRoutes)
   app.route('/', ingestRoutes)
+  app.route('/', scraperInternalRoutes)
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

@@ -49,8 +49,11 @@ export const ROUTE_ACCESS = {
   'GET /v1/admin/users': 'admin',
   'GET /v1/admin/users/:id': 'admin',
   'GET /v1/admin/audit': 'admin',
+  'GET /v1/admin/scraper': 'admin',
+  'GET /v1/admin/scraper/runs/:id': 'admin',
   'POST /internal/ingest': 'hmac',
   'POST /internal/remove': 'hmac',
+  'POST /internal/scrape-runs': 'hmac',
 } as const satisfies Record<string, Access>
 
 type Compiled = { method: string; re: RegExp; access: Access; key: string }

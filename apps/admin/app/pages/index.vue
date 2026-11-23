@@ -108,7 +108,10 @@ const rejectRate = (r: Record<string, number>) => {
       </div>
 
       <el-card shadow="never">
-        <template #header>爬蟲來源 <span class="text-xs text-gray-400 ml-2">最後一次推送：{{ fmtTime(data.sources.lastIngestAt) }}</span></template>
+        <template #header>
+          <div class="flex items-center">爬蟲來源 <span class="text-xs text-gray-400 ml-2">最後一次推送：{{ fmtTime(data.sources.lastIngestAt) }}</span>
+            <NuxtLink to="/scraper" class="ml-auto text-sm text-mygreen-300 hover:underline">執行狀態 →</NuxtLink></div>
+        </template>
         <el-table :data="data.sources.sites" size="small">
           <el-table-column prop="siteId" label="站點" />
           <el-table-column prop="programs" label="福利數" align="right" />

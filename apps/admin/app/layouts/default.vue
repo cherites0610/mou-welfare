@@ -4,6 +4,7 @@ const admin = useAdmin()
 const menu = [
   { path: '/', label: '總覽', icon: 'mdi:view-dashboard-outline' },
   { path: '/welfare', label: '福利', icon: 'mdi:file-document-multiple-outline' },
+  { path: '/scraper', label: '爬蟲', icon: 'mdi:spider-web' },
   { path: '/llm', label: 'LLM 用量', icon: 'mdi:robot-outline' },
   { path: '/users', label: '使用者', icon: 'mdi:account-group-outline' },
   { path: '/audit', label: '稽核紀錄', icon: 'mdi:shield-search' },
