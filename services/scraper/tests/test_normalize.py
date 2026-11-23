@@ -42,3 +42,14 @@ def test_hash_忽略空白差異_附件順序() -> None:
     assert content_hash("a  b\n c", ["u2", "u1"]) == content_hash("a b c", ["u1", "u2"])
     assert content_hash("a b c") != content_hash("a b d")
     assert content_hash("x").startswith("sha256:") and len(content_hash("x")) == 71
+
+
+def test_hash_忽略瀏覽與下載計數器() -> None:
+    a = "流程圖 PDF 98.5KB，下載45次，MD5:1539E"
+    assert content_hash(a) == content_hash("流程圖 PDF 98.5KB，下載46次，MD5:1539E")
+    assert content_hash("說明 瀏覽人次：1,234") == content_hash("說明 瀏覽人次：1,240")
+    assert content_hash("點閱數: 12 補助") == content_hash("點閱數: 99 補助")
+    # 檔案大小或 MD5 變了代表附件內容變了，仍要視為不同
+    assert content_hash(a) != content_hash("流程圖 PDF 98.6KB，下載45次，MD5:1539E")
+    # 「下載申請表」這類正文不受影響
+    assert content_hash("請下載申請表") != content_hash("請申請表")

@@ -8,6 +8,8 @@ const Health = z.object({
   db: z.enum(['ok', 'error']),
   migration: z.string().nullable(),
   jobs: z.object({ mode: z.enum(['inline', 'separate', 'off']), lastBeatSecondsAgo: z.number().nullable() }),
+  /** 福利結構化的 LLM 狀態：額度不足時暫停（docs/backend.md §8.4.1），不影響 status */
+  llm: z.object({ paused: z.boolean(), pausedAt: z.string().nullable(), reason: z.string().nullable() }),
 })
 
 const route = createRoute({
@@ -33,14 +35,20 @@ export const healthRoutes = new OpenAPIHono<AppEnv>().openapi(route, async (c) =
     const [beat] = await db.execute<{ age: number | null }>(
       sql`select extract(epoch from now() - max(beat_at))::float as age from worker_heartbeat`,
     )
+    const [pause] = await db.execute<{ paused_at: string; reason: string }>(
+      sql`select paused_at, reason from llm_pause order by paused_at limit 1`,
+    )
+    const llm = pause
+      ? { paused: true, pausedAt: new Date(pause.paused_at).toISOString(), reason: pause.reason.slice(0, 120) }
+      : { paused: false, pausedAt: null, reason: null }
     const age = beat?.age ?? null
     const jobsOk = mode === 'off' || (age !== null && age <= JOBS_STALE_SECONDS)
     const status = jobsOk ? 'ok' : 'degraded'
     return c.json(
-      { status, db: 'ok', migration: mig ? `${mig.created_at}:${mig.hash.slice(0, 8)}` : null, jobs: { mode, lastBeatSecondsAgo: age } },
+      { status, db: 'ok', migration: mig ? `${mig.created_at}:${mig.hash.slice(0, 8)}` : null, jobs: { mode, lastBeatSecondsAgo: age }, llm },
       200,
     )
   } catch {
-    return c.json({ status: 'error', db: 'error', migration: null, jobs: { mode, lastBeatSecondsAgo: null } }, 503)
+    return c.json({ status: 'error', db: 'error', migration: null, jobs: { mode, lastBeatSecondsAgo: null }, llm: { paused: false, pausedAt: null, reason: null } }, 503)
   }
 })

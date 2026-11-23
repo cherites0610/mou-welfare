@@ -19,7 +19,7 @@ const boss = await createBoss(env.DATABASE_URL)
 const app = createApp({ db, auth, env, mailer, storage, queue: new BossQueue(boss) })
 
 const { structurer, llm } = createStructurer(env)
-const jobs: Jobs | null = env.WORKER_MODE === 'inline' ? await startJobs({ db, boss, structurer, llm }) : null
+const jobs: Jobs | null = env.WORKER_MODE === 'inline' ? await startJobs({ db, boss, structurer, llm, mailer, alertTo: env.ALERT_EMAIL }) : null
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`api listening on http://${info.address}:${info.port} (jobs: ${env.WORKER_MODE}, structurer: ${structurer.kind})`)

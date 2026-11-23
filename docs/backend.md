@@ -329,11 +329,39 @@ export interface LLM {
 
 | 名稱 | 類型 | 內容 |
 |---|---|---|
-| `welfare-structure` | pg-boss 佇列 | 結構化、embedding、寫回資料庫；一次一筆；失敗重試 3 次（指數退避，30 秒起）。內容 hash 沒變就略過，所以重複執行是安全的；啟動時補送遺失的工作（backfill）。結構化期間內容又被更新時不寫回，由新的工作處理 |
+| `welfare-structure` | pg-boss 佇列 | 結構化、embedding、寫回資料庫；一次一筆；失敗重試 3 次（指數退避，30 秒起）。內容 hash 沒變就略過，所以重複執行是安全的；啟動時補送遺失的工作（backfill）。結構化期間內容又被更新時不寫回，由新的工作處理。額度不足時自動暫停與恢復，見 §8.4.1 |
 | `notify` | pg-boss 佇列 | Email（Resend）、LINE push |
 | `deadline-reminder` | pg-boss cron（每日） | 通知收藏的福利即將截止 |
 | `expire` | pg-boss cron（每日） | 把超過截止日的福利標為 `expired` |
 | `cleanup` | pg-boss cron（每週） | 清除過期的邀請碼、session、verification |
+
+#### 8.4.1 LLM 費用與額度的保護
+
+**額度不足時自動暫停、自動恢復**（`jobs/llm-pause.ts`）：
+
+- Gemini 回 402（預付額度用完）或 429（速率或花費限制，訊息含 `RESOURCE_EXHAUSTED`）時，錯誤歸類為 `LLMError` 的 `quota`。
+- 第一次遇到就寫入 `llm_pause` 表並停止從佇列取工作（`offWork`），寄信給 `ALERT_EMAIL`（未設定時只記 log）。觸發的那筆照常交給 pg-boss 重試，其餘工作留在佇列。
+- 暫停中每 10 分鐘送一個極小的請求探測（幾個 token，費用可以忽略）。成功就刪除 `llm_pause`、恢復取工作、執行 backfill 補排尚未完成的福利，再寄一封恢復通知。**儲值後不需要任何操作**。
+- 暫停狀態存在資料庫：重啟或重新部署後仍維持暫停，並在啟動時立刻探測一次（所以儲值後重新部署會馬上恢復）。
+- `/health` 的 `llm` 欄位顯示 `paused`、`pausedAt`、`reason`。暫停**不影響** `status`，部署的煙霧測試照常通過。
+- 暫停期間失敗的福利保留原本的結果（規則版或上一次 LLM 的結果），`structure_error` 記下原因。
+
+**推送與重啟不會全量重做**：
+
+- 啟動時的 backfill 只挑三種福利：從沒結構化過的、內容 hash 變了的、LLM 模式下仍是規則版結果的。全量做過一次後，推送、重新部署都只會挑出 0 筆。
+- 改 prompt 或換模型也**不會**自動重做（避免一次 commit 就花掉全量的費用）。要重做時手動執行，先看預估再加 `--yes`：
+
+  ```bash
+  cd ~/apps/mou-welfare-v2/apps/api
+  ./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/restructure.ts            # 只顯示筆數與預估費用
+  ./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/restructure.ts --yes      # 排入佇列
+  ./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/restructure.ts --city 基隆市 --limit 20 --yes
+  ```
+
+  工作帶 `force: true`，內容沒變也會用 LLM 重做；規則模式下 `force` 無效，不會用規則覆蓋 LLM 的結果。重做前先跑 §8.3.1 的回測。
+- **第一次全量**不需要這支腳本：把 `api.env` 的 `LLM_DRIVER=rules` 拿掉並重啟，backfill 會把規則版的福利全部排入（2026-11-23 估約 4.3 美元、45 分鐘）。
+- 爬蟲的 hash 會去掉「下載 N 次」這類計數器，避免每次爬取都重做（docs/scraper.md §6.4）。
+- 最後一道限制是 AI Studio 的用量上限（目前每月新台幣 300 元）。
 
 ### 8.5 帳號信件與限流
 
@@ -390,7 +418,7 @@ export interface LLM {
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
 | 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
 | HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
-| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定，但目前 `LLM_DRIVER=rules`，見下方「目前狀態」）。完整定義見 `apps/api/src/env.ts` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（Gemini 額度不足暫停時寄信，§8.4.1）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定，但目前 `LLM_DRIVER=rules`，見下方「目前狀態」）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
 | 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。GitHub Actions（`deploy.yml`）在 CI 通過後透過 SSH 傳入 commit SHA 觸發：authorized_keys 以 `command="…/deploy-api.sh --from-ssh"` 限定這把金鑰只能執行部署，`--from-ssh` 模式只接受完整的 40 碼 SHA（其他內容、包括空白一律拒絕）。設定見 `docs/deploy-setup.md` |
@@ -402,7 +430,7 @@ export interface LLM {
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration，待部署第 7 個 `0006_llm_pause`（Gemini 額度不足的暫停狀態）（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |

@@ -43,6 +43,13 @@
       "when": 1795390519498,
       "tag": "0005_pinned",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795398618294,
+      "tag": "0006_llm_pause",
+      "breakpoints": true
     }
   ]
 }

@@ -43,8 +43,18 @@ def program_key(site_id: str, title: str) -> str:
     return f"{site_id}:{name}"
 
 
+# 每次瀏覽都會變的計數器（基隆市附件旁的「下載781次」、常見的「瀏覽人次：123」）。
+# 不去掉的話每次爬取 hash 都不同，後端就會每次重新交給 LLM 結構化（docs/scraper.md §6.4）
+_VOLATILE_RE = re.compile(
+    r"(?:下載|瀏覽|點閱|觀看|閱覽)\s*(?:人次|次數|人數|數)?\s*[:：]?\s*[\d,]+\s*(?:次|人次|人)?"
+    r"|(?:人氣|點閱率)\s*[:：]?\s*[\d,]+"
+)
+
+
 def content_hash(content: str, attachment_urls: list[str] | None = None) -> str:
-    """正文（空白正規化後）加上附件網址的 sha256。附件內容不列入，避免為了比對而每次重新下載附件。"""
-    normalized = re.sub(r"\s+", " ", unicodedata.normalize("NFKC", content)).strip()
+    """正文（空白正規化、去掉瀏覽與下載計數器後）加上附件網址的 sha256。
+    附件內容不列入，避免為了比對而每次重新下載附件。"""
+    text = _VOLATILE_RE.sub("", unicodedata.normalize("NFKC", content))
+    normalized = re.sub(r"\s+", " ", text).strip()
     payload = normalized + "\n" + "\n".join(sorted(attachment_urls or []))
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()

@@ -248,6 +248,17 @@ describe('welfare-structure 工作', () => {
     expect(search.data.map((d) => d.id)).toEqual([id])
   })
 
+  it('force：內容沒變也用 LLM 重做；規則結構化時 force 無效，不覆蓋 LLM 的結果', async () => {
+    const id = await ingestOne()
+    const llm = new FakeLLM({ generate: () => LLM_OUTPUT })
+    const s = new LLMStructurer(llm)
+    expect(await structureProgram(t.db, s, llm, id)).toBe('done')
+    expect(await structureProgram(t.db, s, llm, id)).toBe('skipped')
+    expect(await structureProgram(t.db, s, llm, id, undefined, { force: true })).toBe('done')
+    expect(await structureProgram(t.db, new RuleStructurer(), null, id, undefined, { force: true })).toBe('skipped')
+    expect((await programs())[0]!.structuredBy).toBe('llm')
+  })
+
   it('同樣內容不重複結構化', async () => {
     const id = await ingestOne()
     const s = new RuleStructurer()

@@ -81,10 +81,17 @@ export class GeminiLLM implements LLM {
     try {
       return await fn()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      throw new LLMError(msg, /timeout|aborted/i.test(msg) ? 'timeout' : 'provider')
+      throw toLLMError(e)
     }
   }
+}
+
+/** 把 SDK 的錯誤轉成 LLMError；額度不足（402，2026-11-22 實際遇過）和速率限制（429）歸為 quota */
+export function toLLMError(e: unknown): LLMError {
+  const msg = e instanceof Error ? e.message : String(e)
+  const status = (e as { status?: unknown } | null)?.status
+  if (status === 402 || status === 429 || /RESOURCE_EXHAUSTED|"code":\s*(?:402|429)\b/.test(msg)) return new LLMError(msg, 'quota')
+  return new LLMError(msg, /timeout|aborted/i.test(msg) ? 'timeout' : 'provider')
 }
 
 export function normalize(v: number[]): number[] {

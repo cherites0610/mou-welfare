@@ -2,4 +2,4 @@
 // 實作：fake.ts（測試 / staging）；gemini.ts（@google/genai）。
 export { type LLM, LLMError, type Message } from './types.ts'
 export { FakeLLM } from './fake.ts'
-export { EMBEDDING_DIMS, GeminiLLM } from './gemini.ts'
+export { EMBEDDING_DIMS, GeminiLLM, toLLMError } from './gemini.ts'

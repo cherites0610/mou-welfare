@@ -25,6 +25,8 @@ const EnvSchema = z
     /** 背景工作的執行方式：inline＝在 API 程序內；separate＝由 src/worker.ts 獨立程序；off＝不執行（測試用） */
     WORKER_MODE: z.enum(['inline', 'separate', 'off']).default('inline'),
 
+    /** 系統通知（例如 Gemini 額度不足暫停結構化）的收件人；未設定時只記 log */
+    ALERT_EMAIL: z.email().optional(),
     /** 寄信：resend＝真的寄出；log＝只印在終端機（開發用） */
     MAIL_DRIVER: z.enum(['resend', 'log']).default('log'),
     RESEND_API_KEY: z.string().startsWith('re_').optional(),

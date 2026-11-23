@@ -12,7 +12,8 @@ export interface LLM {
 export class LLMError extends Error {
   constructor(
     message: string,
-    public readonly kind: 'schema' | 'timeout' | 'provider',
+    /** quota：額度用完（402）或超過速率／花費限制（429），等一段時間或儲值後才會恢復 */
+    public readonly kind: 'schema' | 'timeout' | 'provider' | 'quota',
   ) {
     super(message)
   }

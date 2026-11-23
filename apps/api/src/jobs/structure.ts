@@ -30,12 +30,15 @@ export async function structureProgram(
   llm: LLM | null,
   programId: string,
   today: string = new Date().toISOString().slice(0, 10),
+  /** 改 prompt 或換模型後手動重做（scripts/restructure.ts）：內容沒變也重做，但只限 LLM，規則不能覆蓋 LLM 的結果 */
+  opts: { force?: boolean } = {},
 ): Promise<StructureOutcome> {
   const [p] = await db.select().from(w).where(eq(w.id, programId))
   if (!p) return 'missing'
   if (p.status === 'removed') return 'skipped'
+  const force = opts.force && structurer.kind === 'llm'
   // 內容沒變就不重做；改回規則時也不覆蓋 LLM 已經做好的結果（2026-11-22 Gemini 額度用完、改回 rules 時發生過）
-  if (p.structuredHash === p.contentHash && (p.structuredBy === structurer.kind || p.structuredBy === 'llm')) {
+  if (!force && p.structuredHash === p.contentHash && (p.structuredBy === structurer.kind || p.structuredBy === 'llm')) {
     return 'skipped'
   }
 
@@ -90,7 +93,7 @@ export async function structureProgram(
 }
 
 /** 佇列裡已經有等待、重試或執行中的工作的福利（pg-boss 還沒建立時回傳空集合） */
-async function alreadyQueued(db: Db): Promise<Set<string>> {
+export async function alreadyQueued(db: Db): Promise<Set<string>> {
   const [exists] = await db.execute<{ ok: boolean }>(sql`select to_regclass('pgboss.job') is not null as ok`)
   if (!exists?.ok) return new Set()
   const rows = await db.execute<{ id: string }>(

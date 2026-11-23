@@ -682,13 +682,39 @@
                         "mode",
                         "lastBeatSecondsAgo"
                       ]
+                    },
+                    "llm": {
+                      "type": "object",
+                      "properties": {
+                        "paused": {
+                          "type": "boolean"
+                        },
+                        "pausedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "paused",
+                        "pausedAt",
+                        "reason"
+                      ]
                     }
                   },
                   "required": [
                     "status",
                     "db",
                     "migration",
-                    "jobs"
+                    "jobs",
+                    "llm"
                   ]
                 }
               }
@@ -744,13 +770,39 @@
                         "mode",
                         "lastBeatSecondsAgo"
                       ]
+                    },
+                    "llm": {
+                      "type": "object",
+                      "properties": {
+                        "paused": {
+                          "type": "boolean"
+                        },
+                        "pausedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "reason": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "paused",
+                        "pausedAt",
+                        "reason"
+                      ]
                     }
                   },
                   "required": [
                     "status",
                     "db",
                     "migration",
-                    "jobs"
+                    "jobs",
+                    "llm"
                   ]
                 }
               }
