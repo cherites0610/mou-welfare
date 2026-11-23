@@ -1,6 +1,6 @@
 # 後端設計文件（v2）
 
-> 狀態：實作中（P1 核心 API、P2 資料流與 LLM 結構化、家庭與帳號管理、管理後台已上線；前端除聊天與 LINE 外已上線，見第 12 節）
+> 狀態：實作中（P1 核心 API、P2 資料流與 LLM 結構化、家庭與帳號管理、LINE / LIFF 登入、管理後台已上線；Google 登入待設定金鑰；前端除聊天與 LINE Bot 外已上線，見第 12 節）
 > 最後更新：2026-11-23（LLM 全量結構化完成、用量紀錄與額度保護、結構化回測、管理後台上線）
 
 > 相關文件：[管理後台](admin.md)、[爬蟲設計](scraper.md)、[測試規範](testing.md)、[自動部署設定](deploy-setup.md)、[v1 文件](v1/)
@@ -430,6 +430,13 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 由 Better Auth 內建的 `google`、`line` provider 處理（`apps/api/src/lib/auth.ts`），金鑰成對設定才會啟用；未設定時 `/sign-in/social` 回 404，前端顯示「即將開放」。
 
+| 登入方式 | 正式環境狀態 |
+|---|---|
+| LINE（網頁） | ✅ 2026-11-23 啟用，手機實測登入、新帳號導到填寫個人資料正常 |
+| LIFF（LINE 內開啟） | ✅ 2026-11-23 啟用（LIFF Endpoint `https://v2.mou-welfare.com/`），手機實測自動登入正常 |
+| 設定密碼（第三方登入的帳號） | ✅ 2026-11-23 上線 |
+| Google | ⏳ 程式已完成，待建立 OAuth client 並設定金鑰（第 11 節） |
+
 | 方式 | 流程 |
 |---|---|
 | Google、LINE（網頁） | 前端 `signIn.social` → 轉到 Google / LINE → 回到 API 的 `/v1/auth/callback/{google,line}`（在 API 網域設 session cookie）→ 轉回前端 `/oauth-callback`。失敗時轉回 `/login?error=`（綁定時回 `/profile?error=`） |
@@ -539,7 +546,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 網域 | 過渡期為 `v2.mou-welfare.com`（Workers 自訂網域）；正式切換時改為 `mou-welfare.com`（目前仍由 Caddy 提供 v1） |
 | 目前狀態 | ✅ 2026-11-19 部署，2026-11-22 起由 GitHub Actions 自動部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 已加入 `https://v2.mou-welfare.com` |
 | 管理後台 | `apps/admin`，Worker `mou-welfare-admin`，網域 `admin.mou-welfare.com`；部署方式見 [admin.md](admin.md) §8 |
-| 已完成頁面 | 登入註冊流程；2026-11-23 依 v1 介面完成：福利列表 `/welfares`（搜尋、地區／服務／家庭篩選、自動篩選、進階篩選、無限捲動；第一頁 SSR）、福利詳情 `/welfares/:id`（資格分析、AI 摘要、申請條件、補助內容、附件、原文；SSR 含 JSON-LD；網址加 `?review=1` 顯示資料檢核）、個人設定 `/profile`（家庭管理、邀請 QR Code、帳號管理）、編輯個人資料 `/profile/edit`、收藏 `/favorites`、常見問題 `/question`（SSR，含 FAQPage JSON-LD）、服務條款 `/terms`、隱私權政策 `/private` |
+| 已完成頁面 | 登入註冊流程；2026-11-23 依 v1 介面完成：福利列表 `/welfares`（搜尋、地區／服務／家庭篩選、自動篩選、進階篩選、無限捲動；第一頁 SSR）、福利詳情 `/welfares/:id`（資格分析、AI 摘要、申請條件、補助內容、附件、原文；SSR 含 JSON-LD；網址加 `?review=1` 顯示資料檢核）、個人設定 `/profile`（家庭管理、邀請 QR Code、帳號管理：綁定與解除 LINE / Google、設定密碼、刪除帳號）、第三方登入落地頁 `/oauth-callback`（LINE 登入與 LIFF 自動登入見 §8.5.1）、編輯個人資料 `/profile/edit`、收藏 `/favorites`、常見問題 `/question`（SSR，含 FAQPage JSON-LD）、服務條款 `/terms`、隱私權政策 `/private` |
 
 ### 10.3 從 v1 切換到 v2
 
@@ -547,7 +554,8 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 1. v2 在 `api-v2.mou-welfare.com` 和 Workers 的預覽網址上完成測試。確認正式資料庫沒有範例福利（`program_key like 'mock:%'` 為 0 筆；2026-11-23 已刪除）。
 2. 切換網域：`mou-welfare.com` 指向 Workers；Caddy 的 `api.mou-welfare.com` 改代理到 5030。
-3. 觀察一週，沒有問題就停掉 v1：pm2 刪除 `mou-welfare-api`，停用 Redis，刪除 v1 的兩個 worktree，Caddyfile 移除 v1 設定。
+3. 更新第三方登入的網址（§8.5.1）：LINE Login channel 的 Callback URL 與 Google OAuth client 的重新導向 URI 加上 `https://api.mou-welfare.com/v1/auth/callback/{line,google}`；LIFF app 的 Endpoint URL 改為 `https://mou-welfare.com/`；`BETTER_AUTH_URL` 改為 `https://api.mou-welfare.com`。
+4. 觀察一週，沒有問題就停掉 v1：pm2 刪除 `mou-welfare-api`，停用 Redis，刪除 v1 的兩個 worktree，Caddyfile 移除 v1 設定。
 
 ### 10.4 v1 正式環境現況（2026-11-18 修復後）
 

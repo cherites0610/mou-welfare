@@ -34,7 +34,7 @@
 | 前端 | `apps/admin`：Nuxt 4 單頁應用（`ssr: false`）、Element Plus、Tailwind、ECharts（`vue-echarts`，只載入長條圖與折線圖） |
 | 建置 | `nuxt generate` 產生 `.output/public`。API 位址在建置時以 `NUXT_PUBLIC_API_BASE` 寫入，前台網址用 `NUXT_PUBLIC_WEB_BASE` |
 | 部署 | Workers 只放靜態資產（`apps/admin/wrangler.jsonc`，Worker 名稱 `mou-welfare-admin`），找不到的路徑回 `index.html`。自訂網域 `admin.mou-welfare.com`。`/login` 會被轉到 `/login/`（307） |
-| 登入 | 和使用者網站共用 Better Auth 帳號（Email 密碼或 Google）。後台和 API 同在 `mou-welfare.com` 底下，API 網域的 session cookie 會照常送出 |
+| 登入 | 和使用者網站共用 Better Auth 帳號（Email 密碼、LINE，或之後啟用的 Google；管理者的 Email 必須已驗證，LINE 沒有提供 email 的帳號不能當管理者）。後台和 API 同在 `mou-welfare.com` 底下，API 網域的 session cookie 會照常送出 |
 | CORS | `api.env` 的 `TRUSTED_ORIGINS` 包含 `https://admin.mou-welfare.com`。Better Auth 的 `trustedOrigins` 用同一個設定 |
 | 搜尋引擎 | `<meta name="robots" content="noindex, nofollow">`；`robots.txt` 為 `Disallow: /` |
 

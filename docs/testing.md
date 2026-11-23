@@ -157,7 +157,7 @@ const matrix = [
 | 搜尋 → 詳情 → 返回 | 篩選條件和捲動位置要保留（v1 的 keep-alive 實際上沒有作用） |
 | 未登入時收藏 | 導向登入頁，登入後回到原本的頁面並完成收藏 |
 | Email 註冊 → 驗證 → 填寫資料 | 完成後首頁顯示個人的資格比對結果 |
-| LINE 和 Google 登入 | 用 staging 的測試帳號，或在 staging 上換成假的 OAuth provider |
+| LINE 和 Google 登入 | 用 staging 的測試帳號，或在 staging 上換成假的 OAuth provider。目前 API 端由 `tests/social.test.ts` 涵蓋；2026-11-23 在正式環境以手機手動測過 LINE 網頁登入與 LIFF 自動登入 |
 | 建立家庭 → 產生邀請碼 → 另一個帳號加入 | 兩個帳號都能看到家庭；福利卡上出現家人的資格比對 |
 | 阿哞聊天 | 串流有逐字出現；參考來源卡可以點擊（staging 使用 FakeLLM） |
 | 刪除帳號 | 刪除後無法再登入，相關資料也已清除 |
