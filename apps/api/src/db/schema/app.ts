@@ -58,7 +58,7 @@ export const llmCalls = pgTable(
 )
 
 /**
- * 管理端稽核紀錄（docs/backend.md §8.7）：查看使用者個資、修改福利、重新結構化都會寫一列。
+ * 管理端稽核紀錄（docs/admin.md）：查看使用者個資、修改福利、重新結構化都會寫一列。
  * admin_id 不設外鍵：管理者帳號刪除後紀錄仍保留。
  */
 export const adminAudit = pgTable(

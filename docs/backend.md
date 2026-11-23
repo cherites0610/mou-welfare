@@ -1,9 +1,9 @@
 # 後端設計文件（v2）
 
-> 狀態：實作中（P2 資料流已上線；P1 核心 API、家庭與帳號管理已完成；前端個人設定相關頁面已上線，見第 12 節）
-> 最後更新：2026-11-23（結構化評測集與回測、Gemini 額度保護與用量紀錄、開始 LLM 全量結構化、刪除範例資料）
+> 狀態：實作中（P1 核心 API、P2 資料流與 LLM 結構化、家庭與帳號管理、管理後台已上線；前端除聊天與 LINE 外已上線，見第 12 節）
+> 最後更新：2026-11-23（LLM 全量結構化完成、用量紀錄與額度保護、結構化回測、管理後台上線）
 
-> 相關文件：[爬蟲設計](scraper.md)、[v1 文件](v1/)
+> 相關文件：[管理後台](admin.md)、[爬蟲設計](scraper.md)、[測試規範](testing.md)、[自動部署設定](deploy-setup.md)、[v1 文件](v1/)
 
 ---
 
@@ -14,6 +14,7 @@
 | 項目 | 決定 | 取代 v1 的 | 理由 |
 |---|---|---|---|
 | 前端 | **Nuxt**（SSR），部署在 **Cloudflare Workers** | Vue SPA（由主機上的 Caddy 提供） | 重視 SEO，伺服器端渲染在 Cloudflare 機房執行（台灣有機房），也分擔主機記憶體 |
+| 管理後台 | **Nuxt 單頁應用**（`apps/admin`），靜態檔部署在 Cloudflare Workers（`admin.mou-welfare.com`） | — | 和使用者網站分開部署；不需要 SEO，見 [admin.md](admin.md) |
 | API 部署 | **自有主機**（騰訊雲東京，2 vCPU / 2 GB），**pm2** 管理程序，**Caddy** 反向代理與自動 HTTPS | 同一台主機上的 pm2 + Caddy | 沒有 Workers 的 CPU 和時間限制；資料庫在同一台，延遲最低 |
 | API 框架 | **Hono** on Node（`@hono/node-server`）+ `@hono/zod-openapi` | NestJS | 輕量，寫法就是一般函式，沒有 decorator 和 DI；之後要搬到 Workers 也幾乎不用改 |
 | 驗證與型別 | **Zod**（`packages/shared`） | class-validator DTO | 前後端共用同一份 schema，路徑和參數對不上時編譯就會報錯 |
@@ -38,6 +39,8 @@
 │ mou-welfare.com             │                                     │
 │  ├─ 頁面渲染（SEO）           │                                     │
 │  └─ server 端呼叫 API ───────┼──────────┐                          │
+│ admin Worker（靜態檔）        │          │                          │
+│ admin.mou-welfare.com ──────┼──────────┤ /v1/admin/*              │
 │ R2（使用者上傳的圖片）         │◀──┐      │                          │
 └─────────────────────────────┘   │      ▼                          ▼
                                   │   ┌──────── 自有主機（騰訊雲東京）────────────┐
@@ -56,7 +59,8 @@
 ```
 
 **網域**
-- `mou-welfare.com`：Nuxt（Cloudflare）
+- `mou-welfare.com`：Nuxt（Cloudflare）。過渡期間 v1 仍佔用這個網域，v2 先用 `v2.mou-welfare.com`。
+- `admin.mou-welfare.com`：管理後台（Cloudflare Workers 靜態檔，[admin.md](admin.md)）
 - `api.mou-welfare.com`：主機上的 Caddy，代理到 v2 API。過渡期間 v1 仍佔用這個網域，所以 v2 先用 `api-v2.mou-welfare.com`，切換方式見第 10 節。
 
 ---
@@ -66,11 +70,14 @@
 ```
 mou-welfare/
 ├── apps/
-│   ├── web/                    # Nuxt
+│   ├── web/                    # Nuxt（使用者網站）
+│   ├── admin/                  # Nuxt 單頁應用（管理後台，admin.md）
 │   └── api/                    # Hono on Node（pm2）
 │       ├── ecosystem.config.cjs  # pm2：預設只有 api 一個程序
 │       ├── drizzle.config.ts
 │       ├── drizzle/            # migrations
+│       ├── eval/               # 結構化回測的評測集（§8.3.1）
+│       ├── scripts/            # 主機上的維運腳本：restructure、llm-usage、set-role、eval-structure、compare-llm、seed-mock-welfare、openapi
 │       └── src/
 │           ├── server.ts       # HTTP 入口（@hono/node-server）
 │           ├── worker.ts       # 獨立背景工作入口，只在 WORKER_MODE=separate 時使用
@@ -79,20 +86,23 @@ mou-welfare/
 │           ├── db/
 │           │   ├── client.ts   # 連線池（postgres driver，連 localhost）
 │           │   └── schema/     # 依功能拆檔
+│           ├── access.ts       # 路由存取表與權限 middleware（public / optional / user / admin / hmac / line）
 │           ├── features/
-│           │   ├── auth/       # Better Auth 設定、LIFF、profile
-│           │   ├── welfare/    # routes / service / matching / search
+│           │   ├── me/         # 個人資料、刪除帳號
+│           │   ├── welfare/    # routes / service / search / structure（LLM 與規則結構化）
 │           │   ├── family/
 │           │   ├── favorite/
-│           │   ├── chat/       # RAG、串流
 │           │   ├── faq/
 │           │   ├── upload/
-│           │   ├── line-bot/   # webhook、回覆、Flex message
-│           │   ├── notify/
-│           │   └── ingest/     # 接收爬蟲資料 → Queue
-│           ├── jobs/           # pg-boss 的工作處理函式與 cron 定義；startJobs() 由 server.ts 或 worker.ts 呼叫
+│           │   ├── ingest/     # 接收爬蟲資料 → Queue
+│           │   ├── admin/      # 管理端 /v1/admin/*（admin.md）
+│           │   ├── health/
+│           │   ├── chat/       # （P3）RAG、串流
+│           │   ├── line-bot/   # （P4）webhook、回覆、Flex message
+│           │   └── notify/     # （P4）
+│           ├── jobs/           # pg-boss 的工作與 cron；startJobs() 由 server.ts 或 worker.ts 呼叫；llm-pause.ts（§8.4.1）
 │           └── lib/
-│               ├── llm/        # 介面 + gemini.ts
+│               ├── llm/        # 介面、gemini.ts、pricing.ts（價格表）、recorder.ts（用量寫入 llm_calls）
 │               ├── auth.ts     # 取得 session、權限 helper
 │               ├── queue.ts    # pg-boss 封裝（send / work / schedule）
 │               ├── errors.ts
@@ -117,7 +127,7 @@ mou-welfare/
 |---|---|---|
 | 主機資源 | 2 vCPU、1.9 GB RAM、1.9 GB swap；同時跑 Postgres、v1 API、lexicon API、Caddy、Redis（v1 用）。2026-11-18 時已用約 1 GB，swap 用了 234 MB | v2 預設只跑一個程序（背景工作在 API 程序內，實測 150 MB），以 pm2 `max_memory_restart: 300M` 限制；v1 下線後停掉 v1 API 和 Redis，可以釋放約 200 MB；持續觀察 swap 使用量 |
 | 單點故障 | 主機掛了，API 就停 | 每日備份本機加 R2；記錄重建步驟（見第 10 節）；Nuxt 在 Cloudflare，API 掛掉時頁面仍能顯示錯誤提示 |
-| 長時間工作 | LLM 結構化、批次通知 | 一律放進 pg-boss 佇列，由同一程序內的背景工作處理；結構化的同時處理數設為 1–2，避免影響 API 回應。工作量變大時改 `WORKER_MODE=separate` 拆成獨立程序（不需改程式） |
+| 長時間工作 | LLM 結構化、批次通知 | 一律放進 pg-boss 佇列，由同一程序內的背景工作處理；結構化一次處理一筆（實測每筆約 1.3 秒，全量 1,471 筆約 37 分鐘），避免影響 API 回應。工作量變大時改 `WORKER_MODE=separate` 拆成獨立程序（不需改程式） |
 | 聊天串流 | SSE 長連線經過 Cloudflare 和 Caddy | Caddy 的 `reverse_proxy` 對 SSE 加 `flush_interval -1`；API 網域若開啟 Cloudflare 代理，要確認串流不會被緩衝 |
 | Nuxt on Workers | 伺服器端渲染時呼叫 API 會跨區到東京 | 熱門頁面（福利列表、詳情）用 Nuxt 的路由規則做 SWR 快取；登入後的個人化資料改由瀏覽器端呼叫 |
 | 真實客戶端 IP | 經過 Cloudflare 和 Caddy，IP 會被換掉 | Caddy 設定 `trusted_proxies` 為 Cloudflare 的 IP 段；Better Auth 的限流讀 `CF-Connecting-IP` |
@@ -140,7 +150,8 @@ mou-welfare/
 | `gender` | `text` | `男性` / `女性` / null |
 | `city` | `text` | 居住縣市 |
 | `identities` | `text[]` | 身分白名單（定義在 `packages/shared`） |
-| `role` | `text` | `user` / `admin` |
+| `role` | `text` | `user` / `admin`；只能用主機上的 `scripts/set-role.ts` 修改（[admin.md](admin.md) §3） |
+| `is_subscribed` | `boolean` | 是否接收福利資訊通知（P4） |
 
 **家庭**
 
@@ -165,8 +176,10 @@ welfare_programs(
   status text,                      -- pending（待結構化，不出現在搜尋）| active | rejected（不是個人福利）| expired | removed
   site_id text, source_fields jsonb,  -- 爬蟲站點；開放資料原本的結構化欄位
   structured_hash text, structured_by text, structured_at, structure_error,  -- 結構化時的 content_hash、llm | rules
+  structured_model text, structured_prompt_version text,  -- 目前結果由哪個模型、哪一版 prompt 產生（§8.3.2）
   content_hash text,                -- 內容沒變就不重新交給 LLM
-  pinned_at timestamptz,            -- 置頂：搜尋結果排最前面（越晚置頂越前面）；目前用於開發用範例資料，之後給管理端
+  status_override text, reviewed_by, reviewed_at, review_note,  -- 管理者的人工判定（active | rejected），結構化不覆蓋（admin.md §4.3）
+  pinned_at timestamptz,            -- 置頂：搜尋結果排最前面（越晚置頂越前面）；由管理後台設定
   embedding vector(768),            -- RAG 用
   created_at, updated_at
 )
@@ -184,7 +197,14 @@ notification_log(id, user_id, channel, template, payload jsonb, status, sent_at)
 ingest_log(id, program_key, source_url, action, content_hash, received_at)   -- action: created | updated | unchanged | removed
 welfare_sources(url pk, program_id, site_id, content_hash, first_seen_at, last_seen_at)
   -- 一個福利可能來自多個網址（同一福利出現在多個分類）；所有網址都下架才把福利標為 removed
+llm_calls(id, created_at, purpose, program_id, model, prompt_version, attempt, input/output/thoughts/total_tokens,
+          input_chars, latency_ms, ok, error_kind, error, cost_usd)   -- 每次 LLM 呼叫的用量（§8.3.2）
+llm_pause(name pk, reason, paused_at, probed_at)                      -- 額度不足暫停中（§8.4.1）
+admin_audit(id, at, admin_id, admin_email, action, target_type, target_id, detail jsonb, ip)  -- 管理端稽核（admin.md §5）
+worker_heartbeat(name pk, beat_at)                                    -- 背景工作心跳（/health）
 ```
+
+`chat_sessions`、`chat_messages`、`notification_log` 為 P3／P4 預定，尚未建立。
 
 ### 5.2 索引
 
@@ -221,17 +241,23 @@ welfare_sources(url pk, program_id, site_id, content_hash, first_seen_at, last_s
 | 上傳 | `POST /v1/uploads/avatar`（multipart；以內容判斷格式，只收 JPEG/PNG/WebP/GIF，上限 5 MB；壓縮為 512×512 WebP 並移除 EXIF 後存到 R2） | 登入 |
 | LINE | `POST /v1/line/webhook` | **驗證 `x-line-signature`**（HMAC-SHA256，用原始 body 計算） |
 | 爬蟲 | `POST /internal/ingest`、`POST /internal/remove` | **HMAC 簽章加時間戳**，金鑰未設定時一律拒絕 |
-| 管理 | `/v1/admin/*`（福利人工修正、重新結構化、查看隔離區） | admin |
+| 管理 | `GET /v1/admin/overview`、`GET /v1/admin/welfare`、`GET/PATCH /v1/admin/welfare/:id`、`POST /v1/admin/welfare/:id/restructure`、`GET /v1/admin/llm-usage`、`GET /v1/admin/users`、`GET /v1/admin/users/:id`、`GET /v1/admin/audit`（[admin.md](admin.md) §4） | admin（登入、Email 已驗證、`role = 'admin'`） |
+| 系統 | `GET /health`（資料庫、migration、背景工作心跳、LLM 暫停狀態）、`GET /openapi.json` | 公開 |
 
 ---
 
 ## 7. 權限模型
 
-**預設拒絕**：全域 middleware 要求登入，公開端點必須明確標記 `public()`。這是為了修正 v1 中好幾個端點忘了加 Guard 的問題，例如 `/upload` 和家庭相關端點。
+**預設拒絕**：所有路由都要登記在 `access.ts` 的 `ROUTE_ACCESS`，未登記的一律要求登入；路由普查測試會檢查有沒有漏登記。這是為了修正 v1 中好幾個端點忘了加 Guard 的問題，例如 `/upload` 和家庭相關端點。
 
-```ts
-app.use('/v1/*', requireSession({ except: publicRoutes }))
-```
+| 存取等級 | 條件 |
+|---|---|
+| `public` | 不需登入 |
+| `optional` | 不需登入；有登入時提供使用者（附上資格比對） |
+| `user` | 需登入 |
+| `admin` | 需登入、Email 已驗證且 `role = 'admin'`，否則 403（[admin.md](admin.md) §3） |
+| `hmac` | 爬蟲：HMAC 簽章加時間戳 |
+| `line` | LINE webhook 簽章（P4 實作前一律拒絕） |
 
 資源層級的檢查集中寫成 helper，每個路由都必須呼叫：
 
@@ -285,17 +311,20 @@ await assertChatOwner(db, sessionId, user.id)
 
 ```ts
 export interface LLM {
-  generate<T>(o: { system: string; input: string | Part[]; schema: z.ZodType<T>; model?: string }): Promise<T>
+  readonly model: string   // 預設模型，寫進結構化結果
+  generate<T>(o: { system: string; input: string; schema: z.ZodType<T>; model?: string; meta?: LLMCallMeta }): Promise<T>
   stream(o: { system: string; messages: Message[] }): AsyncIterable<string>
-  embed(texts: string[]): Promise<number[][]>
+  embed(texts: string[], meta?: LLMCallMeta): Promise<number[][]>
 }
+// meta：用途（structure / embed / probe / chat）、福利 id、prompt 版本，寫進 llm_calls（§8.3.2）
 ```
 
-- **實作**：`gemini.ts`（`@google/genai`）。可選擇經過 Cloudflare AI Gateway 來看用量和做快取，但不是必要。
+- **實作**：`gemini.ts`（`@google/genai`），預設模型 `gemini-3.5-flash-lite`（依 §8.3.1 回測選定；`GEMINI_MODEL` 可覆寫），embedding 為 `gemini-embedding-001`。每次呼叫的用量寫入 `llm_calls`（§8.3.2）。錯誤轉成 `LLMError`，種類為 `quota`（402／429）、`timeout`、`provider`、`schema`。
 - **結構化輸出**：用 `z.toJSONSchema()` 把 Zod schema 轉成 Gemini 的 `responseSchema`，回傳後再用 Zod 驗證；不合格就重試一次，帶上錯誤訊息。
 - **Embedding**：用 Gemini 的 embedding 模型輸出 768 維（`gemini-embedding-001` 支援 `outputDimensionality`），正規化後存入 pgvector。
-- **沒有金鑰時**（`GEMINI_API_KEY` 未設定或 `LLM_DRIVER=rules`）：改用關鍵字規則結構化（`features/welfare/structure.ts` 的 `RuleStructurer`），只依標題標身分、寧可少標；不做 embedding。資料可以先被搜尋到。設定金鑰後重新啟動，啟動時的 backfill 會把規則結構化的福利全部重新排入。
-- **身分欄位的語意**：`identities` 是「一定要具備」的身分，多個特殊身分視為全部都要；「A 或 B」不列、「低收入戶或中低收入戶」只列中低收入戶（`match()` 的相容規則會涵蓋）。這段寫在 prompt 裡，規則版也遵守。
+- **沒有金鑰時**（`GEMINI_API_KEY` 未設定或 `LLM_DRIVER=rules`）：改用關鍵字規則結構化（`features/welfare/structure.ts` 的 `RuleStructurer`），只依標題標身分、寧可少標；不做 embedding。資料可以先被搜尋到。設定金鑰後重新啟動，啟動時的 backfill 會把規則結構化的福利全部重新排入。正式環境目前用 Gemini（2026-11-23 起）。
+- **身分欄位的語意**：`identities` 是「一定要具備」的身分，多個特殊身分視為全部都要；「A 或 B」不列、「低收入戶或中低收入戶」只列中低收入戶（`match()` 的相容規則會涵蓋）。這段寫在 prompt 裡，規則版也遵守。LLM 的身分判斷方式見 §8.3.1。
+- **人工判定**：管理者在後台判為福利或非福利（`status_override`）後，結構化不再改變狀態（[admin.md](admin.md) §4.3）。
 
 | 用途 | 時機 | 執行位置 |
 |---|---|---|
@@ -385,7 +414,7 @@ cd ~/apps/mou-welfare-v2/apps/api
   ```
 
   工作帶 `force: true`，內容沒變也會用 LLM 重做；規則模式下 `force` 無效，不會用規則覆蓋 LLM 的結果。重做前先跑 §8.3.1 的回測。
-- **第一次全量**不需要這支腳本：把 `api.env` 的 `LLM_DRIVER=rules` 拿掉並重啟，backfill 會把規則版的福利全部排入（2026-11-23 估約 4.3 美元、45 分鐘）。
+- **第一次全量**不需要這支腳本：把 `api.env` 的 `LLM_DRIVER=rules` 拿掉並重啟，backfill 會把規則版的福利全部排入（每次最多 1,000 筆，其餘在恢復或下次重啟時補排）。2026-11-23 就是這樣完成的：實際約 3.52 美元、37 分鐘（預估 4.3 美元）。
 - 爬蟲的 hash 會去掉「下載 N 次」這類計數器，避免每次爬取都重做（docs/scraper.md §6.4）。
 - 最後一道限制是 AI Studio 的用量上限（目前每月新台幣 300 元）。
 
@@ -394,7 +423,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 - 註冊後寄出驗證信，**未驗證不能登入**；點擊連結後自動登入（Better Auth `emailVerification`）。
 - 重設密碼信 1 小時內有效；重設後登出所有既有 session。對不存在的 email 回應完全相同、但不寄信（R14）。
 - 信件為繁體中文 HTML 加純文字版本，使用者名稱一律跳脫（`apps/api/src/lib/mail/templates.ts`）。
-- 寄件人：Resend 網域驗證前使用 `onboarding@resend.dev`，此時**只能寄給 Resend 帳號本人**；正式上線前要在 Resend 驗證 `mou-welfare.com` 並改 `EMAIL_FROM`。
+- 寄件人：`哞福利 <noreply@mou-welfare.com>`（2026-11-22 已在 Resend 驗證網域）。未驗證的環境預設用 `onboarding@resend.dev`，此時**只能寄給 Resend 帳號本人**。系統通知（額度不足暫停與恢復）寄到 `ALERT_EMAIL`。
 - 限流（R15，以 `CF-Connecting-IP` 計算）：登入、註冊每 IP 每分鐘 5 次；重設密碼、重寄驗證信每 IP 每 5 分鐘 3 次。目前存在記憶體（單一程序足夠），改為多程序時要換成資料庫儲存。
 
 ### 8.6 圖片上傳
@@ -411,39 +440,9 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 ---
 
-### 8.7 管理後台
+### 8.8 管理後台
 
-**架構**：獨立的前端專案 `apps/admin`（Nuxt 4 單頁應用、Element Plus、ECharts），`nuxt generate` 產生靜態檔，部署在 Cloudflare Workers 的 `admin.mou-welfare.com`（只有靜態資產，找不到的路徑回 `index.html`）。不做 SSR；`noindex`，`robots.txt` 全部排除。和使用者網站共用 Better Auth 帳號：後台和 API 同在 `mou-welfare.com` 底下，session cookie 照常送出；`admin.mou-welfare.com` 已加入 `TRUSTED_ORIGINS`。API 位址在建置時以 `NUXT_PUBLIC_API_BASE` 寫入（CI 的 `admin` 工作）。
-
-**權限**：
-
-- API 的存取等級 `admin`（`access.ts`）：需登入、Email 已驗證、`user.role = 'admin'`，否則 401／403。前端的 middleware 只負責導向，真正的檢查在 API。
-- 管理者只能在主機上指定，API 不提供修改角色的功能（`PATCH /v1/me` 不接受 `role`，有測試）：
-
-  ```bash
-  cd ~/apps/mou-welfare-v2/apps/api
-  ./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/set-role.ts <email> admin   # 取消：最後一個參數改 user
-  ```
-
-**功能與端點**（`/v1/admin/*`，`features/admin`）：
-
-| 頁面 | 端點 | 內容 |
-|---|---|---|
-| 總覽 | `GET /v1/admin/overview` | 各縣市福利數量（可搜尋／非福利／已截止／待處理與非福利比例）、結構化狀態與版本、LLM 近 30 天每日 token 與費用、額度暫停狀態、使用者與收藏、家庭數、爬蟲各站最後看到的時間 |
-| 福利 | `GET /v1/admin/welfare`、`GET/PATCH /v1/admin/welfare/:id`、`POST /v1/admin/welfare/:id/restructure` | 依縣市、狀態、結構化方式、是否檢核、是否有錯誤篩選；詳情左右對照結構化結果與原文（含附件文字、開放資料欄位）、這筆的 LLM 呼叫與修改紀錄；判為福利／非福利（判定後自動跳下一筆）、備註、置頂、單筆重新結構化 |
-| LLM 用量 | `GET /v1/admin/llm-usage` | `llm_calls` 依日期／用途／模型彙總、錯誤、花費最多的福利（§8.3.2） |
-| 使用者 | `GET /v1/admin/users`、`GET /v1/admin/users/:id` | 唯讀。列表只有名稱、Email、驗證、登入方式、角色、註冊時間；詳情才有生日、性別、縣市、身分、家庭、收藏數、有效登入，**每次查看都寫入稽核紀錄** |
-| 稽核紀錄 | `GET /v1/admin/audit` | `admin_audit`：查看使用者詳情（`user.view`）、修改福利（`welfare.update`，含修改前的值）、重新結構化（`welfare.restructure`），記錄管理者、時間、IP |
-
-**人工判定**（`welfare_programs.status_override`）：
-
-- 判為福利（`active`）或非福利（`rejected`）後立即生效，之後內容更新或 LLM 重做都不會改變狀態；判為福利但已過截止日仍會變成 `expired`。
-- 判為福利而這筆沒有 embedding（之前被判為非福利）時，自動排入一次重新結構化補上 embedding；取消人工判定也會重新結構化，交給 LLM 判斷。每次約 0.0024 美元。
-- 同時記下 `reviewed_by`、`reviewed_at`、`review_note`。人工判定的結果之後可以補進 §8.3.1 的評測集。
-
-**目前狀態**：2026-11-23 上線 https://admin.mou-welfare.com，管理者為 cherites0610@gmail.com。
-
-**本機開發**：`pnpm dev:admin`（http://localhost:3001），API 的 `.env` 的 `TRUSTED_ORIGINS` 要加上 `http://localhost:3001`；用 `scripts/set-role.ts` 把本機帳號設為管理者。
+獨立的前端 `apps/admin`（`admin.mou-welfare.com`）加上 API `/v1/admin/*`：總覽、福利檢核（人工判定不被結構化覆蓋）、LLM 用量、使用者（唯讀，查看詳情寫入稽核紀錄）、稽核紀錄。架構、權限、操作與部署都寫在 **[admin.md](admin.md)**。
 
 ## 9. 資料庫基礎設施（已完成）
 
@@ -478,7 +477,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
 | 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
 | HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
-| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（Gemini 額度不足暫停時寄信，§8.4.1；已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定，但目前 `LLM_DRIVER=rules`，見下方「目前狀態」）。完整定義見 `apps/api/src/env.ts` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（Gemini 額度不足暫停時寄信，§8.4.1；已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定；2026-11-23 起已移除 `LLM_DRIVER=rules`，用 Gemini 結構化）；`TRUSTED_ORIGINS=https://mou-welfare.com,https://v2.mou-welfare.com,https://admin.mou-welfare.com`（CORS 與 Better Auth 共用）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
 | 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。GitHub Actions（`deploy.yml`）在 CI 通過後透過 SSH 傳入 commit SHA 觸發：authorized_keys 以 `command="…/deploy-api.sh --from-ssh"` 限定這把金鑰只能執行部署，`--from-ssh` 模式只接受完整的 40 碼 SHA（其他內容、包括空白一律拒絕）。設定見 `docs/deploy-setup.md` |
@@ -490,14 +489,15 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration，另有 `0006_llm_pause`（Gemini 額度不足的暫停狀態）、`0007_llm_calls`（LLM 用量紀錄）、`0008_admin`（福利人工判定欄位、`admin_audit`）（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 9 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
-| 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）與前端（Workers），再做正式環境煙霧測試；最近一次（`6a7ec4b`，2026-11-23）API 已套用新 migration、前端新頁面皆回 200 |
+| 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）、前端與管理後台（Workers），再做正式環境煙霧測試（API `/health`、前台 `/login`、後台 `/login`）；最近一次成功為 `68b79fd`（2026-11-23） |
 | 範例資料 | 前端開發用 7 筆範例福利（`apps/api/scripts/seed-mock-welfare.ts`）：欄位照 LLM 結構化格式手寫，名稱加「【範例】」、`program_key` 以 `mock:` 開頭、全部置頂。寫入：`pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts`；刪除加 `--remove`。2026-11-23 曾寫入正式資料庫供檢視前端，**同日已刪除**（`removed 7 mock programs`）；之後只在本機開發資料庫使用 |
 | 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,471 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,008 筆），見 `docs/scraper.md` §10.3 |
-| 結構化 | ✅ 2026-11-23 全部 1,471 筆以 Gemini（`gemini-3.5-flash-lite`、prompt `3ff526b52226`）完成結構化與 embedding：active 985、rejected 455、expired 31。共 1,476 次結構化呼叫（3 次 schema 重試、2 筆因重試做了兩次）、輸入 8.04M／輸出 0.44M tokens、約 3.52 美元，實際處理約 37 分鐘。中途預付額度用完一次，**自動暫停與恢復皆已在正式環境驗證**（§8.4.1）。被判為非個人福利的比例：屏東縣 63%、新北市 45%、花蓮縣 38%，待人工抽查 |
+| 結構化 | ✅ 2026-11-23 全部 1,471 筆以 Gemini（`gemini-3.5-flash-lite`、prompt `3ff526b52226`）完成結構化與 embedding：active 985、rejected 455、expired 31。共 1,476 次結構化呼叫（3 次 schema 重試、2 筆因重試做了兩次）、輸入 8.04M／輸出 0.44M tokens、約 3.52 美元，實際處理約 37 分鐘。中途預付額度用完一次，**自動暫停與恢復皆已在正式環境驗證**（§8.4.1）。被判為非個人福利的比例：屏東縣 63%、新北市 45%、花蓮縣 38%，待在管理後台人工檢核（[admin.md](admin.md) §4.3） |
+| 管理後台 | ✅ 2026-11-23 上線 `admin.mou-welfare.com`，管理者 cherites0610@gmail.com（[admin.md](admin.md)） |
 | 爬蟲排程 | ⏸ 還沒有排程；目前在主機上手動執行（`~/.config/mou-welfare/scraper.env` 提供 `API_BASE`、`INGEST_HMAC_KEY`），見 `docs/scraper.md` §10.2 |
 
 **事故紀錄**
@@ -513,6 +513,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 呼叫 API | 環境變數 `NUXT_PUBLIC_API_BASE`（目前為 `https://api-v2.mou-welfare.com`）。瀏覽器以 `credentials: 'include'` 呼叫，API 以 CORS 只允許 `TRUSTED_ORIGINS` 帶 cookie。session cookie 屬於 API 網域，所以登入相關與個人頁面設為只在瀏覽器渲染（`routeRules` 的 `ssr: false`）；公開頁面（福利列表、詳情）維持 SSR |
 | 網域 | 過渡期為 `v2.mou-welfare.com`（Workers 自訂網域）；正式切換時改為 `mou-welfare.com`（目前仍由 Caddy 提供 v1） |
 | 目前狀態 | ✅ 2026-11-19 部署，2026-11-22 起由 GitHub Actions 自動部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 已加入 `https://v2.mou-welfare.com` |
+| 管理後台 | `apps/admin`，Worker `mou-welfare-admin`，網域 `admin.mou-welfare.com`；部署方式見 [admin.md](admin.md) §8 |
 | 已完成頁面 | 登入註冊流程；2026-11-23 依 v1 介面完成：福利列表 `/welfares`（搜尋、地區／服務／家庭篩選、自動篩選、進階篩選、無限捲動；第一頁 SSR）、福利詳情 `/welfares/:id`（資格分析、AI 摘要、申請條件、補助內容、附件、原文；SSR 含 JSON-LD；網址加 `?review=1` 顯示資料檢核）、個人設定 `/profile`（家庭管理、邀請 QR Code、帳號管理）、編輯個人資料 `/profile/edit`、收藏 `/favorites`、常見問題 `/question`（SSR，含 FAQPage JSON-LD）、服務條款 `/terms`、隱私權政策 `/private` |
 
 ### 10.3 從 v1 切換到 v2
@@ -531,9 +532,9 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 注意 | v1 的 `.env` 設定了 `DB_SYNC=true`，**不要在 v1 上部署其他版本**，否則 TypeORM 會自動修改資料表結構 |
 | ⚠️ 2026-11-23 | v1 API 連不到資料庫：`getaddrinfo ENOTFOUND postgres.cherites.org`（主機上也查不到這個網域），所有讀資料庫的 API 回 500。v2 透過 localhost 連線不受影響。待確認 DNS 紀錄（見第 11 節） |
 
-**預估月費**：前端用 Cloudflare Workers（先用免費方案，SSR 若超出 CPU 限制再升級 Paid，每月 5 美元）；R2 在免費額度內；主機為現有資源；Gemini 依用量計費（預付制，額度用完會回 402，結構化工作會重試 3 次後停在 failed，資料維持規則版或舊版結果）。
+**預估月費**：前端與管理後台用 Cloudflare Workers（先用免費方案，SSR 若超出 CPU 限制再升級 Paid，每月 5 美元）；R2 在免費額度內；主機為現有資源；Gemini 依用量計費（預付制；額度用完時結構化自動暫停，儲值後自動恢復，§8.4.1；AI Studio 用量上限每月新台幣 300 元）。
 
-**Gemini 用量估算**（2026-11-23 以正式資料 30 筆實測）：每筆福利結構化一次（輸入上限 16,000 字，含附件文字；中文約 0.84 token／字，平均約 6,200 tokens）加一次 embedding。`gemini-3.5-flash-lite`（$0.30／$2.50 每百萬 tokens，不思考；目前預設，依回測選定）每筆約 1.3 秒、0.0024 美元（加上 identityChecks 後輸出略增），目前 1,471 筆全量約 3.5–4 美元、40 分鐘；`gemini-3.8-flash` 約 10 美元、每筆 5–11 秒。embedding 全量約 0.07 美元。之後只有爬蟲判定內容變動的才會重做，日常每天個位數到數十筆，每月不到 1–2 美元。換模型或改 prompt 時才需要全量重做。注意：`gemini-2.5-flash` 已停用，2026-12-01 起自動改送 `gemini-3.5-flash-lite`；`gemini-2.5-flash-lite` 不開放給新用戶。
+**Gemini 用量估算**（2026-11-23 以正式資料 30 筆實測；同日全量 1,471 筆實際花費約 3.52 美元）：每筆福利結構化一次（輸入上限 16,000 字，含附件文字；中文約 0.84 token／字，平均約 6,200 tokens）加一次 embedding。`gemini-3.5-flash-lite`（$0.30／$2.50 每百萬 tokens，不思考；目前預設，依回測選定）每筆約 1.3 秒、0.0024 美元（加上 identityChecks 後輸出略增），目前 1,471 筆全量約 3.5–4 美元、40 分鐘；`gemini-3.8-flash` 約 10 美元、每筆 5–11 秒。embedding 全量約 0.07 美元。之後只有爬蟲判定內容變動的才會重做，日常每天個位數到數十筆，每月不到 1–2 美元。換模型或改 prompt 時才需要全量重做。注意：`gemini-2.5-flash` 已停用，2026-12-01 起自動改送 `gemini-3.5-flash-lite`；`gemini-2.5-flash-lite` 不開放給新用戶。
 
 ---
 
@@ -554,7 +555,8 @@ cd ~/apps/mou-welfare-v2/apps/api
 - [x] ~~確認騰訊雲安全群組對 5432 port 的規則~~（已確認沒問題）
 - [x] ~~GitHub Actions 自動部署的 SSH 金鑰與 5 個 secrets~~：2026-11-22 完成。
 - [ ] **v1 資料庫連線**：2026-11-23 發現 `postgres.cherites.org` 無法解析，v1 API 讀資料庫全部失敗（見 §10.4）。確認 DNS 紀錄是否被刪除或過期。
-- [ ] **Gemini 儲值**：預付額度已用完（2026-11-22），儲值後把 `api.env` 的 `LLM_DRIVER=rules` 刪除並重啟 API。建議在 AI Studio 設定用量上限與通知。
+- [x] ~~Gemini 儲值~~：2026-11-23 完成，已移除 `LLM_DRIVER=rules`，全量結構化完成；AI Studio 用量上限設為每月新台幣 300 元。
+- [ ] **人工檢核被判為非福利的 455 筆**：在管理後台依縣市檢核（[admin.md](admin.md) §4.3），屏東縣 191 筆最多。
 
 **之後再決定**
 - [ ] `pg_hba.conf` 加入規則，限制 `mou_welfare` 只能連自己的資料庫。
@@ -562,7 +564,8 @@ cd ~/apps/mou-welfare-v2/apps/api
 - [ ] pgvector 要不要升級：改用 PostgreSQL 官方的 PGDG 套件庫，可以裝到較新的版本（目前 0.6.0 已夠用）。
 - [ ] 從 v1 資料庫 `mou-welfare` 搬資料（使用者、家庭、收藏）的範圍和方式。
 - [ ] v1 前端的 `VITE_LIFF_ID`（知道的話可以重新 build v1，讓 LINE 內自動登入恢復）。
-- [ ] 外部監控：定時檢查 `/health`，並在結構化工作持續失敗（`structure_error` 增加）時通知。
+- [ ] 外部監控：定時檢查 `/health`，並在結構化工作持續失敗（`structure_error` 增加）時通知。（Gemini 額度不足已會寄信到 `ALERT_EMAIL`，§8.4.1）
+- [ ] 爬蟲排程：目前手動執行（`docs/scraper.md` §10）。
 - [ ] 清理 pg-boss 舊工作：`completed` 預設保留 7 天，目前不需要處理；若改為長期保留，要加上 `cleanup` cron。
 
 **P0 原型必須驗證**
@@ -578,10 +581,11 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 階段 | 內容 | 完成標準 |
 |---|---|---|
 | **P0 骨架與驗證** | monorepo（pnpm）、`packages/shared`、API（Hono + Drizzle + Better Auth + pg-boss）部署到 `api-v2.mou-welfare.com`、Nuxt 骨架部署到 Workers | 第 11 節四項驗證全部通過 |
-| **P1 核心 API** | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出（2026-11-22 除管理端 `/v1/admin/*` 外已完成） |
-| **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（2026-11-22 正式環境 4 縣市 463 筆；Gemini 結構化待儲值後補做） |
+| **P1 核心 API** ✅ | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware、管理端 | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出（2026-11-23 管理端 `/v1/admin/*` 也完成） |
+| **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（正式環境 12 縣市 1,471 筆；2026-11-23 以 Gemini 全量結構化完成，可搜尋 985 筆） |
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天未開始 |
 | **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | — |
+| **管理後台** ✅ | 總覽、福利檢核、LLM 用量、使用者（唯讀）、稽核紀錄 | 2026-11-23 上線 `admin.mou-welfare.com`（[admin.md](admin.md)） |
 | **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天頁、LINE 分享待 P3 / P4） |
 
 ---

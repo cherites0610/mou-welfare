@@ -1,4 +1,4 @@
-// 管理端（docs/backend.md §8.7）：總覽統計、福利人工修正、LLM 用量、使用者（唯讀）、稽核紀錄。
+// 管理端（docs/admin.md）：總覽統計、福利人工修正、LLM 用量、使用者（唯讀）、稽核紀錄。
 // 查看使用者詳情、修改福利、重新結構化都會寫入 admin_audit。
 import { and, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '../../db/client.ts'

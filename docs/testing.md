@@ -1,8 +1,8 @@
 # 測試規範（v2）
 
-> 狀態：規範定案；CI 與自動部署已運作（API 測試 176 個、爬蟲測試 109 個）
+> 狀態：規範定案；CI 與自動部署已運作（API 測試 196 個、爬蟲測試 110 個；2026-11-23）
 > 最後更新：2026-11-23
-> 適用範圍：`apps/api`、`apps/web`、`packages/shared`、`services/scraper`
+> 適用範圍：`apps/api`、`apps/web`、`apps/admin`、`packages/shared`、`services/scraper`
 > 相關文件：[後端設計](backend.md)、[爬蟲設計](scraper.md)
 
 ---
@@ -81,6 +81,8 @@ const matrix = [
 ]
 ```
 
+**管理端**（`tests/admin.test.ts`）：所有 `/v1/admin/*` 未登入 401、一般使用者 403、Email 未驗證的管理者 403、管理者 200；另測使用者不能用 `PATCH /v1/me` 把自己改成管理者（400，資料庫不變）。
+
 **另外要有一個「路由普查」測試**：列出 app 註冊的所有路由，逐一確認每個路由**要嘛在公開清單裡，要嘛在權限矩陣裡**。新增路由卻沒有登記，這個測試就會失敗。v1 的「忘了加 Guard」就是靠這個測試擋下來。
 
 ### 4.3 必須存在的回歸測試（來自 v1 的 bug）
@@ -110,7 +112,12 @@ const matrix = [
 - **pg-boss 工作**：處理函式可以單獨呼叫測試；另外要有一個整合測試，走完「排入佇列 → 背景工作處理 → 資料庫更新」整個流程。也要測**失敗重試**，以及**同一個工作重複執行時結果不變**（冪等）。
 - **LLM**：用 `FakeLLM` 實作 `lib/llm` 介面，依照輸入回傳預先錄好的結果。要測三種情況：回傳格式不符 schema（應重試一次後失敗）、逾時、成功。
   - Gemini 實作（`gemini.ts`）以 `vi.mock('@google/genai')` 模擬 SDK 測試：結構化輸出的重試、錯誤分類、embedding 維度與正規化（`tests/gemini.test.ts`）。
-  - 結構化工作另外測：內容沒變不重做、不是個人福利 → `rejected`、截止日已過 → `expired`、結構化期間內容被更新時不覆蓋、改回規則時不覆蓋 LLM 結果、backfill 不重複排入。
+  - 結構化工作另外測：內容沒變不重做、不是個人福利 → `rejected`、截止日已過 → `expired`、結構化期間內容被更新時不覆蓋、改回規則時不覆蓋 LLM 結果、backfill 不重複排入、`force` 重做（規則模式下無效）、人工判定（`status_override`）不被覆蓋且判為福利時仍產生 embedding（`tests/ingest.test.ts`、`tests/admin.test.ts`）。
+  - 身分判斷：`sanitizeIdentities`（兩個年齡層或兩個性別整類拿掉）、`hasEvidence`（依據句子要有關鍵字）。
+  - 用量紀錄：每次呼叫寫入 `llm_calls`（用途、福利、模型、prompt 版本、token、費用），失敗的呼叫也記錄；結構化結果記下 `structured_model`、`structured_prompt_version`。
+  - 額度不足（`tests/jobs.test.ts`）：402／429 歸類為 `quota`；結構化遇到 402 → 暫停並寄一次通知、`/health` 顯示暫停但 `status` 仍為 ok、探測失敗時維持暫停且不重複寄信、恢復後寄恢復通知；重啟時已在暫停 → 立刻探測並恢復。
+- **管理端**（`tests/admin.test.ts`）：人工判定立即生效並寫入稽核紀錄；已過截止日的判為福利仍為 `expired`；取消判定會排入重新結構化；列表篩選；使用者列表不含生日與身分、查看詳情寫入 `user.view`；總覽與用量的統計。
+- **結構化回測**（不在 CI，會呼叫真實的 Gemini）：`pnpm --filter @mou-welfare/api eval:structure`，98 筆評測集與門檻見 `docs/backend.md` §8.3.1。改 prompt、換模型、改 schema 或 `buildInput` 時必須跑，結果附在 PR。
 - **環境變數**：缺少必要的變數時，應用程式拒絕啟動，並在錯誤訊息裡列出缺少的變數名稱。
 
 ---
@@ -167,6 +174,14 @@ const matrix = [
 - 登入、註冊等頁面有 `noindex`
 
 另外要驗證 `sitemap.xml` 包含所有 `active` 狀態的福利，而且不包含已下架的福利。
+
+---
+
+### 7.4 管理後台（`apps/admin`）
+
+- 目前只有型別檢查（`pnpm --filter @mou-welfare/admin typecheck`，CI 的 `pnpm typecheck` 會一起跑）。權限與資料的正確性由 API 的 `tests/admin.test.ts` 保證。
+- 2026-11-23 以本機 dev 環境手動跑過（Playwright 臨時腳本，未進版控）：登入、總覽、篩選非福利、判定後跳下一筆、修改紀錄、LLM 用量、使用者詳情（含稽核提示）、稽核紀錄，沒有 console 錯誤。
+- 待辦：把「登入 → 判定一筆 → 稽核紀錄出現」寫成正式的 E2E 腳本。
 
 ---
 
@@ -230,6 +245,9 @@ API 執行 `pm2 reload` 之後：
 1. `GET /health` 回傳 200，而且回應內容包含資料庫連線狀態和目前的 migration 版本。
 2. 用一個公開端點實際查詢資料庫，例如 `GET /v1/faq`。
 3. 背景工作在 30 秒內回報心跳（`/health` 的 `jobs.lastBeatSecondsAgo`；`WORKER_MODE=separate` 時檢查獨立的 worker 程序）。
+4. GitHub Actions 部署後另外檢查：`api-v2.mou-welfare.com/health` 為 ok、`v2.mou-welfare.com/login` 與 `admin.mou-welfare.com/login`（跟隨轉址）回 200。
+
+LLM 額度暫停（`/health` 的 `llm.paused`）**不算**部署失敗。
 
 任何一項失敗，就切回上一個版本，並發出通知。
 
@@ -240,7 +258,7 @@ API 執行 `pm2 reload` 之後：
 - [x] ~~在主機的 Postgres 建立 `mou_welfare_test`~~（2026-11-18 完成：擁有者為 `mou_welfare`，已啟用 `vector 0.6.0`、`pg_trgm 1.6`、`pgcrypto 1.3`；帳密已加入 `~/.pgpass`）
 - [x] ~~主機安裝 `uv`~~（2026-11-18 完成：`uv 0.13.9`，安裝在 `~/.local/bin`，並在 `~/.zshenv` 加入 PATH；已實測 `uv run pytest`）
 - [x] ~~建立 `.github/workflows/ci.yml`（PR）~~（P0 骨架已加入：typecheck、單元、契約、API 整合（pgvector 容器）、爬蟲 ruff / mypy / pytest、build）
-- [x] ~~`deploy.yml`~~：CI 通過後自動部署 API（SSH forced command）與前端（Workers），並做正式環境煙霧測試；secrets 設定見 `docs/deploy-setup.md`
+- [x] ~~`deploy.yml`~~：CI 通過後自動部署 API（SSH forced command）、前端與管理後台（Workers），並做正式環境煙霧測試；secrets 設定見 `docs/deploy-setup.md`
 - [ ] `nightly.yml`（E2E 需要 staging 環境與測試信箱後再加）
 - [ ] GitHub 上 `main` 分支的保護規則。
 - [ ] 建立 staging 用的 LINE 和 Google OAuth 測試應用程式。

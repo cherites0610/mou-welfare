@@ -1,4 +1,4 @@
-// 設定使用者角色（docs/backend.md §8.7）。管理者只能在主機上用這支腳本指定，API 不提供修改角色的功能。
+// 設定使用者角色（docs/admin.md）。管理者只能在主機上用這支腳本指定，API 不提供修改角色的功能。
 // 用法：tsx --env-file=<env> scripts/set-role.ts <email> <admin|user>
 import { eq } from 'drizzle-orm'
 import { createDb } from '../src/db/client.ts'

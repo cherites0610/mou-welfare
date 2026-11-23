@@ -125,7 +125,7 @@ jobs:
       - if: steps.cfg.outputs.enabled == 'true'
         run: pnpm --filter @mou-welfare/admin build
         env:
-          # 純前端：API 位址在建置時寫入（docs/backend.md §8.7）
+          # 純前端：API 位址在建置時寫入（docs/admin.md）
           NUXT_PUBLIC_API_BASE: https://api-v2.mou-welfare.com
           NUXT_PUBLIC_WEB_BASE: https://v2.mou-welfare.com
       - if: steps.cfg.outputs.enabled == 'true'

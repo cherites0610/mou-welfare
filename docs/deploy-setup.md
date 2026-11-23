@@ -1,6 +1,6 @@
 # 自動部署設定（GitHub Actions）
 
-> 2026-11-22 已全部設定完成：部署金鑰在 `~/.ssh/mou-welfare-deploy`（authorized_keys 限定 `deploy-api.sh --from-ssh`），5 個 secrets 已透過 GitHub API 寫入。以下保留作為重建時的參考。
+> 2026-11-22 已全部設定完成：部署金鑰在 `~/.ssh/mou-welfare-deploy`（authorized_keys 限定 `deploy-api.sh --from-ssh`），5 個 secrets 已透過 GitHub API 寫入。2026-11-23 加入管理後台（`admin` job），沿用同一組 Cloudflare secrets，不需新增。以下保留作為重建時的參考。
 
 `.github/workflows/deploy.yml`：`main` 的 CI 通過後，部署**通過 CI 的那個 commit**；也可在 Actions 頁面手動執行。
 未設定 secrets 的 job 會顯示提示並略過，不會失敗。
@@ -27,12 +27,25 @@ Repo → Settings → Secrets and variables → Actions → New repository secre
 | `DEPLOY_SSH_KEY` | `~/.ssh/mou-welfare-deploy`（私鑰）的完整內容 |
 | `DEPLOY_HOST` | `cherites@43.130.226.136` |
 | `DEPLOY_KNOWN_HOSTS` | 在主機執行 `ssh-keyscan -t ed25519 43.130.226.136` 的輸出 |
-| `CLOUDFLARE_API_TOKEN` | 新建的 Cloudflare token：範本「Edit Cloudflare Workers」，帳號限定本帳號、Zone 限定 `mou-welfare.com` |
+| `CLOUDFLARE_API_TOKEN` | 新建的 Cloudflare token：範本「Edit Cloudflare Workers」，帳號限定本帳號、Zone 限定 `mou-welfare.com`。前台（`mou-welfare-web`）與管理後台（`mou-welfare-admin`，自訂網域 `admin.mou-welfare.com`）共用 |
 | `CLOUDFLARE_ACCOUNT_ID` | `86f177fc5eb1bc6dff97f020c91c98fb` |
 
 > 不要把 telegram-bot 專案的 token 放進 GitHub；前端部署請用專用 token。
 
 ## 3. 驗證
 
-Actions → deploy → Run workflow。`api`、`web` 兩個 job 都應該實際執行（不再顯示「略過」），
-`smoke` 會檢查 `https://api-v2.mou-welfare.com/health` 與 `https://v2.mou-welfare.com/login`。
+Actions → deploy → Run workflow。`api`、`web`、`admin` 三個 job 都應該實際執行（不再顯示「略過」），
+`smoke` 會檢查 `https://api-v2.mou-welfare.com/health`、`https://v2.mou-welfare.com/login`
+與 `https://admin.mou-welfare.com/login`（後台是靜態檔，`/login` 會 307 轉到 `/login/`，所以用 `curl -L`）。
+
+## 4. 各 job 的內容
+
+| job | 內容 |
+|---|---|
+| `resolve` | 取得通過 CI 的 commit SHA（手動執行時用目前的 commit） |
+| `api` | SSH 到主機，以 forced command 執行 `ops/deploy-api.sh <sha>`：拉取、安裝、build、migration、`pm2 reload`、煙霧測試，失敗自動退回 |
+| `web` | `pnpm --filter @mou-welfare/web build` → `wrangler deploy`（`apps/web/wrangler.jsonc`） |
+| `admin` | 以 `NUXT_PUBLIC_API_BASE`、`NUXT_PUBLIC_WEB_BASE` 建置 `@mou-welfare/admin`（`nuxt generate`）→ `wrangler deploy`（`apps/admin/wrangler.jsonc`，詳見 `docs/admin.md` §8） |
+| `smoke` | 上述三者完成後檢查正式環境 |
+
+注意：CI 剛開始時會觸發一次 `deploy`，因為 CI 還沒成功而被略過（`skipped`）；真正的部署在 CI 成功後才執行。

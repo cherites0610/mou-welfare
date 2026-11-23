@@ -1,6 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 
-// 管理後台（docs/backend.md §8.7）：純前端單頁應用，靜態檔部署在 Cloudflare Workers（admin.mou-welfare.com）。
+// 管理後台（docs/admin.md）：純前端單頁應用，靜態檔部署在 Cloudflare Workers（admin.mou-welfare.com）。
 // 不做 SSR：所有資料都需要管理者 session，且 cookie 在 API 網域。
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',
