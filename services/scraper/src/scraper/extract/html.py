@@ -148,6 +148,20 @@ def _trafilatura(html: str, url: str) -> str:
     return md or ""
 
 
+# 計數器的標籤只給螢幕閱讀器（sr-only），抽取後只剩「4279人」，normalize._VOLATILE_RE 認不出來（彰化）
+_COUNTER_LABEL = re.compile(r"^\s*(?:瀏覽|點閱|觀看|閱覽|下載)\s*(?:人數|人次|次數|數)\s*[:：]?\s*$")
+
+
+def _drop_counters(doc: LexborHTMLParser) -> int:
+    """移除瀏覽／點閱計數器（含隱藏標籤的那個元素整個拿掉），否則每次爬取 hash 都不同、後端每次重做結構化。"""
+    dropped = 0
+    for label in doc.css(".sr-only, .visually-hidden"):
+        if _COUNTER_LABEL.match(label.text() or ""):
+            (label.parent or label).decompose()
+            dropped += 1
+    return dropped
+
+
 def extract_html(
     html: str, url: str, *, hint: str | None = None, body: str | None = None, content: str | None = None
 ) -> Extracted:
@@ -156,6 +170,8 @@ def extract_html(
     # 正文區塊裡的 <script> 會被當成文字（臺北：點閱數的 $.ajax 出現在正文）
     for node in doc.css("script, style, noscript"):
         node.decompose()
+    # 有移除計數器時，整頁抽取也要用移除後的內容；沒有時沿用原始 HTML，其他站的抽取結果（與 hash）不變
+    page = doc.html or html if _drop_counters(doc) else html
     text = ""
     region_nodes = doc.css(content) if content else []
     if region_nodes:
@@ -165,7 +181,7 @@ def extract_html(
         region = "".join(n.html or "" for n in region_nodes)
         text = clean_markdown(_trafilatura(f"<html><body><article>{region}</article></body></html>", url))
     else:
-        text = clean_markdown(_trafilatura(html, url))
+        text = clean_markdown(_trafilatura(page, url))
     # 正文區塊是空的時，trafilatura 會退回整頁文字（選單、頁尾），這種結果不能用
     if navigation_ratio(doc, text) > MAX_NAVIGATION_RATIO:
         text = ""

@@ -191,3 +191,24 @@ def test_正文區塊空白時不退回整頁() -> None:
     nav = "".join(f'<li><a href="/List_sp/{i}">選單項目{i}</a></li>' for i in range(40))
     html = f'<html><body><ul>{nav}</ul><p>{"頁尾說明文字。" * 30}</p><div class="edit_box"></div></body></html>'
     assert extract_html(html, "https://sa.hl.gov.tw/Detail_sp/x", content="div.edit_box").content_md == ""
+
+
+def test_計數器標籤只給螢幕閱讀器時_整個移除() -> None:
+    # 彰化：<div class="views"><span class="sr-only">瀏覽人數：</span>4273人</div>，抽取後只剩「4273人」，
+    # 每次爬取 hash 都不同（2026-11-23 兩次執行間隔 45 分鐘，33 頁有 23 頁被當成更新）
+    def page(views: int) -> str:
+        return (
+            '<html><body><div class="con"><h3>育兒津貼</h3>'
+            '<div class="post-date">承辦單位 兒童及少年福利科</div>'
+            f'<div class="views"><i class="fa fa-eye"></i><span class="sr-only">瀏覽人數：</span>{views}人</div>'
+            "<p>補助對象：實際年齡未滿2歲的我國籍兒童，每月補助5,000元，名額 50人，請向戶籍地公所申請。</p>"
+            "<p>應備文件：申請表、戶口名簿影本、申請人存摺封面影本，以及其他經公所認定需要的證明文件。</p>"
+            "</div></body></html>"
+        )
+
+    # 彰化沒有設定正文區塊（整頁抽取）
+    a = extract_html(page(4273), "https://www.chcg.gov.tw/x")
+    b = extract_html(page(4274), "https://www.chcg.gov.tw/x")
+    assert a.content_md == b.content_md
+    assert "4273" not in a.content_md
+    assert "名額 50人" in a.content_md
