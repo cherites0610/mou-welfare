@@ -152,6 +152,7 @@ jobs:
           echo "web ok ($code)"
       - name: admin /login
         run: |
-          code=$(curl -s -m 15 -o /dev/null -w '%{http_code}' https://admin.mou-welfare.com/login)
+          # 靜態資產會把 /login 轉到 /login/（307），跟隨轉址
+          code=$(curl -sL -m 15 -o /dev/null -w '%{http_code}' https://admin.mou-welfare.com/login)
           [ "$code" = "200" ] || { echo "::error::admin.mou-welfare.com/login returned $code"; exit 1; }
           echo "admin ok ($code)"
