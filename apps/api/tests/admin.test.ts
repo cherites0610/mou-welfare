@@ -1,4 +1,4 @@
-// 管理端（docs/backend.md §8.6）：權限、人工覆寫不被結構化蓋掉、稽核紀錄、統計。
+// 管理端（docs/backend.md §8.7）：權限、人工覆寫不被結構化蓋掉、稽核紀錄、統計。
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { adminAudit, llmCalls, user, welfarePrograms } from '../src/db/schema/index.ts'

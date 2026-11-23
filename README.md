@@ -17,6 +17,7 @@
 ```
 apps/api           Hono API（Node，pm2 部署在自有主機）
 apps/web           Nuxt 前端（部署在 Cloudflare Workers）
+apps/admin         管理後台（Nuxt 單頁應用，admin.mou-welfare.com；docs/backend.md §8.7）
 packages/shared    前後端共用：Zod schema、身分與類別白名單、年齡計算
 services/scraper   Python 爬蟲（uv）
 ```
@@ -34,6 +35,7 @@ pnpm dev:api
 
 # 前端（指向本機 API）
 NUXT_PUBLIC_API_BASE=http://localhost:5031 pnpm dev:web
+pnpm dev:admin   # 後台 http://localhost:3001（API 的 TRUSTED_ORIGINS 要加上這個網址）
 pnpm --filter @mou-welfare/api db:generate   # 修改 schema 後產生 migration
 pnpm --filter @mou-welfare/api openapi       # 修改 API 後更新 openapi.json
 pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts   # 寫入置頂的範例福利（--remove 刪除；只在本機開發資料庫使用）

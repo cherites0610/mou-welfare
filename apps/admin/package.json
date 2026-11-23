@@ -1,0 +1,35 @@
+{
+  "name": "@mou-welfare/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --port 3001",
+    "build": "nuxt generate",
+    "preview": "wrangler dev",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@element-plus/nuxt": "^1.1.5",
+    "@iconify/vue": "^5.0.5",
+    "@mou-welfare/shared": "workspace:*",
+    "@tailwindcss/vite": "^4.3.5",
+    "better-auth": "^1.7.25",
+    "echarts": "^6.1.0",
+    "element-plus": "^2.14.8",
+    "markdown-it": "^15.0.3",
+    "nuxt": "^4.6.4",
+    "tailwindcss": "^4.3.5",
+    "vue": "^3.5.45",
+    "vue-echarts": "^8.3.2",
+    "vue-router": "^5.5.1"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
+    "typescript": "~5.9.3",
+    "vue-tsc": "^3.3.14",
+    "wrangler": "^4.164.0"
+  }
+}

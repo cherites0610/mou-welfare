@@ -1,0 +1,9 @@
+// 管理後台：只有靜態檔（nuxt generate），由 Workers 的 assets 直接提供；找不到的路徑回 index.html（單頁應用）。
+// 部署：pnpm --filter @mou-welfare/admin build && pnpm --filter @mou-welfare/admin run deploy
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mou-welfare-admin",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": ".output/public", "not_found_handling": "single-page-application" },
+  "routes": [{ "pattern": "admin.mou-welfare.com", "custom_domain": true }]
+}

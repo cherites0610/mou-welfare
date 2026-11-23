@@ -70,7 +70,7 @@ export async function structureProgram(
     throw e // 交給 pg-boss 重試
   }
 
-  // 人工判定優先（§8.6）：判為 rejected 就維持 rejected；判為 active 時仍依截止日變 expired
+  // 人工判定優先（§8.7）：判為 rejected 就維持 rejected；判為 active 時仍依截止日變 expired
   const individual = p.statusOverride ? p.statusOverride === 'active' : r.isIndividualWelfare
   const status = !individual ? 'rejected' : r.deadline && r.deadline < today ? 'expired' : 'active'
   // 只在內容沒有再被更新的情況下寫回；被更新的話，新的工作會處理

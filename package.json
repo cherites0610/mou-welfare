@@ -10,7 +10,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "dev:api": "pnpm --filter @mou-welfare/api dev",
-    "dev:web": "pnpm --filter @mou-welfare/web dev"
+    "dev:web": "pnpm --filter @mou-welfare/web dev",
+    "dev:admin": "pnpm --filter @mou-welfare/admin dev"
   },
   "devDependencies": {
     "typescript": "~5.9.3"

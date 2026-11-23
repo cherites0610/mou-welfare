@@ -411,6 +411,38 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 ---
 
+### 8.7 管理後台
+
+**架構**：獨立的前端專案 `apps/admin`（Nuxt 4 單頁應用、Element Plus、ECharts），`nuxt generate` 產生靜態檔，部署在 Cloudflare Workers 的 `admin.mou-welfare.com`（只有靜態資產，找不到的路徑回 `index.html`）。不做 SSR；`noindex`，`robots.txt` 全部排除。和使用者網站共用 Better Auth 帳號：後台和 API 同在 `mou-welfare.com` 底下，session cookie 照常送出；`admin.mou-welfare.com` 已加入 `TRUSTED_ORIGINS`。API 位址在建置時以 `NUXT_PUBLIC_API_BASE` 寫入（CI 的 `admin` 工作）。
+
+**權限**：
+
+- API 的存取等級 `admin`（`access.ts`）：需登入、Email 已驗證、`user.role = 'admin'`，否則 401／403。前端的 middleware 只負責導向，真正的檢查在 API。
+- 管理者只能在主機上指定，API 不提供修改角色的功能（`PATCH /v1/me` 不接受 `role`，有測試）：
+
+  ```bash
+  cd ~/apps/mou-welfare-v2/apps/api
+  ./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/set-role.ts <email> admin   # 取消：最後一個參數改 user
+  ```
+
+**功能與端點**（`/v1/admin/*`，`features/admin`）：
+
+| 頁面 | 端點 | 內容 |
+|---|---|---|
+| 總覽 | `GET /v1/admin/overview` | 各縣市福利數量（可搜尋／非福利／已截止／待處理與非福利比例）、結構化狀態與版本、LLM 近 30 天每日 token 與費用、額度暫停狀態、使用者與收藏、家庭數、爬蟲各站最後看到的時間 |
+| 福利 | `GET /v1/admin/welfare`、`GET/PATCH /v1/admin/welfare/:id`、`POST /v1/admin/welfare/:id/restructure` | 依縣市、狀態、結構化方式、是否檢核、是否有錯誤篩選；詳情左右對照結構化結果與原文（含附件文字、開放資料欄位）、這筆的 LLM 呼叫與修改紀錄；判為福利／非福利（判定後自動跳下一筆）、備註、置頂、單筆重新結構化 |
+| LLM 用量 | `GET /v1/admin/llm-usage` | `llm_calls` 依日期／用途／模型彙總、錯誤、花費最多的福利（§8.3.2） |
+| 使用者 | `GET /v1/admin/users`、`GET /v1/admin/users/:id` | 唯讀。列表只有名稱、Email、驗證、登入方式、角色、註冊時間；詳情才有生日、性別、縣市、身分、家庭、收藏數、有效登入，**每次查看都寫入稽核紀錄** |
+| 稽核紀錄 | `GET /v1/admin/audit` | `admin_audit`：查看使用者詳情（`user.view`）、修改福利（`welfare.update`，含修改前的值）、重新結構化（`welfare.restructure`），記錄管理者、時間、IP |
+
+**人工判定**（`welfare_programs.status_override`）：
+
+- 判為福利（`active`）或非福利（`rejected`）後立即生效，之後內容更新或 LLM 重做都不會改變狀態；判為福利但已過截止日仍會變成 `expired`。
+- 判為福利而這筆沒有 embedding（之前被判為非福利）時，自動排入一次重新結構化補上 embedding；取消人工判定也會重新結構化，交給 LLM 判斷。每次約 0.0024 美元。
+- 同時記下 `reviewed_by`、`reviewed_at`、`review_note`。人工判定的結果之後可以補進 §8.3.1 的評測集。
+
+**本機開發**：`pnpm dev:admin`（http://localhost:3001），API 的 `.env` 的 `TRUSTED_ORIGINS` 要加上 `http://localhost:3001`；用 `scripts/set-role.ts` 把本機帳號設為管理者。
+
 ## 9. 資料庫基礎設施（已完成）
 
 2026-11-18 在 `postgres.cherites.org`（騰訊雲東京，2 vCPU、1.9 GB RAM）完成以下設定：
@@ -456,7 +488,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration，待部署 `0006_llm_pause`（Gemini 額度不足的暫停狀態）、`0007_llm_calls`（LLM 用量紀錄與福利的 `structured_model`、`structured_prompt_version`）（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration，另有 `0006_llm_pause`（Gemini 額度不足的暫停狀態）、`0007_llm_calls`（LLM 用量紀錄）、待部署 `0008_admin`（福利人工判定欄位、`admin_audit`）（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |

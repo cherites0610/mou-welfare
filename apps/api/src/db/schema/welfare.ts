@@ -45,7 +45,7 @@ export const welfarePrograms = pgTable(
     structuredModel: text('structured_model'),
     structuredPromptVersion: text('structured_prompt_version'),
     /**
-     * 管理者的人工判定（docs/backend.md §8.6）：有值時結構化不改變狀態（active 但已過截止日仍會變 expired），
+     * 管理者的人工判定（docs/backend.md §8.7）：有值時結構化不改變狀態（active 但已過截止日仍會變 expired），
      * 讓 LLM 重做或內容更新時不會把人工修正蓋掉。
      */
     statusOverride: text('status_override', { enum: ['active', 'rejected'] }),

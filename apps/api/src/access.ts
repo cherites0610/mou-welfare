@@ -9,7 +9,7 @@ export type Access =
   | 'public' // 不需登入
   | 'optional' // 不需登入；有登入時提供使用者（例如附上資格比對）
   | 'user' // 需登入
-  | 'admin' // 管理端：需登入、Email 已驗證且 role = 'admin'（docs/backend.md §8.6）
+  | 'admin' // 管理端：需登入、Email 已驗證且 role = 'admin'（docs/backend.md §8.7）
   | 'hmac' // 爬蟲：HMAC 簽章（lib/hmac.ts）
   | 'line' // LINE webhook：x-line-signature（P4 實作）
 

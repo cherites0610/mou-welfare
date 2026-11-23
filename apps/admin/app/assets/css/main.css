@@ -1,0 +1,28 @@
+/* 後台沿用前台的主色（apps/web/app/assets/css/main.css） */
+@import 'tailwindcss';
+
+@theme {
+  --color-mygreen: #92c700;
+  --color-mygreen-300: #5A8700;
+}
+
+html body {
+  --el-color-primary: #5a8700;
+  --el-color-primary-light-3: #b3d84d;
+  --el-color-primary-light-5: #c9e380;
+  --el-color-primary-light-7: #dff0b3;
+  --el-color-primary-light-8: #e9f6cc;
+  --el-color-primary-light-9: #f4fae6;
+  --el-color-primary-dark-2: #486c00;
+  background: #f5f7f2;
+}
+
+/* 原文 Markdown */
+.prose-md { line-height: 1.7; word-break: break-word; }
+.prose-md h1, .prose-md h2, .prose-md h3 { font-weight: 700; margin: 0.8em 0 0.4em; }
+.prose-md p, .prose-md ul, .prose-md ol, .prose-md table { margin: 0.4em 0; }
+.prose-md ul { list-style: disc; padding-left: 1.4em; }
+.prose-md ol { list-style: decimal; padding-left: 1.4em; }
+.prose-md a { color: #3a90e0; text-decoration: underline; }
+.prose-md table { border-collapse: collapse; display: block; overflow-x: auto; }
+.prose-md th, .prose-md td { border: 1px solid #dcdfe6; padding: 4px 8px; }
