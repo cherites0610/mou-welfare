@@ -1,0 +1,675 @@
+{
+ "daf41353-dcf3-42e0-8e2f-b6232fc39a0d": {
+  "title": "新北市｜115年度住宿式服務機構使用者補助方案",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": "2026-12-16",
+  "note": "附件寫明當年度受理至 12 月 16 日"
+ },
+ "39e1fa71-df7e-41a3-90ab-1e7886146b9c": {
+  "title": "花蓮縣｜花蓮縣政府辦理托育服務緊急事件處理流程",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "9c342d1b-6b0c-4898-8bdf-22c0dab07511": {
+  "title": "嘉義市｜未滿二歲兒童托育費用補助(含延長二至三歲)",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "9dc3002b-22ee-49b5-aef3-6d92c64076d6": {
+  "title": "臺北市｜獨居老人",
+  "isIndividualWelfare": true,
+  "identities": [
+   "65歲以上"
+  ],
+  "deadline": null
+ },
+ "f8b35c3e-f975-49bc-bff9-b939e7dfc194": {
+  "title": "新北市｜住宿機構照顧品質獎勵計畫",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "c45c1b78-9269-4596-987e-8a89d304791f": {
+  "title": "花蓮縣｜長青大學",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "71aa31a3-e584-40a3-ac93-2d0d214e0e9e": {
+  "title": "桃園市｜身心障礙者社區居住補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "6d2902b3-735e-4279-8354-c626e83b78b7": {
+  "title": "臺中市｜中低收入獨居老人營養餐飲服務",
+  "isIndividualWelfare": true,
+  "identities": [
+   "65歲以上"
+  ],
+  "deadline": null,
+  "note": "身份1 與身份2 擇一，所以不列中低收入戶"
+ },
+ "4385d2c4-f28a-4ac6-a024-20ad651ee900": {
+  "title": "桃園市｜申請漁業天然災害救助及低利貸款",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "43af3fe5-059f-40f7-a229-f3897634aebb": {
+  "title": "臺中市｜設籍前新住民社會救助計畫",
+  "isIndividualWelfare": true,
+  "identities": [
+   "外籍配偶家庭"
+  ],
+  "deadline": null,
+  "note": "三種身分都是設籍前新住民，中低收入戶只是其中一種"
+ },
+ "0d80e6ae-1418-4323-9842-5a508cab97a1": {
+  "title": "臺中市｜中低收入老人健保保費自付額補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "65歲以上"
+  ],
+  "deadline": null,
+  "note": "身份1 與身份2 擇一"
+ },
+ "7911f473-92b0-44cf-a620-c992dfabbdc2": {
+  "title": "臺中市｜愛心手鍊",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "0d30b01e-e925-4fd6-a34b-d17ba56f259b": {
+  "title": "嘉義市｜身心障礙者參加社會保險保險費補助辦法",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "2d106a18-0cc7-40f6-9200-0860e7186c87": {
+  "title": "屏東縣｜人身安全",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "00fb81a8-842b-4600-ad18-49ccd13bb050": {
+  "title": "花蓮縣｜花蓮縣坐月子到宅服務",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "17b9e1f2-4c4e-4682-b45d-4d85c1b3be08": {
+  "title": "臺南市｜中低收入老人重病住院看護費用補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "65歲以上"
+  ],
+  "deadline": null,
+  "note": "資格是「符合中低收入老人生活津貼規定」，不等於中低收入戶（兩個模型都錯）"
+ },
+ "adf8f02d-eec1-4ee9-9261-7e27aea20ea6": {
+  "title": "嘉義市｜嘉義市新住民家庭服務中心",
+  "isIndividualWelfare": true,
+  "identities": [
+   "外籍配偶家庭"
+  ],
+  "deadline": null
+ },
+ "efdac991-e9e0-400f-b674-cb4bd4426f98": {
+  "title": "桃園市｜桃園市身心障礙福利團體一覽表",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "f805fa16-5197-4741-a983-a6f5d41b441f": {
+  "title": "臺南市｜中低收入老人醫療補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "65歲以上"
+  ],
+  "deadline": null
+ },
+ "03df56a2-1d2b-4e2f-bef5-ed7851496d65": {
+  "title": "新北市｜兒童及少年事故傷害防制專區",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "9be7ab55-b616-4939-8675-1d01d438ebd4": {
+  "title": "屏東縣｜成立大會",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "75e94cc2-b8b3-4747-84d0-c496077469b0": {
+  "title": "新北市｜兒少及家庭社區支持服務方案(守護家庭小衛星)",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "8e2bb1df-d6f9-4935-ab4c-2089675b877a": {
+  "title": "嘉義市｜身心障礙者租賃房屋租金補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "4611474f-c89f-4a08-94e1-2ef4b512bc21": {
+  "title": "屏東縣｜家庭暴力相對人支持性服務方案",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "af3dadda-7e7f-438e-b066-a42c0aa2da77": {
+  "title": "花蓮縣｜花蓮縣政府處理家外安置兒少申訴處理機制",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null,
+  "note": "安置機構的申訴管道，不是可申請的福利（兩個模型都錯）"
+ },
+ "11f4c943-2f96-4d80-b1e8-f9fc2d4472b2": {
+  "title": "花蓮縣｜公益勸募案件審核實務解析",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "38151d66-b31b-468b-9364-a60334efad25": {
+  "title": "臺南市｜特殊境遇家庭法律訴訟補助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "41c99f0d-53b3-4a9a-b044-9490051bb5bb": {
+  "title": "屏東縣｜會務財務審核標準",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "3d04f324-0453-4ef6-9d3e-93ddd16a467d": {
+  "title": "新北市｜低收入戶、中低收入失能老人接受長期照顧機構安置補助(開啟新視窗)",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null,
+  "note": "65 歲以上或 55 歲以上原住民，年齡不列；低收、中低收、津貼擇一"
+ },
+ "565684b1-9e72-4c92-8620-29676723e3ed": {
+  "title": "基隆市｜輔具評估報告書",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "b4b41085-0347-4da7-9d0a-1e1c2660d31b": {
+  "title": "臺南市｜特殊境遇家庭相關法令及表單",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null,
+  "note": "法規與表單彙編；可申請的項目另有獨立頁面（模型判為是）"
+ },
+ "9e2745e6-88ad-4da6-a658-fa1b77c43e81": {
+  "title": "臺北市｜友善托育補助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "38abd98e-ad4f-422c-a7a9-706b4196edae": {
+  "title": "臺中市｜身心障礙者裝置假牙補助計畫",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "6e3cb5bd-2cb5-4997-9046-f617337147b5": {
+  "title": "臺中市｜身心障礙者生活補助費",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "48a6c302-6a86-4d5d-af79-30db23092241": {
+  "title": "新北市｜托嬰中心感染管制查核基準",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "20da23e2-1e92-406d-bbef-bdc4512f6032": {
+  "title": "基隆市｜活動申請補助",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "5429ff60-0113-4263-8970-61bfe85a4138": {
+  "title": "臺北市｜購買停車位貸款利息補貼",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null,
+  "note": "每年 6/1–6/30 受理，沒有特定年份；身分只有身心障礙者（低收、中低收、生活補助三者擇一）"
+ },
+ "5aa3cb67-6b08-47c8-835e-61436db76efa": {
+  "title": "新北市｜通報方式一覽",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null,
+  "note": "發展遲緩幼兒通報後提供早療服務，視為福利入口"
+ },
+ "6a76ae3c-a896-4afd-9688-b9e27ec0bc54": {
+  "title": "桃園市｜桃園市特殊境遇家庭扶助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "dfa9203d-c58b-4640-b6e2-c257bb2b943c": {
+  "title": "桃園市｜家庭托顧服務",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "b6bbd5b6-179a-4d95-9b9d-7d3e7bbcb4ae": {
+  "title": "桃園市｜身心障礙者社區居住服務",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "53306759-4a03-42df-9067-2a1c48a99cf0": {
+  "title": "桃園市｜預防走失愛的手鍊",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "512267b5-498b-4ed9-b691-1634498b3214": {
+  "title": "桃園市｜長青學苑",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null,
+  "note": "年滿 60 歲（55 歲可兼收），不對應年齡層"
+ },
+ "1064591d-7020-4e77-8b8e-4112756baf4a": {
+  "title": "桃園市｜公益勸募",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "45ac563b-41da-4291-8dd4-5c10ea12e344": {
+  "title": "桃園市｜居家服務",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "1cbc786f-e207-459b-af4e-d874aa945c62": {
+  "title": "嘉義市｜中低收入老人生活津貼",
+  "isIndividualWelfare": true,
+  "identities": [
+   "65歲以上"
+  ],
+  "deadline": null
+ },
+ "1de9da95-500d-4548-a81a-a3a4f1f6cb14": {
+  "title": "嘉義市｜實物銀行",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "b2414083-c78e-4042-b4b5-076923490992": {
+  "title": "嘉義市｜兒童少年生活扶助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "3f7d7ca5-a28a-46c9-8850-00ee1170cf47": {
+  "title": "嘉義市｜嘉義市精神障礙者協作模式服務據點",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null,
+  "note": "身障證明或精神疾病診斷擇一"
+ },
+ "b2fd5e92-3c65-4536-9382-cc019b888df4": {
+  "title": "花蓮縣｜身心障礙者參加社會保險保險費補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "b3a3d719-9a65-4b84-96d4-68a439d367c9": {
+  "title": "花蓮縣｜家庭照顧者支持服務-關懷訪視服務",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "8e5de480-beb8-4087-b3f1-acf5a64f1c47": {
+  "title": "花蓮縣｜中低收入老人生活津貼",
+  "isIndividualWelfare": true,
+  "identities": [
+   "65歲以上"
+  ],
+  "deadline": null,
+  "note": "中低收入老人生活津貼本身不需要中低收入戶身分"
+ },
+ "ebf612dd-81e6-4e8b-8fd2-a207db882cf0": {
+  "title": "花蓮縣｜急難救助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "634216a5-b117-4fc4-bc16-a79383367a34": {
+  "title": "花蓮縣｜身心障礙者房屋租金補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "16564f57-3b0c-442d-842d-fd12c290f259": {
+  "title": "花蓮縣｜身心障礙者涉訟或作證協助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "ba8a02ca-b2cc-4279-a51b-ebe58458a3ee": {
+  "title": "花蓮縣｜花蓮縣居家托育人員於托育地裝設監視錄影設備補助試辦計畫",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null,
+  "note": "對象是居家托育人員，不是民眾"
+ },
+ "db0f485d-3a30-4568-830b-3ceba0ba1d3c": {
+  "title": "屏東縣｜01屏東市δ",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "3e30a4d3-0aa7-4f62-957c-1a65aa38bf26": {
+  "title": "屏東縣｜緊急救援系統暨愛心手環",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "a5d64b38-ce00-46f4-9063-c49bf792158f": {
+  "title": "屏東縣｜社會保險補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "b9fab680-dff3-4710-bb77-dc920e2c1f7c": {
+  "title": "屏東縣｜屏東縣重陽節敬老慰問金發放",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null,
+  "note": "內容只有導覽列，沒有明確年齡門檻"
+ },
+ "63035b6c-3449-4593-8904-387f3200cfde": {
+  "title": "屏東縣｜居家身心障礙者使用維生器材及必要生活輔具用電優惠",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "730cf9b4-d0fa-4a49-8fb7-91b436af0973": {
+  "title": "屏東縣｜23車城鄉δ",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "50191da4-83c2-4d13-b3e1-f757e65a52a8": {
+  "title": "屏東縣｜屏東縣社區發展工作分級輔導培力計畫",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "aad46002-506b-453d-9700-583f7c5a504c": {
+  "title": "屏東縣｜未滿2歲兒童托育公共化及準公共服務",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "a82a2fe7-0fef-4359-a8cb-202fd2cd4d65": {
+  "title": "屏東縣｜身心障礙者保護行政業務",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "120910ee-4573-4264-a3e2-eeaf9941558f": {
+  "title": "屏東縣｜相關書表範例",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "f8a9b5ce-3558-4098-913a-15f3619f0c1c": {
+  "title": "屏東縣｜合格訓練組織(113年)",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "d677b3e5-bb38-4e0b-b843-7a67ace12275": {
+  "title": "屏東縣｜屏東縣身心障礙者乘車電子票證【博愛卡】、【博愛陪伴卡】服務",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "c577b6f8-1ba7-42c0-ae1f-3288654eff6e": {
+  "title": "新北市｜身心障礙者日間照顧及住宿式照顧費用補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "a7820477-a399-4436-8a23-7b9877e08938": {
+  "title": "新北市｜0~2歲擴大育兒津貼及準公共化、合作聯盟托育專區(開啟新視窗)",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "df49bbd9-eb29-46bd-8fdf-26788934e771": {
+  "title": "新北市｜身心障礙者參加全民健康保險及社會自付保費補助(另開新視窗)",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "f73d1efa-97e6-423c-ab6d-177475509ff1": {
+  "title": "新北市｜兒少保護通報",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null,
+  "note": "保護通報專線與中心沿革介紹"
+ },
+ "2f63e0f9-d996-4005-9c6b-2984d5f999da": {
+  "title": "新北市｜身心障礙者購屋貸款利息補貼(另開新視窗)",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "f933b22b-e1ba-4a0c-8420-8b6371d6fdcd": {
+  "title": "新北市｜新北市政府私立托嬰中心定金收取實施原則",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "d231e11c-8cab-4a57-ab2a-ddc472520942": {
+  "title": "新北市｜家事商談及未成年子女照顧計畫服務",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "d89dd3e0-2967-4b3d-b7af-a96ea1ec47f2": {
+  "title": "基隆市｜兒童及少年未來教育與發展帳戶",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null,
+  "note": "低收、中低收、安置兒少擇一；兒童福利由家長申請不列年齡"
+ },
+ "5d699031-acc7-471d-93c1-ba166c86bf7a": {
+  "title": "基隆市｜基隆市辦理國民年金被保險人所得未達一定標準資格調查辦法",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null,
+  "note": "行政作業辦法全文，不是福利說明（兩個模型都錯）"
+ },
+ "ef576a4f-3f8c-4bd1-a40a-1b1d91fcf864": {
+  "title": "基隆市｜強化社會安全網-急難紓困實施方案",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "b218c106-871e-4807-828b-dd99b88106aa": {
+  "title": "基隆市｜居家使用維生器材之身障者平時及災時斷電（救護）處理流程",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null,
+  "note": "跨機關斷電救護流程圖"
+ },
+ "64640993-97cd-42b0-b03f-1516be3b261a": {
+  "title": "基隆市｜115年中低收入老人補助裝置假牙實施計畫",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": "2026-12-31",
+  "note": "65 歲以上或 55 歲以上原住民；五種身分擇一"
+ },
+ "a1a6c5ff-4483-4d90-a37d-26eaf4ab7670": {
+  "title": "臺中市｜身心障礙者參加社會保險自付保費補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "65513445-d76a-4353-a3ab-745061626078": {
+  "title": "臺中市｜老人健保補助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "90c14312-57b5-447f-b511-88c050ff65c3": {
+  "title": "臺中市｜單親及弱勢家庭短期租屋津貼計畫",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "a1ff0589-7144-41f5-abef-98373f2dd123": {
+  "title": "臺北市｜委託方案查訪表",
+  "isIndividualWelfare": false,
+  "identities": [],
+  "deadline": null
+ },
+ "0388ea4f-49ff-476a-b640-cb1a47d9f5c0": {
+  "title": "臺北市｜長者預防走失手鍊",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null,
+  "note": "身障證明、診斷證明、失蹤紀錄擇一"
+ },
+ "4de3f544-185b-4fa5-a121-c573d8ce14d4": {
+  "title": "臺北市｜中低收入戶醫療補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "中低收入戶"
+  ],
+  "deadline": null
+ },
+ "ef49615c-b9ff-4249-8ca2-fa926348a2c1": {
+  "title": "臺北市｜協力照顧補助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "29a8d25c-d373-4562-b67a-10b4e7e5076f": {
+  "title": "臺北市｜身心障礙者嚴重情緒行為正向支持服務",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "f4027cce-67e5-405d-9a90-a1ec734c153d": {
+  "title": "臺南市｜長期照顧服務",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "83320169-bfb7-4b62-9a64-dbb5e8d54e52": {
+  "title": "臺南市｜【新制】112年元月起取消排富~育有未滿2歲兒童育兒津貼",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "c08a82a1-d8e9-44d1-b876-17565fc0a635": {
+  "title": "臺南市｜臺南市推展到宅坐月子媒合平台服務",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "aaf6cd0e-0463-45dd-b7f1-5439696432d6": {
+  "title": "彰化縣｜發展遲緩兒童早期療育費用補助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "e6cc1721-4a28-4125-9d7f-ae6ace5120aa": {
+  "title": "彰化縣｜彰化縣政府生育補助",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "7b8dc88b-889f-4107-a8c9-87cf07d5879e": {
+  "title": "彰化縣｜中低收入老人生活津貼",
+  "isIndividualWelfare": true,
+  "identities": [
+   "65歲以上"
+  ],
+  "deadline": null
+ },
+ "847657ae-12cf-4630-a5a7-bcfbb74c7cad": {
+  "title": "金門縣｜太武社區公共托育家園",
+  "isIndividualWelfare": true,
+  "identities": [],
+  "deadline": null
+ },
+ "cd02e98d-f0b7-447a-b84f-855e03227719": {
+  "title": "金門縣｜金門縣身心障礙者婚姻及生育輔導服務",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "48ec8225-1933-488f-b4fe-b25b51416a48": {
+  "title": "金門縣｜金門縣身心障礙者家庭支持服務",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ },
+ "843b2fbd-935b-4127-b559-32cf919a47f2": {
+  "title": "金門縣｜身心障礙者日間及住宿式照顧費用補助",
+  "isIndividualWelfare": true,
+  "identities": [
+   "身心障礙者"
+  ],
+  "deadline": null
+ }
+}

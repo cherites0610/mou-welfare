@@ -3,7 +3,7 @@ import type { IngestItem } from '@mou-welfare/shared'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { ingestLog, welfareAttachments, welfarePrograms, welfareSources } from '../src/db/schema/index.ts'
-import { LLMStructurer, RuleStructurer, StructuredWelfare } from '../src/features/welfare/structure.ts'
+import { LLMStructurer, RuleStructurer, sanitizeIdentities, StructuredWelfare } from '../src/features/welfare/structure.ts'
 import { backfill, embeddingText, structureProgram } from '../src/jobs/structure.ts'
 import { sign, verify } from '../src/lib/hmac.ts'
 import { FakeLLM } from '../src/lib/llm/index.ts'
@@ -203,6 +203,15 @@ async function ingestOne(patch: Parameters<typeof item>[0] = {}) {
   const res = await post('/internal/ingest', item(patch))
   return ((await res.json()) as { data: { id: string } }).data.id
 }
+
+describe('sanitizeIdentities', () => {
+  it('同時要求兩個年齡層或兩個性別時整類拿掉；低收入戶與中低收入戶只留中低收入戶', () => {
+    expect(sanitizeIdentities(['20歲以下', '20歲-65歲', '身心障礙者'])).toEqual(['身心障礙者'])
+    expect(sanitizeIdentities(['男性', '女性', '65歲以上'])).toEqual(['65歲以上'])
+    expect(sanitizeIdentities(['低收入戶', '中低收入戶'])).toEqual(['中低收入戶'])
+    expect(sanitizeIdentities(['65歲以上', '中低收入戶'])).toEqual(['65歲以上', '中低收入戶'])
+  })
+})
 
 describe('welfare-structure 工作', () => {
   it('LLM：寫回結構化欄位與 embedding，狀態改為 active，之後可以搜尋到', async () => {

@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "openapi": "tsx scripts/openapi.ts",
-    "check:openapi": "tsx scripts/openapi.ts --check"
+    "check:openapi": "tsx scripts/openapi.ts --check",
+    "eval:structure": "tsx --env-file-if-exists=.env scripts/eval-structure.ts"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

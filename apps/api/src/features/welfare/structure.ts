@@ -1,6 +1,6 @@
 // 福利結構化（docs/backend.md §8.3）：爬蟲送來的正文 → 摘要、類別、身分、資格、補助內容、截止日。
 // 有 Gemini 金鑰時用 LLM；沒有時用關鍵字規則，讓資料先可以被搜尋到，之後有金鑰再重新結構化。
-import { CATEGORIES, type Category, IDENTITIES, type Identity } from '@mou-welfare/shared'
+import { AGE_GROUPS, CATEGORIES, type Category, GENDERS, IDENTITIES, type Identity } from '@mou-welfare/shared'
 import { z } from 'zod'
 import type { LLM } from '../../lib/llm/index.ts'
 
@@ -40,11 +40,17 @@ export const SYSTEM_PROMPT = `你是台灣政府福利資料的整理員。輸�
 - 只根據輸入內容，不要推測或補充沒寫的資訊；資格與金額照原文的數字與條件寫。
 - categories 從清單中選最相關的 1–3 個；都不適合用「其他福利」。
 - identities 只列「申請人一定要具備」的身分，選項：${IDENTITIES.join('、')}。
-  - 多個特殊身分會被視為「全部都要具備」；若原文是「A 或 B 其中之一」就都不要列。
+  - 列出的身分會被視為「全部都要具備」。原文寫「符合下列其一」「A 或 B」「A、B 擇一」時，這些選項都不要列。
+    例：「領有身心障礙證明，且為低收入戶、中低收入戶或領有生活補助費其中之一」→ 只列「身心障礙者」。
   - 「低收入戶或中低收入戶」只列「中低收入戶」（低收入戶自動符合）。
-  - 年齡只在有明確年齡門檻時列（例如年滿 65 歲 → 65歲以上）；給兒童的福利但由家長申請時不要列年齡。
+  - 年齡（依序判斷）：
+    1. 給兒童或幼兒、通常由家長或家屬申請或通報的（托育、早療、發展遲緩、生育、兒童補助），不要列年齡。
+    2. 門檻跨越多個年齡層（例如「未滿 65 歲」「6 至 30 歲」）或沒有明確門檻時，不要列年齡。
+    3. 其餘只在門檻正好對應一個年齡層時列一個：年滿 65 歲 → 65歲以上；由青少年本人申請、限未滿 20 歲 → 20歲以下。
   - 沒有身分限制就給空陣列。
-- isIndividualWelfare：機構評鑑、設置管理、補助民間團體、宣導影片、調查報告、捐款名冊、會議紀錄、採購等都是 false。`
+- isIndividualWelfare：看服務對象是不是一般民眾或家庭。
+  - true：直接提供給民眾或家庭的補助、津貼、服務、諮詢、陪伴、安置（例如家暴相對人支持服務、兒少與家庭支持方案）。
+  - false：對象是社工人員、機構或團體（機構評鑑、設置管理、補助民間團體、人員訓練），或不是可申請的項目（宣導影片、調查報告、捐款名冊、會議紀錄、採購、團體名冊）。`
 
 export function buildInput(input: StructureInput): string {
   const fields = Object.entries(input.sourceFields)
@@ -73,8 +79,22 @@ export class LLMStructurer implements Structurer {
 
   async structure(input: StructureInput): Promise<StructureResult> {
     const out = await this.llm.generate({ system: SYSTEM_PROMPT, input: buildInput(input), schema: StructuredWelfare })
-    return { ...out, by: 'llm' }
+    return { ...out, identities: sanitizeIdentities(out.identities), by: 'llm' }
   }
+}
+
+/**
+ * 身分會被當成「全部都要具備」，所以同時要求兩個年齡層或兩個性別的組合沒有人能符合，會讓所有人看到紅燈。
+ * prompt 已要求不要這樣標，這裡再擋一次：同類出現兩個以上就整類拿掉（寧可少標）。
+ * 「低收入戶＋中低收入戶」只留「中低收入戶」（低收入戶自動符合）。
+ */
+export function sanitizeIdentities(ids: Identity[]): Identity[] {
+  const set = new Set(ids)
+  for (const group of [AGE_GROUPS, GENDERS] as const) {
+    if (group.filter((g) => set.has(g)).length > 1) for (const g of group) set.delete(g)
+  }
+  if (set.has('中低收入戶')) set.delete('低收入戶')
+  return [...set]
 }
 
 // ---- 沒有 LLM 時的關鍵字規則：寧可少標，不要標錯（身分標錯會讓使用者看到錯誤的紅燈） ----
