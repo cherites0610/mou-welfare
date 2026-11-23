@@ -18,6 +18,26 @@ export const StructuredWelfare = z.object({
 })
 export type StructuredWelfare = z.infer<typeof StructuredWelfare>
 
+/**
+ * 交給 LLM 的格式：身分不直接列，而是逐一附上原文依據並判斷「沒有這個身分是否也能申請」，
+ * 只採用不能替代的（docs/backend.md §8.3.1：直接列時常把擇一的條件或標題上的詞當成必備）。
+ */
+export const LLMStructuredWelfare = StructuredWelfare.omit({ identities: true }).extend({
+  identityChecks: z
+    .array(
+      z.object({
+        identity: z.enum(IDENTITIES),
+        quote: z.string().max(300).describe('原文中提到這個身分的申請資格句子，照抄'),
+        canApplyWithout: z
+          .boolean()
+          .describe('沒有這個身分的人是否也可能符合資格（擇一、另有替代資格、門檻不同、只是加碼或優先對象時為 true）'),
+      }),
+    )
+    .max(8)
+    .describe('原文申請資格中提到的候選身分，逐一判斷；沒有就給空陣列'),
+})
+export type LLMStructuredWelfare = z.infer<typeof LLMStructuredWelfare>
+
 export type StructureInput = {
   title: string
   city: string
@@ -39,18 +59,25 @@ export const SYSTEM_PROMPT = `你是台灣政府福利資料的整理員。輸�
 規則：
 - 只根據輸入內容，不要推測或補充沒寫的資訊；資格與金額照原文的數字與條件寫。
 - categories 從清單中選最相關的 1–3 個；都不適合用「其他福利」。
-- identities 只列「申請人一定要具備」的身分，選項：${IDENTITIES.join('、')}。
+- identityChecks：列出申請資格中提到的候選身分（選項：${IDENTITIES.join('、')}），每個都照抄原文依據，並判斷 canApplyWithout。
+  只有 canApplyWithout 為 false 的身分會被當成「每一個申請人都一定要具備」。寧可判為 true：誤判為必備會讓符合資格的人被誤判為不符合。
+  以下規則說明哪些情況必備（false）、哪些不是（true）；寫「不要列」「不列」的，就是 canApplyWithout 為 true（或不列入候選）：
   - 列出的身分會被視為「全部都要具備」。原文寫「符合下列其一」「A 或 B」「A、B 擇一」時，這些選項都不要列。
     例：「領有身心障礙證明，且為低收入戶、中低收入戶或領有生活補助費其中之一」→ 只列「身心障礙者」。
-  - 「低收入戶或中低收入戶」只列「中低收入戶」（低收入戶自動符合）。
+  - 不要因為標題或名稱有某個詞就列，要看申請資格怎麼寫。
+  - 中低收入戶：只在原文要求「列冊低收入戶或中低收入戶」而且沒有其他替代資格時列（低收入戶自動符合，所以「低收入戶或中低收入戶」只列「中低收入戶」）。
+    以下都不列：「中低收入老人生活津貼」「身心障礙者生活補助」的資格或領取者（這些是另外審核的津貼，不等於中低收入戶）；
+    只寫家庭收入或財產標準；中低收入戶只是幾種替代資格之一（例如「低收、中低收或領有中低收入老人生活津貼」）。
+  - 身心障礙者：原文要求領有身心障礙證明（手冊）才列；「身障證明或醫師診斷」這類可替代時不列。
+  - 外籍配偶家庭：對象限新住民、外籍或大陸配偶及其家庭時列。
   - 年齡（依序判斷）：
     1. 給兒童或幼兒、通常由家長或家屬申請或通報的（托育、早療、發展遲緩、生育、兒童補助），不要列年齡。
-    2. 門檻跨越多個年齡層（例如「未滿 65 歲」「6 至 30 歲」）或沒有明確門檻時，不要列年齡。
+    2. 有替代條件（例如「65 歲以上或 55 歲以上原住民」「老人或身心障礙者」）、門檻跨越多個年齡層（例如「未滿 65 歲」「6 至 30 歲」）、門檻不是 65 或 20（例如「年滿 60 歲」）或沒有明確門檻時，不要列年齡。
     3. 其餘只在門檻正好對應一個年齡層時列一個：年滿 65 歲 → 65歲以上；由青少年本人申請、限未滿 20 歲 → 20歲以下。
-  - 沒有身分限制就給空陣列。
+  - 年齡、性別若不必備，也可以不列出。沒有任何候選身分就給空陣列。
 - isIndividualWelfare：看服務對象是不是一般民眾或家庭。
   - true：直接提供給民眾或家庭的補助、津貼、服務、諮詢、陪伴、安置（例如家暴相對人支持服務、兒少與家庭支持方案）。
-  - false：對象是社工人員、機構或團體（機構評鑑、設置管理、補助民間團體、人員訓練），或不是可申請的項目（宣導影片、調查報告、捐款名冊、會議紀錄、採購、團體名冊）。`
+  - false：對象是社工人員、機構或團體（機構評鑑、設置管理、補助民間團體、人員訓練），或不是可申請的項目（宣導影片、調查報告、捐款名冊、會議紀錄、採購、團體名冊、法規全文）。`
 
 export function buildInput(input: StructureInput): string {
   const fields = Object.entries(input.sourceFields)
@@ -78,9 +105,36 @@ export class LLMStructurer implements Structurer {
   constructor(private readonly llm: LLM) {}
 
   async structure(input: StructureInput): Promise<StructureResult> {
-    const out = await this.llm.generate({ system: SYSTEM_PROMPT, input: buildInput(input), schema: StructuredWelfare })
-    return { ...out, identities: sanitizeIdentities(out.identities), by: 'llm' }
+    const { identityChecks, ...out } = await this.llm.generate({
+      system: SYSTEM_PROMPT,
+      input: buildInput(input),
+      schema: LLMStructuredWelfare,
+    })
+    const identities = identityChecks.filter((c) => !c.canApplyWithout && hasEvidence(c)).map((c) => c.identity)
+    return { ...out, identities: sanitizeIdentities([...new Set(identities)]), by: 'llm' }
   }
+}
+
+/**
+ * 依據句子裡要有該身分的關鍵字才採用。模型常拿標題或「中低收入獨居老人」「符合中低收入老人生活津貼規定」
+ * 這類不含身分本身的句子當依據（docs/backend.md §8.3.1）。
+ */
+const EVIDENCE: Record<Identity, RegExp> = {
+  '20歲以下': /未滿\s*(?:20|二十)\s*歲|20\s*歲以下|二十歲以下/,
+  '20歲-65歲': /(?:20|二十)\s*歲.*(?:65|六十五)\s*歲/,
+  '65歲以上': /65|六十五/,
+  男性: /男/,
+  女性: /女|婦|孕|產/,
+  // 「中低收入老人（生活津貼）」「中低收入獨居老人」不算
+  中低收入戶: /低收入戶|低收(?!入(?:老人|獨居))/,
+  低收入戶: /低收入戶|低收(?!入(?:老人|獨居))/,
+  榮民: /榮民/,
+  身心障礙者: /身心障礙|身障|障礙/,
+  原住民: /原住民/,
+  外籍配偶家庭: /新住民|外籍|大陸|配偶|外配/,
+}
+export function hasEvidence(c: { identity: Identity; quote: string }): boolean {
+  return EVIDENCE[c.identity].test(c.quote)
 }
 
 /**

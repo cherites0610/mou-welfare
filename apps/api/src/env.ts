@@ -20,7 +20,7 @@ const EnvSchema = z
     /** 福利結構化：gemini＝呼叫 Gemini；rules＝關鍵字規則（沒有金鑰時的備案）。未設定時有金鑰就用 gemini */
     LLM_DRIVER: z.enum(['gemini', 'rules']).optional(),
     GEMINI_API_KEY: z.string().optional(),
-    GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+    GEMINI_MODEL: z.string().default('gemini-3.5-flash-lite'), // 依回測選定（docs/backend.md §8.3.1）
     GEMINI_EMBED_MODEL: z.string().default('gemini-embedding-001'),
     /** 背景工作的執行方式：inline＝在 API 程序內；separate＝由 src/worker.ts 獨立程序；off＝不執行（測試用） */
     WORKER_MODE: z.enum(['inline', 'separate', 'off']).default('inline'),

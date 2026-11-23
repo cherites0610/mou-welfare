@@ -3,7 +3,7 @@ import type { IngestItem } from '@mou-welfare/shared'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { ingestLog, welfareAttachments, welfarePrograms, welfareSources } from '../src/db/schema/index.ts'
-import { LLMStructurer, RuleStructurer, sanitizeIdentities, StructuredWelfare } from '../src/features/welfare/structure.ts'
+import { hasEvidence, type LLMStructuredWelfare, LLMStructurer, RuleStructurer, sanitizeIdentities, StructuredWelfare } from '../src/features/welfare/structure.ts'
 import { backfill, embeddingText, structureProgram } from '../src/jobs/structure.ts'
 import { sign, verify } from '../src/lib/hmac.ts'
 import { FakeLLM } from '../src/lib/llm/index.ts'
@@ -188,12 +188,16 @@ describe('POST /internal/remove', () => {
   })
 })
 
-const LLM_OUTPUT: StructuredWelfare = {
+const LLM_OUTPUT: LLMStructuredWelfare = {
   isIndividualWelfare: true,
   name: '中低收入老人生活津貼',
   summary: '設籍金門縣、年滿 65 歲的中低收入老人，每月可領 8,329 元生活津貼。',
   categories: ['老人福利', '社會救助福利'],
-  identities: ['65歲以上', '中低收入戶'],
+  identityChecks: [
+    { identity: '65歲以上', quote: '年滿 65 歲', canApplyWithout: false },
+    { identity: '中低收入戶', quote: '列冊中低收入戶', canApplyWithout: false },
+    { identity: '身心障礙者', quote: '身心障礙者另加發', canApplyWithout: true },
+  ],
   requirements: ['設籍並實際居住本縣', '年滿 65 歲'],
   rewards: ['每月 8,329 元'],
   deadline: null,
@@ -210,6 +214,16 @@ describe('sanitizeIdentities', () => {
     expect(sanitizeIdentities(['男性', '女性', '65歲以上'])).toEqual(['65歲以上'])
     expect(sanitizeIdentities(['低收入戶', '中低收入戶'])).toEqual(['中低收入戶'])
     expect(sanitizeIdentities(['65歲以上', '中低收入戶'])).toEqual(['65歲以上', '中低收入戶'])
+  })
+})
+
+describe('hasEvidence', () => {
+  it('依據句子要有該身分的關鍵字', () => {
+    expect(hasEvidence({ identity: '65歲以上', quote: '屏東縣重陽節敬老慰問金發放辦法' })).toBe(false)
+    expect(hasEvidence({ identity: '65歲以上', quote: '年滿六十五歲' })).toBe(true)
+    expect(hasEvidence({ identity: '中低收入戶', quote: '符合中低收入老人生活津貼發給辦法第二條規定' })).toBe(false)
+    expect(hasEvidence({ identity: '中低收入戶', quote: '列冊低收入戶或中低收入戶' })).toBe(true)
+    expect(hasEvidence({ identity: '20歲以下', quote: '未滿十八歲之兒童及少年' })).toBe(false)
   })
 })
 
@@ -285,7 +299,8 @@ describe('welfare-structure 工作', () => {
       structure: async () => {
         // 模擬結構化進行中，爬蟲推送了新版本
         await t.db.update(welfarePrograms).set({ contentHash: newer }).where(eq(welfarePrograms.id, id))
-        return { ...LLM_OUTPUT, by: 'llm' as const }
+        const { identityChecks: _, ...rest } = LLM_OUTPUT
+        return { ...rest, identities: [], by: 'llm' as const }
       },
     }
     expect(await structureProgram(t.db, racing, null, id)).toBe('skipped')
