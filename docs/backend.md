@@ -441,6 +441,8 @@ cd ~/apps/mou-welfare-v2/apps/api
 - 判為福利而這筆沒有 embedding（之前被判為非福利）時，自動排入一次重新結構化補上 embedding；取消人工判定也會重新結構化，交給 LLM 判斷。每次約 0.0024 美元。
 - 同時記下 `reviewed_by`、`reviewed_at`、`review_note`。人工判定的結果之後可以補進 §8.3.1 的評測集。
 
+**目前狀態**：2026-11-23 上線 https://admin.mou-welfare.com，管理者為 cherites0610@gmail.com。
+
 **本機開發**：`pnpm dev:admin`（http://localhost:3001），API 的 `.env` 的 `TRUSTED_ORIGINS` 要加上 `http://localhost:3001`；用 `scripts/set-role.ts` 把本機帳號設為管理者。
 
 ## 9. 資料庫基礎設施（已完成）
@@ -488,7 +490,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration，另有 `0006_llm_pause`（Gemini 額度不足的暫停狀態）、`0007_llm_calls`（LLM 用量紀錄）、待部署 `0008_admin`（福利人工判定欄位、`admin_audit`）（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration，另有 `0006_llm_pause`（Gemini 額度不足的暫停狀態）、`0007_llm_calls`（LLM 用量紀錄）、`0008_admin`（福利人工判定欄位、`admin_audit`）（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
