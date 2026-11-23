@@ -1616,6 +1616,578 @@
           "lastActiveAt"
         ]
       },
+      "AdminScraperStatus": {
+        "type": "object",
+        "properties": {
+          "intervalDays": {
+            "type": "number"
+          },
+          "nextDueAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "latest": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "trigger": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "startedAt": {
+                "type": "string"
+              },
+              "finishedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "planned": {
+                "type": "number"
+              },
+              "done": {
+                "type": "number"
+              },
+              "current": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "totals": {
+                "type": "object",
+                "properties": {
+                  "seen": {
+                    "type": "number"
+                  },
+                  "new": {
+                    "type": "number"
+                  },
+                  "updated": {
+                    "type": "number"
+                  },
+                  "removed": {
+                    "type": "number"
+                  },
+                  "pushed": {
+                    "type": "number"
+                  },
+                  "quarantined": {
+                    "type": "number"
+                  },
+                  "errors": {
+                    "type": "number"
+                  },
+                  "notOk": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "seen",
+                  "new",
+                  "updated",
+                  "removed",
+                  "pushed",
+                  "quarantined",
+                  "errors",
+                  "notOk"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "trigger",
+              "status",
+              "startedAt",
+              "finishedAt",
+              "updatedAt",
+              "planned",
+              "done",
+              "current",
+              "totals"
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "trigger": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "finishedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "planned": {
+                  "type": "number"
+                },
+                "done": {
+                  "type": "number"
+                },
+                "current": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "totals": {
+                  "type": "object",
+                  "properties": {
+                    "seen": {
+                      "type": "number"
+                    },
+                    "new": {
+                      "type": "number"
+                    },
+                    "updated": {
+                      "type": "number"
+                    },
+                    "removed": {
+                      "type": "number"
+                    },
+                    "pushed": {
+                      "type": "number"
+                    },
+                    "quarantined": {
+                      "type": "number"
+                    },
+                    "errors": {
+                      "type": "number"
+                    },
+                    "notOk": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "seen",
+                    "new",
+                    "updated",
+                    "removed",
+                    "pushed",
+                    "quarantined",
+                    "errors",
+                    "notOk"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "trigger",
+                "status",
+                "startedAt",
+                "finishedAt",
+                "updatedAt",
+                "planned",
+                "done",
+                "current",
+                "totals"
+              ]
+            }
+          },
+          "sites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "siteId": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "runId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "last": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "siteId": {
+                      "type": "string"
+                    },
+                    "city": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "seen": {
+                      "type": "number"
+                    },
+                    "new": {
+                      "type": "number"
+                    },
+                    "updated": {
+                      "type": "number"
+                    },
+                    "unchanged": {
+                      "type": "number"
+                    },
+                    "removed": {
+                      "type": "number"
+                    },
+                    "filtered": {
+                      "type": "number"
+                    },
+                    "quarantined": {
+                      "type": "number"
+                    },
+                    "pushed": {
+                      "type": "number"
+                    },
+                    "pushFailed": {
+                      "type": "number"
+                    },
+                    "pages": {
+                      "type": "number"
+                    },
+                    "health": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "degraded",
+                        "blocked",
+                        "failed"
+                      ]
+                    },
+                    "healthDetail": {
+                      "type": "string"
+                    },
+                    "errorCount": {
+                      "type": "number"
+                    },
+                    "startedAt": {
+                      "type": "string"
+                    },
+                    "finishedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "siteId",
+                    "city",
+                    "seen",
+                    "new",
+                    "updated",
+                    "unchanged",
+                    "removed",
+                    "filtered",
+                    "quarantined",
+                    "pushed",
+                    "pushFailed",
+                    "pages",
+                    "health",
+                    "healthDetail",
+                    "errorCount",
+                    "startedAt",
+                    "finishedAt"
+                  ]
+                },
+                "lastOkAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "programs": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "type": "number"
+                    },
+                    "total": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "active",
+                    "total"
+                  ]
+                }
+              },
+              "required": [
+                "siteId",
+                "city",
+                "runId",
+                "last",
+                "lastOkAt",
+                "programs"
+              ]
+            }
+          }
+        },
+        "required": [
+          "intervalDays",
+          "nextDueAt",
+          "overdue",
+          "latest",
+          "runs",
+          "sites"
+        ]
+      },
+      "AdminScraperRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "finishedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "planned": {
+            "type": "number"
+          },
+          "done": {
+            "type": "number"
+          },
+          "current": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "seen": {
+                "type": "number"
+              },
+              "new": {
+                "type": "number"
+              },
+              "updated": {
+                "type": "number"
+              },
+              "removed": {
+                "type": "number"
+              },
+              "pushed": {
+                "type": "number"
+              },
+              "quarantined": {
+                "type": "number"
+              },
+              "errors": {
+                "type": "number"
+              },
+              "notOk": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "seen",
+              "new",
+              "updated",
+              "removed",
+              "pushed",
+              "quarantined",
+              "errors",
+              "notOk"
+            ]
+          },
+          "intervalDays": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "plannedSites": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "siteId": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "seen": {
+                  "type": "number"
+                },
+                "new": {
+                  "type": "number"
+                },
+                "updated": {
+                  "type": "number"
+                },
+                "unchanged": {
+                  "type": "number"
+                },
+                "removed": {
+                  "type": "number"
+                },
+                "filtered": {
+                  "type": "number"
+                },
+                "quarantined": {
+                  "type": "number"
+                },
+                "pushed": {
+                  "type": "number"
+                },
+                "pushFailed": {
+                  "type": "number"
+                },
+                "pages": {
+                  "type": "number"
+                },
+                "health": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "degraded",
+                    "blocked",
+                    "failed"
+                  ]
+                },
+                "healthDetail": {
+                  "type": "string"
+                },
+                "errorCount": {
+                  "type": "number"
+                },
+                "startedAt": {
+                  "type": "string"
+                },
+                "finishedAt": {
+                  "type": "string"
+                },
+                "errors": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "quarantine": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "issues": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "url",
+                      "issues"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "siteId",
+                "city",
+                "seen",
+                "new",
+                "updated",
+                "unchanged",
+                "removed",
+                "filtered",
+                "quarantined",
+                "pushed",
+                "pushFailed",
+                "pages",
+                "health",
+                "healthDetail",
+                "errorCount",
+                "startedAt",
+                "finishedAt",
+                "errors",
+                "quarantine"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "trigger",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "updatedAt",
+          "planned",
+          "done",
+          "current",
+          "totals",
+          "intervalDays",
+          "plannedSites",
+          "sites"
+        ]
+      },
       "WelfareDetail": {
         "allOf": [
           {
@@ -4425,6 +4997,223 @@
           },
           "403": {
             "description": "不是管理者",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/scraper": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "爬蟲排程狀態、最近的執行與各站結果",
+        "responses": {
+          "200": {
+            "description": "狀態",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminScraperStatus"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "不是管理者",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/scraper/runs/{id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "單次執行的各站結果（含錯誤與隔離清單）",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{8}-\\d{6}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "執行",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/AdminScraperRun"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登入",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "不是管理者",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "不存在",
             "content": {
               "application/json": {
                 "schema": {
