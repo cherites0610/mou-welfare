@@ -13,6 +13,6 @@
   "vars": {
     "NUXT_PUBLIC_API_BASE": "https://api-v2.mou-welfare.com",
     // LIFF app 的 ID（公開值）；空字串＝不啟用 LIFF 自動登入。LIFF 的 Endpoint URL 要和前端網域一致
-    "NUXT_PUBLIC_LIFF_ID": ""
+    "NUXT_PUBLIC_LIFF_ID": "2008948767-vs5zb0Hg"
   }
 }

@@ -581,7 +581,8 @@ cd ~/apps/mou-welfare-v2/apps/api
 - [x] ~~GitHub Actions 自動部署的 SSH 金鑰與 5 個 secrets~~：2026-11-22 完成。
 - [ ] **v1 資料庫連線**：2026-11-23 發現 `postgres.cherites.org` 無法解析，v1 API 讀資料庫全部失敗（見 §10.4）。確認 DNS 紀錄是否被刪除或過期。
 - [x] ~~Gemini 儲值~~：2026-11-23 完成，已移除 `LLM_DRIVER=rules`，全量結構化完成；AI Studio 用量上限設為每月新台幣 300 元。
-- [ ] **第三方登入的金鑰**：建立 Google OAuth client、LINE Login channel 與 LIFF app（設定值見 §8.5.1），透過 key.cherites.org 提供 `GOOGLE_CLIENT_ID`／`SECRET`、`LINE_CHANNEL_ID`／`SECRET`，以及 LIFF ID。程式已完成（2026-11-23），金鑰設定後即啟用。
+- [x] ~~LINE 登入的金鑰~~：2026-11-23 設定 `LINE_CHANNEL_ID`／`SECRET`（以 LINE token 端點驗證）與 LIFF ID（`apps/web/wrangler.jsonc`），已啟用。
+- [ ] **Google 登入的金鑰**：建立 Google OAuth client（設定值見 §8.5.1），透過 key.cherites.org 提供 `GOOGLE_CLIENT_ID`／`GOOGLE_CLIENT_SECRET`。
 - [ ] **人工檢核被判為非福利的 455 筆**：在管理後台依縣市檢核（[admin.md](admin.md) §4.3），屏東縣 191 筆最多。
 
 **之後再決定**
@@ -609,7 +610,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | **P1 核心 API** ✅ | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware、管理端 | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出（2026-11-23 管理端 `/v1/admin/*` 也完成） |
 | **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（正式環境 12 縣市 1,471 筆；2026-11-23 以 Gemini 全量結構化完成，可搜尋 985 筆） |
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天未開始 |
-| **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | Google / LINE / LIFF 登入的程式已完成（2026-11-23，`tests/social.test.ts`），待設定金鑰；其餘未開始 |
+| **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | Google / LINE / LIFF 登入的程式已完成（2026-11-23，`tests/social.test.ts`）；LINE 與 LIFF 已啟用，Google 待設定金鑰；其餘未開始 |
 | **管理後台** ✅ | 總覽、福利檢核、LLM 用量、使用者（唯讀）、稽核紀錄 | 2026-11-23 上線 `admin.mou-welfare.com`（[admin.md](admin.md)） |
 | **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天頁、LINE 分享待 P3 / P4） |
 
