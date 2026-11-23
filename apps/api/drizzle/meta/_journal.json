@@ -50,6 +50,13 @@
       "when": 1795398618294,
       "tag": "0006_llm_pause",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1795399174422,
+      "tag": "0007_llm_calls",
+      "breakpoints": true
     }
   ]
 }

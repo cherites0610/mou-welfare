@@ -5,16 +5,10 @@
 // 用法：tsx --env-file=<env> scripts/restructure.ts [--city 臺北市,基隆市] [--limit 100] [--yes]
 import postgres from 'postgres'
 import { loadEnv } from '../src/env.ts'
+import { estimateCostUsd } from '../src/lib/llm/index.ts'
 import { BossQueue, createBoss } from '../src/lib/queue.ts'
 
-/** 每百萬 tokens 的美元價格（輸入、輸出；2026-11 官方價格頁）。不在表中的模型只顯示 token 數 */
-const PRICES: Record<string, [number, number]> = {
-  'gemini-3.5-flash-lite': [0.3, 2.5],
-  'gemini-3.1-flash-lite': [0.25, 1.5],
-  'gemini-3.8-flash': [0.75, 3.75],
-}
-const EMBED_PRICE = 0.15
-// 2026-11-23 實測：中文約 0.84 token／字；system prompt 與 schema 約 1,500 tokens；輸出（含 identityChecks）約 400 tokens
+// 價格見 src/lib/llm/pricing.ts。2026-11-23 實測：中文約 0.84 token／字；system prompt 與 schema 約 1,500 tokens；輸出（含 identityChecks）約 400 tokens
 const TOKENS_PER_CHAR = 0.84
 const PROMPT_TOKENS = 1_500
 const OUTPUT_TOKENS = 400
@@ -43,11 +37,12 @@ const rows = await sql<{ id: string; chars: number }[]>`
 
 const input = rows.reduce((s, r) => s + Math.round(r.chars * TOKENS_PER_CHAR) + PROMPT_TOKENS, 0)
 const output = rows.length * OUTPUT_TOKENS
-const price = PRICES[env.GEMINI_MODEL]
-const cost = price ? (input * price[0] + output * price[1] + rows.length * EMBED_TOKENS * EMBED_PRICE) / 1e6 : null
+const gen = estimateCostUsd(env.GEMINI_MODEL, input, output)
+const emb = estimateCostUsd(env.GEMINI_EMBED_MODEL, rows.length * EMBED_TOKENS, 0)
+const cost = gen === null ? null : gen + (emb ?? 0)
 console.log(`結構化方式：${driver}${driver === 'gemini' ? `（${env.GEMINI_MODEL}）` : ''}`)
 console.log(`範圍：${cities.length ? cities.join('、') : '全部縣市'}，${rows.length} 筆`)
-console.log(`預估：輸入 ${(input / 1e6).toFixed(2)}M tokens、輸出 ${(output / 1e6).toFixed(2)}M tokens` + (cost === null ? '（此模型不在價格表中）' : `，約 US$${cost.toFixed(2)}`))
+console.log(`預估：輸入 ${(input / 1e6).toFixed(2)}M tokens、輸出 ${(output / 1e6).toFixed(2)}M tokens` + (cost === null ? '（此模型不在 src/lib/llm/pricing.ts 的價格表中）' : `，約 US$${cost.toFixed(2)}`))
 console.log(`預估時間：約 ${Math.ceil((rows.length * 1.8) / 60)} 分鐘（一次一筆）`)
 
 if (driver !== 'gemini') {
@@ -73,6 +68,6 @@ for (const r of rows) {
   await queue.send('welfare-structure', { programId: r.id, force: true })
   sent++
 }
-console.log(`\n已排入 ${sent} 筆（${rows.length - sent} 筆已在佇列中）。進度：/health 與 welfare_programs.structured_at`)
+console.log(`\n已排入 ${sent} 筆（${rows.length - sent} 筆已在佇列中）。進度與實際用量：scripts/llm-usage.ts`)
 await boss.stop({ graceful: true, timeout: 5_000 })
 await sql.end()

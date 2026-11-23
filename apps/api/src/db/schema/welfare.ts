@@ -41,6 +41,9 @@ export const welfarePrograms = pgTable(
     structuredHash: text('structured_hash'),
     structuredBy: text('structured_by', { enum: STRUCTURED_BY }),
     structuredAt: timestamp('structured_at', { withTimezone: true }),
+    /** 目前結果是哪個模型、哪一版 prompt 做的（規則結構化時為 null；docs/backend.md §8.3.2） */
+    structuredModel: text('structured_model'),
+    structuredPromptVersion: text('structured_prompt_version'),
     /** 置頂：有值的福利在搜尋結果中排最前面（越晚置頂越前面）。目前用於開發用的範例資料，之後給管理端使用 */
     pinnedAt: timestamp('pinned_at', { withTimezone: true }),
     structureError: text('structure_error'),

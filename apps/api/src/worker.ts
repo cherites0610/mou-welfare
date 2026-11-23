@@ -3,6 +3,7 @@ import { createDb } from './db/client.ts'
 import { loadEnv } from './env.ts'
 import { startJobs } from './jobs/index.ts'
 import { createStructurer } from './jobs/structure.ts'
+import { dbUsageRecorder } from './lib/llm/index.ts'
 import { LogMailer, ResendMailer } from './lib/mail/index.ts'
 import { createBoss } from './lib/queue.ts'
 
@@ -14,7 +15,7 @@ if (env.WORKER_MODE !== 'separate') {
 
 const { db, sql } = createDb(env.DATABASE_URL, { max: 3 })
 const boss = await createBoss(env.DATABASE_URL)
-const { structurer, llm } = createStructurer(env)
+const { structurer, llm } = createStructurer(env, dbUsageRecorder(db))
 const mailer = env.MAIL_DRIVER === 'resend' ? new ResendMailer(env.RESEND_API_KEY!, env.EMAIL_FROM) : new LogMailer()
 const jobs = await startJobs({ db, boss, structurer, llm, mailer, alertTo: env.ALERT_EMAIL })
 console.log(`worker started (structurer: ${structurer.kind})`)

@@ -55,7 +55,8 @@ export async function startJobs(opts: {
   // 只有真的呼叫 LLM 時才需要暫停機制（規則結構化不會遇到額度問題）
   const pause = llm
     ? new LLMPause(db, {
-        probe: () => llm.generate({ system: '只輸出 JSON。', input: 'ok', schema: z.object({ ok: z.boolean() }) }),
+        probe: () =>
+          llm.generate({ system: '只輸出 JSON。', input: 'ok', schema: z.object({ ok: z.boolean() }), meta: { purpose: 'probe' } }),
         onResume: async () => {
           await work()
           await queueBackfill()

@@ -2,11 +2,20 @@
 import type { IngestItem } from '@mou-welfare/shared'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { ingestLog, welfareAttachments, welfarePrograms, welfareSources } from '../src/db/schema/index.ts'
-import { hasEvidence, type LLMStructuredWelfare, LLMStructurer, RuleStructurer, sanitizeIdentities, StructuredWelfare } from '../src/features/welfare/structure.ts'
+import { z } from 'zod'
+import { ingestLog, llmCalls, welfareAttachments, welfarePrograms, welfareSources } from '../src/db/schema/index.ts'
+import {
+  hasEvidence,
+  type LLMStructuredWelfare,
+  LLMStructurer,
+  PROMPT_VERSION,
+  RuleStructurer,
+  sanitizeIdentities,
+  StructuredWelfare,
+} from '../src/features/welfare/structure.ts'
 import { backfill, embeddingText, structureProgram } from '../src/jobs/structure.ts'
 import { sign, verify } from '../src/lib/hmac.ts'
-import { FakeLLM } from '../src/lib/llm/index.ts'
+import { dbUsageRecorder, FakeLLM, GeminiLLM, type LLMUsage } from '../src/lib/llm/index.ts'
 import { MemoryQueue } from '../src/lib/queue.ts'
 import { resetDb, setupApp } from './helpers.ts'
 
@@ -257,6 +266,51 @@ describe('welfare-structure 工作', () => {
     expect(await structureProgram(t.db, s, llm, id, undefined, { force: true })).toBe('done')
     expect(await structureProgram(t.db, new RuleStructurer(), null, id, undefined, { force: true })).toBe('skipped')
     expect((await programs())[0]!.structuredBy).toBe('llm')
+  })
+
+  it('用量紀錄：每次呼叫寫入 llm_calls（用途、福利、模型、prompt 版本、token），結果記下模型與 prompt 版本', async () => {
+    const id = await ingestOne()
+    const llm = new FakeLLM({ generate: () => LLM_OUTPUT, recorder: dbUsageRecorder(t.db) })
+    expect(await structureProgram(t.db, new LLMStructurer(llm), llm, id)).toBe('done')
+
+    const calls = await t.db.select().from(llmCalls).orderBy(llmCalls.id)
+    expect(calls.map((c) => [c.purpose, c.programId, c.model, c.ok])).toEqual([
+      ['structure', id, 'fake', true],
+      ['embed', id, 'fake', true],
+    ])
+    expect(calls[0]!.promptVersion).toBe(PROMPT_VERSION)
+    expect(calls[0]!.inputTokens).toBeGreaterThan(0)
+    const [p] = await programs()
+    expect(p).toMatchObject({ structuredModel: 'fake', structuredPromptVersion: PROMPT_VERSION })
+  })
+
+  it('GeminiLLM 回報 usageMetadata；失敗的呼叫也記錄，並估算費用', async () => {
+    const seen: LLMUsage[] = []
+    const g = new GeminiLLM('k', 'gemini-3.5-flash-lite', 'gemini-embedding-001', 1000, async (u) => {
+      seen.push(u)
+      await dbUsageRecorder(t.db)(u)
+    })
+    let fail = false
+    ;(g as unknown as { ai: unknown }).ai = {
+      models: {
+        generateContent: async () => {
+          if (fail) throw Object.assign(new Error('RESOURCE_EXHAUSTED'), { status: 402 })
+          return { text: '{"ok":true}', usageMetadata: { promptTokenCount: 1000, candidatesTokenCount: 100, totalTokenCount: 1100 } }
+        },
+      },
+    }
+    const schema = z.object({ ok: z.boolean() })
+    await g.generate({ system: 's', input: 'x', schema, meta: { purpose: 'structure', programId: undefined, promptVersion: 'v1' } })
+    fail = true
+    await expect(g.generate({ system: 's', input: 'x', schema, meta: { purpose: 'probe' } })).rejects.toMatchObject({ kind: 'quota' })
+
+    expect(seen.map((u) => [u.purpose, u.ok, u.inputTokens, u.outputTokens, u.errorKind])).toEqual([
+      ['structure', true, 1000, 100, undefined],
+      ['probe', false, null, null, 'quota'],
+    ])
+    const rows = await t.db.select().from(llmCalls).orderBy(llmCalls.id)
+    expect(rows[0]!.costUsd).toBeCloseTo((1000 * 0.3 + 100 * 2.5) / 1e6, 10)
+    expect(rows[1]).toMatchObject({ ok: false, errorKind: 'quota', costUsd: null })
   })
 
   it('同樣內容不重複結構化', async () => {

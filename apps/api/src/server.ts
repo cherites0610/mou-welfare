@@ -4,6 +4,7 @@ import { createDb } from './db/client.ts'
 import { loadEnv } from './env.ts'
 import { type Jobs, startJobs } from './jobs/index.ts'
 import { createStructurer } from './jobs/structure.ts'
+import { dbUsageRecorder } from './lib/llm/index.ts'
 import { createAuth } from './lib/auth.ts'
 import { LogMailer, ResendMailer } from './lib/mail/index.ts'
 import { BossQueue, createBoss } from './lib/queue.ts'
@@ -18,7 +19,7 @@ const auth = createAuth(db, env, mailer)
 const boss = await createBoss(env.DATABASE_URL)
 const app = createApp({ db, auth, env, mailer, storage, queue: new BossQueue(boss) })
 
-const { structurer, llm } = createStructurer(env)
+const { structurer, llm } = createStructurer(env, dbUsageRecorder(db))
 const jobs: Jobs | null = env.WORKER_MODE === 'inline' ? await startJobs({ db, boss, structurer, llm, mailer, alertTo: env.ALERT_EMAIL }) : null
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {

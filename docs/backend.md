@@ -325,6 +325,33 @@ export interface LLM {
   目前已知的錯誤：「符合中低收入老人生活津貼規定」的依據沒有寫 65 歲，所以少標 65歲以上；法規彙編、申訴管道偶爾被判為福利；家暴相對人服務、重陽敬老金偶爾被判為非福利。
 - **注意**：即使 temperature 為 0，同一個模型兩次的結果也會有少數不同，差距小時要多跑一次確認。正確答案以 `gemini-3.8-flash` 的輸出為底再人工修正，對該模型的分數會偏高。
 
+#### 8.3.2 LLM 用量紀錄
+
+每一次 Gemini API 呼叫（包括失敗、schema 不合格後的重試、額度探測）都寫一列到 `llm_calls`：
+
+| 欄位 | 內容 |
+|---|---|
+| `purpose` | `structure`（結構化）、`embed`（embedding）、`probe`（額度探測）；之後的聊天為 `chat` |
+| `program_id` | 處理的福利（不設外鍵，福利刪除後紀錄仍保留） |
+| `model`、`prompt_version` | 實際使用的模型；prompt 版本是 `SYSTEM_PROMPT` 加上輸出 schema 的 sha256 前 12 碼（`PROMPT_VERSION`），改 prompt 就會變 |
+| `attempt` | 同一次結構化中第幾次呼叫（schema 不合格會重試一次） |
+| `input_tokens`、`output_tokens`、`thoughts_tokens`、`total_tokens` | Gemini 回報的 `usageMetadata`；失敗時為 null |
+| `input_chars`、`latency_ms`、`ok`、`error_kind`、`error` | 輸入字數、耗時、是否成功與錯誤類型（`quota`、`timeout`、`provider`、`schema`） |
+| `cost_usd` | 呼叫當下依 `lib/llm/pricing.ts` 估算的費用（不在價格表的模型為 null） |
+
+福利本身另外記下目前結果的 `structured_model`、`structured_prompt_version`（規則結構化時為 null）。回測與比較腳本不寫入這張表。
+
+查詢：
+
+```bash
+cd ~/apps/mou-welfare-v2/apps/api
+./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/llm-usage.ts              # 最近 30 天依日期／用途／模型彙總、錯誤、各版本的福利筆數
+./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/llm-usage.ts --days 7
+./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/llm-usage.ts --program <福利 id>   # 單筆福利的每次呼叫
+```
+
+預估費用以官方價格計算，實際帳單以 AI Studio 為準（兩者有差距時更新 `pricing.ts`）。
+
 ### 8.4 背景工作
 
 | 名稱 | 類型 | 內容 |
@@ -418,7 +445,7 @@ export interface LLM {
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
 | 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
 | HTTPS | Caddy：`api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 }`，切換後改為 `api.mou-welfare.com` |
-| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（Gemini 額度不足暫停時寄信，§8.4.1）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定，但目前 `LLM_DRIVER=rules`，見下方「目前狀態」）。完整定義見 `apps/api/src/env.ts` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（Gemini 額度不足暫停時寄信，§8.4.1；已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定，但目前 `LLM_DRIVER=rules`，見下方「目前狀態」）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
 | 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。GitHub Actions（`deploy.yml`）在 CI 通過後透過 SSH 傳入 commit SHA 觸發：authorized_keys 以 `command="…/deploy-api.sh --from-ssh"` 限定這把金鑰只能執行部署，`--from-ssh` 模式只接受完整的 40 碼 SHA（其他內容、包括空白一律拒絕）。設定見 `docs/deploy-setup.md` |
@@ -430,7 +457,7 @@ export interface LLM {
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration，待部署第 7 個 `0006_llm_pause`（Gemini 額度不足的暫停狀態）（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 6 個 migration，待部署 `0006_llm_pause`（Gemini 額度不足的暫停狀態）、`0007_llm_calls`（LLM 用量紀錄與福利的 `structured_model`、`structured_prompt_version`）（`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |

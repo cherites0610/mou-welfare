@@ -5,15 +5,15 @@ import type { Db } from '../db/client.ts'
 import { welfareAttachments, welfarePrograms as w } from '../db/schema/index.ts'
 import { LLMStructurer, RuleStructurer, type Structurer } from '../features/welfare/structure.ts'
 import type { Env } from '../env.ts'
-import { GeminiLLM, type LLM } from '../lib/llm/index.ts'
+import { GeminiLLM, type LLM, type UsageRecorder } from '../lib/llm/index.ts'
 import type { Queue } from '../lib/queue.ts'
 
 export type StructureOutcome = 'done' | 'skipped' | 'missing'
 
-export function createStructurer(env: Env): { structurer: Structurer; llm: LLM | null } {
+export function createStructurer(env: Env, recorder?: UsageRecorder): { structurer: Structurer; llm: LLM | null } {
   const driver = env.LLM_DRIVER ?? (env.GEMINI_API_KEY ? 'gemini' : 'rules')
   if (driver === 'gemini') {
-    const llm = new GeminiLLM(env.GEMINI_API_KEY!, env.GEMINI_MODEL, env.GEMINI_EMBED_MODEL)
+    const llm = new GeminiLLM(env.GEMINI_API_KEY!, env.GEMINI_MODEL, env.GEMINI_EMBED_MODEL, undefined, recorder)
     return { structurer: new LLMStructurer(llm), llm }
   }
   return { structurer: new RuleStructurer(), llm: null }
@@ -51,6 +51,7 @@ export async function structureProgram(
   let embedding: number[] | null = null
   try {
     r = await structurer.structure({
+      programId,
       title: p.name,
       city: p.city,
       contentMd: p.contentMd,
@@ -58,7 +59,7 @@ export async function structureProgram(
       sourceFields: p.sourceFields,
     })
     if (llm && r.isIndividualWelfare) {
-      embedding = (await llm.embed([embeddingText({ ...r, city: p.city })]))[0] ?? null
+      embedding = (await llm.embed([embeddingText({ ...r, city: p.city })], { purpose: 'embed', programId }))[0] ?? null
     }
   } catch (e) {
     await db
@@ -85,6 +86,8 @@ export async function structureProgram(
       structuredHash: p.contentHash,
       structuredBy: r.by,
       structuredAt: new Date(),
+      structuredModel: r.model ?? null,
+      structuredPromptVersion: r.promptVersion ?? null,
       structureError: null,
     })
     .where(and(eq(w.id, programId), p.contentHash ? eq(w.contentHash, p.contentHash) : isNull(w.contentHash)))

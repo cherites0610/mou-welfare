@@ -49,6 +49,7 @@ describe('LLM 額度不足：暫停、探測、恢復（docs/backend.md §8.4.1�
   // 可切換的 LLM：quota=true 時所有呼叫都回 402
   const state = { quota: true }
   const llm: LLM = {
+    model: 'fake-quota',
     async generate<T>(o: { schema: { parse: (v: unknown) => T } }) {
       if (state.quota) throw toLLMError(Object.assign(new Error('{"error":{"code":402,"status":"RESOURCE_EXHAUSTED"}}'), { status: 402 }))
       return o.schema.parse({ ok: true })

@@ -1,6 +1,7 @@
 // 福利結構化（docs/backend.md §8.3）：爬蟲送來的正文 → 摘要、類別、身分、資格、補助內容、截止日。
 // 有 Gemini 金鑰時用 LLM；沒有時用關鍵字規則，讓資料先可以被搜尋到，之後有金鑰再重新結構化。
 import { AGE_GROUPS, CATEGORIES, type Category, GENDERS, IDENTITIES, type Identity } from '@mou-welfare/shared'
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import type { LLM } from '../../lib/llm/index.ts'
 
@@ -39,6 +40,8 @@ export const LLMStructuredWelfare = StructuredWelfare.omit({ identities: true })
 export type LLMStructuredWelfare = z.infer<typeof LLMStructuredWelfare>
 
 export type StructureInput = {
+  /** 用量紀錄用（llm_calls.program_id）；回測時沒有 */
+  programId?: string
   title: string
   city: string
   contentMd: string
@@ -46,7 +49,7 @@ export type StructureInput = {
   sourceFields: Record<string, unknown>
 }
 
-export type StructureResult = StructuredWelfare & { by: 'llm' | 'rules' }
+export type StructureResult = StructuredWelfare & { by: 'llm' | 'rules'; model?: string; promptVersion?: string }
 
 export interface Structurer {
   readonly kind: 'llm' | 'rules'
@@ -100,6 +103,16 @@ export function buildInput(input: StructureInput): string {
   return text.slice(0, MAX_INPUT_CHARS)
 }
 
+/**
+ * prompt 與輸出格式的版本：內容一改就變，寫進 llm_calls 與 welfare_programs，事後才知道每筆是哪一版做的。
+ * 只看 prompt 與 schema；改 buildInput 不會變（需要時手動調整這裡的後綴）。
+ */
+export const PROMPT_VERSION = createHash('sha256')
+  .update(SYSTEM_PROMPT)
+  .update(JSON.stringify(z.toJSONSchema(LLMStructuredWelfare)))
+  .digest('hex')
+  .slice(0, 12)
+
 export class LLMStructurer implements Structurer {
   readonly kind = 'llm' as const
   constructor(private readonly llm: LLM) {}
@@ -109,9 +122,16 @@ export class LLMStructurer implements Structurer {
       system: SYSTEM_PROMPT,
       input: buildInput(input),
       schema: LLMStructuredWelfare,
+      meta: { purpose: 'structure', programId: input.programId, promptVersion: PROMPT_VERSION },
     })
     const identities = identityChecks.filter((c) => !c.canApplyWithout && hasEvidence(c)).map((c) => c.identity)
-    return { ...out, identities: sanitizeIdentities([...new Set(identities)]), by: 'llm' }
+    return {
+      ...out,
+      identities: sanitizeIdentities([...new Set(identities)]),
+      by: 'llm',
+      model: this.llm.model,
+      promptVersion: PROMPT_VERSION,
+    }
   }
 }
 
