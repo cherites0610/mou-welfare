@@ -1,5 +1,5 @@
 // 路由存取表：所有路由都必須在這裡登記（docs/testing.md §4.2 路由普查）。
-// 預設拒絕：未登記或標為 'user' 的路由一律要求登入。
+// 預設拒絕：未登記或標為 'user' 的路由一律要求登入；'admin' 另外要求管理者角色。
 import type { MiddlewareHandler } from 'hono'
 import type { Auth, SessionUser } from './lib/auth.ts'
 import { apiError } from './lib/errors.ts'
@@ -9,6 +9,7 @@ export type Access =
   | 'public' // 不需登入
   | 'optional' // 不需登入；有登入時提供使用者（例如附上資格比對）
   | 'user' // 需登入
+  | 'admin' // 管理端：需登入、Email 已驗證且 role = 'admin'（docs/backend.md §8.6）
   | 'hmac' // 爬蟲：HMAC 簽章（lib/hmac.ts）
   | 'line' // LINE webhook：x-line-signature（P4 實作）
 
@@ -39,6 +40,15 @@ export const ROUTE_ACCESS = {
   'GET /v1/welfare/:id': 'optional',
   'POST /v1/welfare/simulate': 'public',
   'POST /v1/uploads/avatar': 'user',
+  'GET /v1/admin/overview': 'admin',
+  'GET /v1/admin/welfare': 'admin',
+  'GET /v1/admin/welfare/:id': 'admin',
+  'PATCH /v1/admin/welfare/:id': 'admin',
+  'POST /v1/admin/welfare/:id/restructure': 'admin',
+  'GET /v1/admin/llm-usage': 'admin',
+  'GET /v1/admin/users': 'admin',
+  'GET /v1/admin/users/:id': 'admin',
+  'GET /v1/admin/audit': 'admin',
   'POST /internal/ingest': 'hmac',
   'POST /internal/remove': 'hmac',
 } as const satisfies Record<string, Access>
@@ -106,6 +116,9 @@ export function accessControl(auth: Auth, opts: AccessOptions = {}): MiddlewareH
     }
     const session = await auth.api.getSession({ headers: c.req.raw.headers })
     if (!session) return apiError(c, 401, 'unauthorized', '請先登入')
+    if (access === 'admin' && !(session.user.role === 'admin' && session.user.emailVerified)) {
+      return apiError(c, 403, 'forbidden', '需要管理者權限')
+    }
     c.set('user', session.user)
     return next()
   }

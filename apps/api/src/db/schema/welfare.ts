@@ -44,6 +44,14 @@ export const welfarePrograms = pgTable(
     /** 目前結果是哪個模型、哪一版 prompt 做的（規則結構化時為 null；docs/backend.md §8.3.2） */
     structuredModel: text('structured_model'),
     structuredPromptVersion: text('structured_prompt_version'),
+    /**
+     * 管理者的人工判定（docs/backend.md §8.6）：有值時結構化不改變狀態（active 但已過截止日仍會變 expired），
+     * 讓 LLM 重做或內容更新時不會把人工修正蓋掉。
+     */
+    statusOverride: text('status_override', { enum: ['active', 'rejected'] }),
+    reviewedBy: text('reviewed_by'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewNote: text('review_note'),
     /** 置頂：有值的福利在搜尋結果中排最前面（越晚置頂越前面）。目前用於開發用的範例資料，之後給管理端使用 */
     pinnedAt: timestamp('pinned_at', { withTimezone: true }),
     structureError: text('structure_error'),

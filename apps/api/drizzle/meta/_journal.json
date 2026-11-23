@@ -57,6 +57,13 @@
       "when": 1795399174422,
       "tag": "0007_llm_calls",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795402837196,
+      "tag": "0008_admin",
+      "breakpoints": true
     }
   ]
 }

@@ -58,7 +58,8 @@ export async function structureProgram(
       attachments,
       sourceFields: p.sourceFields,
     })
-    if (llm && r.isIndividualWelfare) {
+    // 人工判為福利的也要有 embedding，才搜尋得到
+    if (llm && (p.statusOverride ? p.statusOverride === 'active' : r.isIndividualWelfare)) {
       embedding = (await llm.embed([embeddingText({ ...r, city: p.city })], { purpose: 'embed', programId }))[0] ?? null
     }
   } catch (e) {
@@ -69,7 +70,9 @@ export async function structureProgram(
     throw e // 交給 pg-boss 重試
   }
 
-  const status = !r.isIndividualWelfare ? 'rejected' : r.deadline && r.deadline < today ? 'expired' : 'active'
+  // 人工判定優先（§8.6）：判為 rejected 就維持 rejected；判為 active 時仍依截止日變 expired
+  const individual = p.statusOverride ? p.statusOverride === 'active' : r.isIndividualWelfare
+  const status = !individual ? 'rejected' : r.deadline && r.deadline < today ? 'expired' : 'active'
   // 只在內容沒有再被更新的情況下寫回；被更新的話，新的工作會處理
   const updated = await db
     .update(w)

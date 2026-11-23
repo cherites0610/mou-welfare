@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { bigserial, boolean, doublePrecision, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { bigserial, boolean, doublePrecision, index, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 export const faqs = pgTable(
   'faqs',
@@ -55,6 +55,26 @@ export const llmCalls = pgTable(
     costUsd: doublePrecision('cost_usd'),
   },
   (t) => [index('llm_calls_created_idx').on(t.createdAt), index('llm_calls_program_idx').on(t.programId)],
+)
+
+/**
+ * 管理端稽核紀錄（docs/backend.md §8.6）：查看使用者個資、修改福利、重新結構化都會寫一列。
+ * admin_id 不設外鍵：管理者帳號刪除後紀錄仍保留。
+ */
+export const adminAudit = pgTable(
+  'admin_audit',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
+    adminId: text('admin_id').notNull(),
+    adminEmail: text('admin_email').notNull(),
+    action: text('action').notNull(),
+    targetType: text('target_type').notNull(),
+    targetId: text('target_id').notNull(),
+    detail: jsonb('detail').$type<Record<string, unknown>>().notNull().default({}),
+    ip: text('ip'),
+  },
+  (t) => [index('admin_audit_at_idx').on(t.at), index('admin_audit_target_idx').on(t.targetType, t.targetId)],
 )
 
 /** worker 心跳：/health 用來確認背景工作程序還活著（docs/testing.md §9.2） */

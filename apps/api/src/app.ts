@@ -5,6 +5,7 @@ import { accessControl, type AppVariables } from './access.ts'
 import type { Db } from './db/client.ts'
 import type { Env } from './env.ts'
 import { faqRoutes } from './features/faq/routes.ts'
+import { adminRoutes } from './features/admin/routes.ts'
 import { familyRoutes } from './features/family/routes.ts'
 import { favoriteRoutes } from './features/favorite/routes.ts'
 import { healthRoutes } from './features/health/routes.ts'
@@ -61,6 +62,7 @@ export function createApp(deps: Deps) {
   app.route('/', meRoutes)
   app.route('/', favoriteRoutes)
   app.route('/', familyRoutes)
+  app.route('/', adminRoutes)
   app.route('/', welfareRoutes)
   app.route('/', uploadRoutes)
   app.route('/', ingestRoutes)
