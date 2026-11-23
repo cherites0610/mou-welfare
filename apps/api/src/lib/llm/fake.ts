@@ -9,6 +9,9 @@ export class FakeLLM implements LLM {
     private readonly responses: {
       generate?: (input: string) => unknown
       stream?: string[]
+      /** 串流在吐出這麼多段後丟出錯誤（測試退回固定格式） */
+      streamFailAfter?: number
+      streamError?: LLMError
       dims?: number
       /** 測試用量紀錄：每次呼叫以字數當作 token 數回報 */
       recorder?: UsageRecorder
@@ -38,11 +41,22 @@ export class FakeLLM implements LLM {
     return parsed.data
   }
 
-  async *stream(_opts: { system: string; messages: Message[] }): AsyncIterable<string> {
-    for (const chunk of this.responses.stream ?? ['哞～', '這是測試回覆。']) yield chunk
+  /** 最後一次 stream 收到的內容（測試檢查 prompt） */
+  lastStream: { system: string; messages: Message[] } | null = null
+
+  async *stream(opts: { system: string; messages: Message[]; meta?: LLMCallMeta }): AsyncIterable<string> {
+    this.lastStream = { system: opts.system, messages: opts.messages }
+    const chunks = this.responses.stream ?? ['哞～', '這是測試回覆。']
+    const failAt = this.responses.streamFailAfter
+    for (const [i, chunk] of chunks.entries()) {
+      if (failAt !== undefined && i >= failAt) break
+      yield chunk
+    }
+    if (failAt !== undefined) throw this.responses.streamError ?? new LLMError('fake stream failed', 'provider')
+    await this.record(opts.meta ?? { purpose: 'chat' }, opts.system.length)
   }
 
-  async embed(texts: string[], meta?: LLMCallMeta): Promise<number[][]> {
+  async embed(texts: string[], meta?: LLMCallMeta, _task?: 'document' | 'query'): Promise<number[][]> {
     await this.record(meta ?? { purpose: 'embed' }, texts.join('').length)
     const dims = this.responses.dims ?? 768
     return texts.map((t) => Array.from({ length: dims }, (_, i) => ((t.charCodeAt(i % t.length) || 0) % 100) / 100))

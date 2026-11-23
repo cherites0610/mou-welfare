@@ -33,8 +33,10 @@ export interface LLM {
   readonly model: string
   /** 結構化輸出：回傳值一定通過 schema 驗證，否則丟出 LLMError */
   generate<T>(opts: { system: string; input: string; schema: z.ZodType<T>; model?: string; meta?: LLMCallMeta }): Promise<T>
-  stream(opts: { system: string; messages: Message[] }): AsyncIterable<string>
-  embed(texts: string[], meta?: LLMCallMeta): Promise<number[][]>
+  /** 串流回答；用量在串流結束時記錄（最後一個 chunk 才有 usageMetadata） */
+  stream(opts: { system: string; messages: Message[]; meta?: LLMCallMeta }): AsyncIterable<string>
+  /** task：福利本身用 document（預設），使用者的問題用 query（Gemini 的 RETRIEVAL_QUERY） */
+  embed(texts: string[], meta?: LLMCallMeta, task?: 'document' | 'query'): Promise<number[][]>
 }
 
 export class LLMError extends Error {

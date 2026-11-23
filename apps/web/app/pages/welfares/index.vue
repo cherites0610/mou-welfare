@@ -142,14 +142,14 @@ const refreshFavorites = async () => {
 }
 watch(() => !!session.value.data, (v) => v && refreshFavorites(), { immediate: true })
 
-// 阿哞聊天（v1 在列表頁開浮動聊天視窗；v2 的聊天尚未完成，先導向聊天頁）
+// 阿哞聊天：桌機在列表頁開浮動視窗（與 v1 相同），手機走底部導航的 /chat
 const isChatOpen = ref(false)
 const toggleChat = () => {
   if (!session.value.data) {
     router.push({ path: '/login', query: { redirect: '/chat' } })
     return
   }
-  router.push('/chat')
+  isChatOpen.value = !isChatOpen.value
 }
 </script>
 
@@ -192,6 +192,15 @@ const toggleChat = () => {
         </p>
       </div>
     </div>
+
+    <ClientOnly>
+      <transition name="fade">
+        <div v-if="isChatOpen"
+          class="fixed bottom-28 right-8 z-50 hidden md:block w-[400px] h-[min(640px,calc(100vh-10rem))] rounded-2xl shadow-2xl overflow-hidden border border-gray-100">
+          <ChatBoard @close="isChatOpen = false" />
+        </div>
+      </transition>
+    </ClientOnly>
 
     <div class="fixed bottom-8 right-8 z-50 hidden md:flex flex-col items-end gap-2">
       <transition name="fade">

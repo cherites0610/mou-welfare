@@ -4,6 +4,7 @@ import { cors } from 'hono/cors'
 import { accessControl, type AppVariables } from './access.ts'
 import type { Db } from './db/client.ts'
 import type { Env } from './env.ts'
+import { chatRoutes } from './features/chat/routes.ts'
 import { faqRoutes } from './features/faq/routes.ts'
 import { adminRoutes } from './features/admin/routes.ts'
 import { familyRoutes } from './features/family/routes.ts'
@@ -16,11 +17,21 @@ import { uploadRoutes } from './features/upload/routes.ts'
 import { welfareRoutes } from './features/welfare/routes.ts'
 import { AUTH_BASE_PATH, type Auth } from './lib/auth.ts'
 import type { Mailer } from './lib/mail/index.ts'
+import type { LLM } from './lib/llm/index.ts'
 import type { Queue } from './lib/queue.ts'
 import type { Storage } from './lib/storage.ts'
 import { ApiError, apiError } from './lib/errors.ts'
 
-export type Deps = { db: Db; auth: Auth; env: Env; mailer: Mailer; storage: Storage | null; queue: Queue }
+export type Deps = {
+  db: Db
+  auth: Auth
+  env: Env
+  mailer: Mailer
+  storage: Storage | null
+  queue: Queue
+  /** 聊天用的 LLM（docs/backend.md §8.9）；null 或未提供＝規則模式，聊天退回固定格式 */
+  llm?: LLM | null
+}
 export type AppEnv = { Variables: AppVariables & { deps: Deps } }
 
 export function createApp(deps: Deps) {
@@ -67,6 +78,7 @@ export function createApp(deps: Deps) {
   app.route('/', scraperAdminRoutes)
   app.route('/', welfareRoutes)
   app.route('/', uploadRoutes)
+  app.route('/', chatRoutes)
   app.route('/', ingestRoutes)
   app.route('/', scraperInternalRoutes)
 

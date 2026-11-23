@@ -55,21 +55,45 @@ export class GeminiLLM implements LLM {
     throw new LLMError('structured output does not match schema', 'schema')
   }
 
-  async *stream(opts: { system: string; messages: Message[] }): AsyncIterable<string> {
-    // TODO(P3 聊天)：串流的用量在最後一個 chunk 的 usageMetadata，接上聊天時一併記錄
-    const res = await this.call(null, () =>
-      this.ai.models.generateContentStream({
+  async *stream(opts: { system: string; messages: Message[]; meta?: LLMCallMeta }): AsyncIterable<string> {
+    const meta = opts.meta ?? { purpose: 'chat' }
+    const inputChars = opts.system.length + opts.messages.reduce((n, m) => n + m.content.length, 0)
+    const t0 = Date.now()
+    let usage: UsageMetadata | undefined
+    const record = (extra: Partial<LLMUsage>) =>
+      this.record({
+        ...meta,
+        model: this.model,
+        attempt: 1,
+        inputChars,
+        latencyMs: Date.now() - t0,
+        inputTokens: usage?.promptTokenCount ?? null,
+        outputTokens: usage?.candidatesTokenCount ?? null,
+        thoughtsTokens: usage?.thoughtsTokenCount ?? null,
+        totalTokens: usage?.totalTokenCount ?? null,
+        ok: true,
+        ...extra,
+      })
+    try {
+      const res = await this.ai.models.generateContentStream({
         model: this.model,
         contents: opts.messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
-        config: { systemInstruction: opts.system },
-      }),
-    )
-    for await (const chunk of res) {
-      if (chunk.text) yield chunk.text
+        config: { systemInstruction: opts.system, temperature: 0.3 },
+      })
+      for await (const chunk of res) {
+        // 用量在最後一個 chunk；每個 chunk 都帶的話取最後一次
+        if (chunk.usageMetadata) usage = chunk.usageMetadata
+        if (chunk.text) yield chunk.text
+      }
+    } catch (e) {
+      const err = toLLMError(e)
+      await record({ ok: false, errorKind: err.kind, error: err.message.slice(0, 300) })
+      throw err
     }
+    await record({})
   }
 
-  async embed(texts: string[], meta?: LLMCallMeta): Promise<number[][]> {
+  async embed(texts: string[], meta?: LLMCallMeta, task: 'document' | 'query' = 'document'): Promise<number[][]> {
     if (!texts.length) return []
     const res = await this.call(
       { model: this.embedModel, attempt: 1, inputChars: texts.reduce((s, t) => s + t.length, 0), meta: meta ?? { purpose: 'embed' } },
@@ -77,7 +101,7 @@ export class GeminiLLM implements LLM {
         this.ai.models.embedContent({
           model: this.embedModel,
           contents: texts,
-          config: { outputDimensionality: EMBEDDING_DIMS, taskType: 'RETRIEVAL_DOCUMENT' },
+          config: { outputDimensionality: EMBEDDING_DIMS, taskType: task === 'query' ? 'RETRIEVAL_QUERY' : 'RETRIEVAL_DOCUMENT' },
         }),
     )
     const vectors = (res.embeddings ?? []).map((e) => e.values ?? [])

@@ -17,9 +17,8 @@ const storage = createStorage(env)
 const auth = createAuth(db, env, mailer)
 // API 程序一定要能送出工作（爬蟲推送後排入結構化）；是否在本程序執行工作由 WORKER_MODE 決定
 const boss = await createBoss(env.DATABASE_URL)
-const app = createApp({ db, auth, env, mailer, storage, queue: new BossQueue(boss) })
-
 const { structurer, llm } = createStructurer(env, dbUsageRecorder(db))
+const app = createApp({ db, auth, env, mailer, storage, queue: new BossQueue(boss), llm })
 const jobs: Jobs | null = env.WORKER_MODE === 'inline' ? await startJobs({ db, boss, structurer, llm, mailer, alertTo: env.ALERT_EMAIL }) : null
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {

@@ -10,6 +10,7 @@ export type ErrorCode =
   | 'gone'
   | 'internal'
   | 'unavailable'
+  | 'rate_limited'
 
 export function apiError(c: Context, status: ContentfulStatusCode, code: ErrorCode, message: string, extra?: object) {
   return c.json({ error: { code, message, ...extra } }, status)

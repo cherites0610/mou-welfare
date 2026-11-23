@@ -1,6 +1,6 @@
 # 測試規範（v2）
 
-> 狀態：規範定案；CI 與自動部署已運作（API 測試 218 個、爬蟲測試 112 個；2026-11-23）
+> 狀態：規範定案；CI 與自動部署已運作（API 測試 269 個、爬蟲測試 113 個；2026-11-23）
 > 最後更新：2026-11-23
 > 適用範圍：`apps/api`、`apps/web`、`apps/admin`、`packages/shared`、`services/scraper`
 > 相關文件：[後端設計](backend.md)、[爬蟲設計](scraper.md)
@@ -95,7 +95,7 @@ const matrix = [
 | R4 | `identity != '[]'` 永遠成立，排序失效 | 有身分限制的福利排在前面；身分為空陣列的福利排在後面 |
 | R5 | 年齡只用年份相減 | 今天的前一天、當天、後一天滿 20 歲和滿 65 歲，各自要歸到正確的年齡組 |
 | R6 | `POST /welfare` 可帶任意 `userId` / `familyId` | 帶非自己所屬家庭的 `familyId`，回傳 403，而且回應裡不能出現該家庭成員的姓名或頭像（已實作：`tests/family.test.ts`，涵蓋搜尋、詳情、收藏） |
-| R7 | 聊天 session 沒檢查擁有者 | 讀取、刪除、續聊別人的 session，一律回傳 404 |
+| R7 | 聊天 session 沒檢查擁有者 | 讀取、刪除、續聊別人的 session，一律回傳 404，且不寫入訊息、不扣次數（已實作：`tests/chat.test.ts`） |
 | R8 | 任何登入者都能修改或刪除任何家庭 | 已涵蓋在權限矩陣（`tests/family.test.ts` 的「權限矩陣：家庭」：匿名／外人／成員／管理者） |
 | R9 | 可以直接把任何人加進任何家庭 | 只能透過邀請碼加入；邀請碼過期、已使用、不存在時回傳 4xx（已實作：`tests/family.test.ts`，含同一碼同時使用只有一人成功） |
 | R10 | `PATCH /users/:id` 可以修改 `lineId` / `googleId` | 更新個人資料時帶這兩個欄位，會被忽略或拒絕，資料庫內容不變 |
@@ -118,6 +118,7 @@ const matrix = [
   - 額度不足（`tests/jobs.test.ts`）：402／429 歸類為 `quota`；結構化遇到 402 → 暫停並寄一次通知、`/health` 顯示暫停但 `status` 仍為 ok、探測失敗時維持暫停且不重複寄信、恢復後寄恢復通知；重啟時已在暫停 → 立刻探測並恢復。
 - **爬蟲執行紀錄與系統檢查**（`tests/scraper.test.ts`）：回報需要 HMAC、格式錯誤 400；開始 → 每站 → 結束的狀態變化，全部正常不寄信；有站點不正常時狀態為 `warning` 並寄信一次（重複回報不重寄）；後台各站取最近一次結果與最後正常時間、詳情含隔離清單、一般使用者 403；系統檢查的中斷（4 小時沒有回報）、逾期（寄一次、24 小時內不重寄、恢復後解除）、沒有執行紀錄時不算逾期、結構化錯誤增加才寄信。爬蟲端（`services/scraper/tests/test_push.py`）測回報的順序與內容，以及一站丟出例外時記為 `failed`、其他站照常執行。
 - **第三方登入**（`tests/social.test.ts`，LINE 的 `/verify` 以 stub 的 fetch 取代）：未設定金鑰回 404、ID 與 secret 必須成對；Google 授權網址的 `redirect_uri`、`callbackURL` 不在 `TRUSTED_ORIGINS` 時 403；LIFF ID Token 建立新帳號、重複登入不重建、沒有 email 時用 `.invalid` 替代地址且不寄信、`aud` 不符拒絕、與已驗證帳號合併、與**未驗證**帳號不合併、沒有密碼的帳號收信設定密碼後可用密碼登入（docs/backend.md §8.5.1）。
+- **阿哞聊天**（docs/backend.md §8.9）：規則解析（縣市別名、身分口語、追問判斷、條件合併）、二字詞關鍵字、引用改寫（標註被切在兩段之間）、prompt 不含生日以表格測（`tests/chat-parse.test.ts`）；流程以 FakeLLM 測（`tests/chat.test.ts`）：SSE 順序 `sources → delta → done`、清單外的引用移除、存下訊息與條件、用量記為 `chat`、追問沿用主題、不套用個人資料、家庭模式燈號、居住縣市沒有資料、退回固定格式（沒有 LLM、額度暫停、串流中途失敗）、沒有結果不呼叫 LLM、每日 30 則（含同時送出不超過、刪除對話不歸零、臺北時間換日）、擁有者與家庭成員檢查、prompt 不含姓名／email／生日。Gemini 串流的用量紀錄與 `RETRIEVAL_QUERY` 在 `tests/gemini.test.ts`。檢索品質另以評測集（`pnpm --filter @mou-welfare/api eval:chat`）量測。
 - **管理端**（`tests/admin.test.ts`）：人工判定立即生效並寫入稽核紀錄；已過截止日的判為福利仍為 `expired`；取消判定會排入重新結構化；列表篩選；使用者列表不含生日與身分、查看詳情寫入 `user.view`；總覽與用量的統計。
 - **結構化回測**（不在 CI，會呼叫真實的 Gemini）：`pnpm --filter @mou-welfare/api eval:structure`，98 筆評測集與門檻見 `docs/backend.md` §8.3.1。改 prompt、換模型、改 schema 或 `buildInput` 時必須跑，結果附在 PR。
 - **環境變數**：缺少必要的變數時，應用程式拒絕啟動，並在錯誤訊息裡列出缺少的變數名稱。
@@ -160,7 +161,7 @@ const matrix = [
 | Email 註冊 → 驗證 → 填寫資料 | 完成後首頁顯示個人的資格比對結果 |
 | LINE 和 Google 登入 | 用 staging 的測試帳號，或在 staging 上換成假的 OAuth provider。目前 API 端由 `tests/social.test.ts` 涵蓋；2026-11-23 在正式環境以手機手動測過 LINE 網頁登入與 LIFF 自動登入 |
 | 建立家庭 → 產生邀請碼 → 另一個帳號加入 | 兩個帳號都能看到家庭；福利卡上出現家人的資格比對 |
-| 阿哞聊天 | 串流有逐字出現；參考來源卡可以點擊（staging 使用 FakeLLM） |
+| 阿哞聊天 | 串流有逐字出現；參考來源卡可以點擊（staging 使用 FakeLLM）。2026-11-23 以本機瀏覽器（Playwright）測過手機 `/chat` 與桌機浮動視窗：串流、福利卡、編號引用跳到詳情、追問換縣市 |
 | 刪除帳號 | 刪除後無法再登入，相關資料也已清除 |
 
 - 手機（iPhone、Android 尺寸）和桌機各跑一次。

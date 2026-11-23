@@ -39,6 +39,8 @@ pnpm typecheck && pnpm test && pnpm build
 
 # API（需要 apps/api/.env，參考 apps/api/src/env.ts；本機建議 MAIL_DRIVER=log，信件連結會印在終端機）
 pnpm dev:api
+# 本機要測阿哞的真實回答時才設 GEMINI_API_KEY，而且同時設 WORKER_MODE=off：
+# 有金鑰時啟動的 backfill 會把開發資料庫所有規則版的福利排進 LLM 結構化（約 1 美元，2026-11-23 差點發生）
 
 # 前端（指向本機 API）
 NUXT_PUBLIC_API_BASE=http://localhost:5031 pnpm dev:web
@@ -48,11 +50,13 @@ pnpm --filter @mou-welfare/api openapi       # 修改 API 後更新 openapi.json
 pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts   # 寫入置頂的範例福利（--remove 刪除；只在本機開發資料庫使用）
 pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/set-role.ts <email> admin   # 指定管理者（docs/admin.md §3）
 pnpm --filter @mou-welfare/api eval:structure   # 結構化回測（呼叫 Gemini，約 0.25 美元；docs/backend.md §8.3.1）
+pnpm --filter @mou-welfare/api eval:chat        # 聊天檢索評測（唯讀；--keyword-only 不呼叫 Gemini；docs/backend.md §8.9）
 
 # 主機上的維運（正式環境，env 檔為 ~/.config/mou-welfare/api.env）
 #   scripts/llm-usage.ts     LLM 用量與費用（docs/backend.md §8.3.2）
 #   scripts/restructure.ts   全量或部分重新結構化，先顯示預估費用，加 --yes 才執行（§8.4.1）
 #   scripts/set-role.ts      指定或取消管理者
+#   scripts/eval-chat.ts     聊天檢索評測（對正式資料唯讀，問題的 embedding 費用可忽略）
 
 # 爬蟲（dry-run 結果寫到 services/scraper/out/，報告在 out/reports/）
 cd services/scraper && uv sync && uv run pytest

@@ -1,6 +1,6 @@
 # 後端設計文件（v2）
 
-> 狀態：實作中（P1 核心 API、P2 資料流與 LLM 結構化、家庭與帳號管理、LINE / LIFF 登入、管理後台已上線；Google 登入待設定金鑰；前端除聊天與 LINE Bot 外已上線，見第 12 節）
+> 狀態：實作中（P1 核心 API、P2 資料流與 LLM 結構化、家庭與帳號管理、LINE / LIFF 登入、管理後台已上線；Google 登入待設定金鑰；前端除 LINE Bot 外已上線，見第 12 節）
 > 最後更新：2026-11-23（LLM 全量結構化完成、用量紀錄與額度保護、結構化回測、管理後台上線）
 
 > 相關文件：[管理後台](admin.md)、[爬蟲設計](scraper.md)、[測試規範](testing.md)、[自動部署設定](deploy-setup.md)、[v1 文件](v1/)
@@ -97,7 +97,7 @@ mou-welfare/
 │           │   ├── ingest/     # 接收爬蟲資料 → Queue
 │           │   ├── admin/      # 管理端 /v1/admin/*（admin.md）
 │           │   ├── health/
-│           │   ├── chat/       # （P3）規則解析、混合檢索、SSE 串流（§8.9）
+│           │   ├── chat/       # 阿哞聊天：規則解析、混合檢索、SSE 串流（§8.9）
 │           │   ├── line-bot/   # （P4）webhook、回覆、Flex message
 │           │   └── notify/     # （P4）
 │           ├── jobs/           # pg-boss 的工作與 cron；startJobs() 由 server.ts 或 worker.ts 呼叫；llm-pause.ts（§8.4.1）
@@ -193,6 +193,7 @@ favorites(user_id, program_id, created_at, pk(user_id, program_id))
 faqs(id, question, answer, sort, published)
 chat_sessions(id, user_id, family_id null, title, filters jsonb, created_at, updated_at)   -- filters：上一輪的條件，追問時沿用（§8.9）
 chat_messages(id, session_id, role, content, metadata jsonb, created_at)
+chat_usage(user_id, day date, count, pk(user_id, day))   -- 每人每日訊息數（臺北時間），刪除對話不會歸零（§8.9）
   -- assistant 的 metadata：sources（福利 id 與燈號）、filters、mode（llm | fallback）、model、tokens
 notification_log(id, user_id, channel, template, payload jsonb, status, sent_at)
 ingest_log(id, program_key, source_url, action, content_hash, received_at)   -- action: created | updated | unchanged | removed
@@ -208,7 +209,7 @@ scrape_runs(id pk, trigger, status, interval_days, planned, current, sites jsonb
 alert_state(key pk, value, sent_at)                                   -- 系統通知的去重（§8.4.2）
 ```
 
-`chat_sessions`、`chat_messages`、`notification_log` 為 P3／P4 預定，尚未建立。
+`notification_log` 為 P4 預定，尚未建立。
 
 ### 5.2 索引
 
@@ -363,7 +364,7 @@ export interface LLM {
 
 | 欄位 | 內容 |
 |---|---|
-| `purpose` | `structure`（結構化）、`embed`（embedding）、`probe`（額度探測）；之後的聊天為 `chat` |
+| `purpose` | `structure`（結構化）、`embed`（embedding）、`probe`（額度探測）、`chat`（聊天的問題 embedding 與回答） |
 | `program_id` | 處理的福利（不設外鍵，福利刪除後紀錄仍保留） |
 | `model`、`prompt_version` | 實際使用的模型；prompt 版本是 `SYSTEM_PROMPT` 加上輸出 schema 的 sha256 前 12 碼（`PROMPT_VERSION`），改 prompt 就會變 |
 | `attempt` | 同一次結構化中第幾次呼叫（schema 不合格會重試一次） |
@@ -498,53 +499,68 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 ### 8.9 聊天（阿哞）
 
-> 狀態：設計定案（2026-11-23），尚未實作。原則：**只有「產生文字」交給外部 LLM**；理解問題、檢索、對話紀錄都在自己這邊，LLM 不可用時聊天仍能列出符合的福利。
+> 狀態：2026-11-23 完成（API、前端、檢索評測集）；LINE Bot 共用聊天服務尚未做（§8.7）。原則：**只有「產生文字」交給外部 LLM**；理解問題、檢索、對話紀錄都在自己這邊，LLM 不可用時聊天仍能列出符合的福利。
 
 **與 v1 的差別**：v1 每則訊息呼叫兩次 LLM（NLU 判斷意圖、產生回答），檢索交給 Google Vertex AI Search（福利資料另外同步到 Google、要服務帳號金鑰），沒有串流；任一服務出問題聊天就整個不能用。
 
-| 環節 | v2 做法 | 外部依賴 |
+| 環節 | v2 做法（`apps/api/src/features/chat/`） | 外部依賴 |
 |---|---|---|
-| 理解問題 | **規則解析**（不用 LLM）：縣市（22 縣市與別名，臺／台）、身分（`SPECIAL_IDENTITIES` 與口語，例如身障、低收、懷孕）、年齡（長者、65 歲、小孩）、類別。沒提到的用個人資料補（家庭模式時用成員資料）；追問（「那臺北呢」）沿用 `chat_sessions.filters` 的上一輪條件 | 無 |
-| 檢索 | **一條 SQL**：`status = 'active'` 加條件篩選 → 語意分數（pgvector cosine，問題的 embedding）加關鍵字分數（pg_trgm）→ 取前 20 筆 → 現有的資格比對算紅黃綠燈 → 綠燈優先，取前 6 筆 | 問題的 embedding 呼叫 Gemini（費用可忽略）；失敗時只用條件與關鍵字 |
-| 對話紀錄 | `chat_sessions`、`chat_messages`，不使用供應商的 thread 功能 | 無 |
-| 產生回答 | **一次 LLM 串流呼叫**（`lib/llm` 的 `stream()`）：只能根據這 6 筆回答，以 `[[福利 id]]` 標註引用；不在 6 筆內的引用在輸出時移除 | Gemini（換供應商只改一個實作檔） |
-| LLM 不可用 | 額度暫停（§8.4.1）、逾時或錯誤時**退回固定格式**：「AI 暫時無法回覆，以下是依你的條件找到的福利」加上福利卡與燈號，`metadata.mode = 'fallback'` | 無 |
+| 理解問題 | **規則解析**（`parse.ts`，不用 LLM）：縣市（22 縣市、去掉「市／縣」的簡稱、臺／台、雙北、馬祖；只說新竹、嘉義時市與縣都算）、身分（低收、中低收、身障、原民、外配、長者、懷孕等口語）、年齡（「70 歲」）、類別。另有一小份同義詞表把口語加上公告常用的寫法（身障→身心障礙、租屋→房屋租金、輪椅→輔具、單親→特殊境遇家庭……），只加進關鍵字 | 無 |
+| 條件合併 | 縣市：提到就換，沒提到沿用上一輪，第一輪用個人資料的居住縣市。**追問**（去掉縣市、身分、語助詞後沒有實質內容，例如「那臺北呢」「那低收入戶呢」）沿用上一輪的主題並合併身分，檢索文字是「主題＋追問」；其他情況視為新問題。條件存在 `chat_sessions.filters` | 無 |
+| 檢索 | **一條 SQL**（`retrieve.ts`）：`status = 'active'`、縣市篩選 → 分數 = 0.7 × 語意（pgvector cosine，問題用 `RETRIEVAL_QUERY` 的 embedding）＋ 0.3 × 關鍵字，再加權（福利要求的身分與問題提到的重疊 +0.05、類別相符 +0.03、使用者或家人可能符合 +0.03）→ 取前 20 筆做資格比對 → 綠燈 +0.04、黃燈 +0.02 → 取前 6 筆，分數低於第一名 60% 的不列 | 問題的 embedding 呼叫 Gemini（費用可忽略）；失敗、沒有金鑰或額度暫停時只用關鍵字 |
+| 關鍵字分數 | **不用 pg_trgm**：它把整句中文當成一個詞（「育兒津貼」對「臺北市育兒津貼補助」只有 0.4）。改成問題關鍵字的**二字詞**有幾成出現在名稱（權重 1）與摘要（權重 0.5） | 無 |
+| 縣市沒有資料 | 篩選的縣市完全沒有福利（還沒收錄）時改列其他縣市的，並在 prompt 要求先說明 | 無 |
+| 對話紀錄 | `chat_sessions`、`chat_messages`，不使用供應商的 thread 功能；最近 6 則（拿掉引用）帶進 prompt | 無 |
+| 產生回答 | **一次 LLM 串流呼叫**（`lib/llm` 的 `stream()`，temperature 0.3）。prompt 裡的福利以 1–6 編號，LLM 以 `[[編號]]` 標註；伺服器串流時換成 `[[福利 id]]`，不在清單內的編號直接移除（`CitationRewriter`，標註被切在兩個 chunk 之間也能處理） | Gemini（換供應商只改一個實作檔） |
+| LLM 不可用 | 沒有金鑰（規則模式）、額度暫停中（`llm_pause` 有資料，§8.4.1）、串流逾時或錯誤時**退回固定格式**：「AI 暫時無法回覆，以下是依你的條件找到的福利」加上福利清單與福利卡，`metadata.mode = 'fallback'`、`metadata.error` 記下原因。沒有找到任何福利時不呼叫 LLM | 無 |
 
-**一則訊息的流程**（`POST /v1/chat/sessions/:id/messages`，SSE）：
+**API**（全部需要登入；別人的對話一律 404，R7）：
 
-1. 檢查登入、session 擁有者（`assertChatOwner`）、每日次數。
+| 端點 | 說明 |
+|---|---|
+| `GET /v1/chat/sessions` | 最近 50 個對話，`meta.quota` 為今日已用與上限 |
+| `POST /v1/chat/sessions` | 開新對話（前端在送出第一則時才建立） |
+| `GET /v1/chat/sessions/:id` | 對話與訊息（助理訊息附 `sources`、`mode`） |
+| `DELETE /v1/chat/sessions/:id` | 刪除對話（不會讓今日次數歸零） |
+| `POST /v1/chat/sessions/:id/messages` | `{ content（1–500 字）, familyId?, useProfile（預設 true） }`，回 SSE |
+
+**一則訊息的流程**：
+
+1. 擁有者（404）、家庭成員（403）、每日次數（429）在開始串流前檢查，回一般的 HTTP 狀態碼。次數以條件式 upsert 原子地加一（`chat_usage`），同時送出也不會超過。
 2. 規則解析條件，與個人資料、上一輪條件合併，存回 `chat_sessions.filters`。
-3. 檢索並做資格比對。
-4. SSE 先送 `sources`（福利卡與燈號，不等 LLM），再送 `delta`（逐段文字），最後送 `done`（訊息 id、模式）。錯誤時送 `error` 並退回固定格式。
-5. 存下使用者與助理的訊息；用量寫入 `llm_calls`（`purpose = 'chat'`，管理後台的 LLM 用量頁自動顯示）。串流的用量在最後一個 chunk 的 `usageMetadata`。
+3. 檢索並做資格比對（`useProfile = false` 時不比對、也不用居住縣市；`familyId` 附上家人的燈號）。
+4. SSE 依序送出：`sources`（福利卡與燈號，不等 LLM）→ `delta`（逐段文字）→ `done`（訊息 id、模式、**完整內容**：前端以它取代逐段文字，所以串流到一半失敗改成固定格式也正確）。非預期的錯誤送 `error`。回應加 `cache-control: no-transform`、`x-accel-buffering: no`。
+5. 存下使用者與助理的訊息；用量寫入 `llm_calls`（`purpose = 'chat'`：問題的 embedding 與回答各一列，串流的用量取最後一個 chunk 的 `usageMetadata`；管理後台的 LLM 用量頁自動顯示）。
 
-**Prompt 的內容**：系統規則（只談台灣政府福利、只根據提供的福利回答、不確定時請使用者看原公告或洽承辦單位、繁體中文）、6 筆福利（id、名稱、縣市、摘要、資格、補助內容、截止日、燈號與原因）、粗略條件、最近 6 則對話。
+**Prompt 的內容**（`prompt.ts`）：系統規則（只根據提供的福利回答、第一次提到時標註編號、考慮燈號且不保證符合、無關時說沒找到、只談福利、300 字內不用表格、不索取個資）、今天日期、條件（縣市、問題提到的身分、使用者的年齡層／性別／身分、家人的年齡層與身分）、6 筆福利（名稱、縣市、摘要、資格、補助內容、截止日、對使用者與家人的燈號）、最近 6 則對話。
 
 **決定事項**（2026-11-23）：
 
 - **必須登入**（控制費用與濫用，也才能用個人資料比對資格）。
-- **每人每日 30 則**（台北時間計算），超過時回 429 並提示明天再來。
+- **每人每日 30 則**（臺北時間計算），超過時回 429 並提示明天再來。
 - **LLM 不可用時退回列出福利**，不顯示「暫停服務」。
 
-**個資**：送到 LLM 的只有問題、公開的福利內容、粗略條件（年齡層、縣市、身分標籤）；不送姓名、email、生日，家人也只送年齡層與身分。
+**個資**：送到 LLM 的只有問題、公開的福利內容、粗略條件（年齡層、性別、縣市、身分標籤）；不送姓名、email、生日，家人以「家人 1、2」表示，也只送年齡層與身分（`tests/chat.test.ts` 檢查 prompt 不含姓名、email、生日）。
 
-**費用**：每則約 0.002 美元（輸入約 4,000 tokens、輸出約 400 tokens，`gemini-3.5-flash-lite`）；一天 1,000 則約 2 美元。
+**費用**：每則約 0.002 美元（輸入約 4,000 tokens、輸出約 400 tokens，`gemini-3.5-flash-lite`）；一天 1,000 則約 2 美元。上限 30 則／人／日。
 
 **自己跑模型**：主機 2 核、1.9 GB 記憶體（可用約 700 MB），對話模型不可行。embedding 可以換成本機小模型（例如 multilingual-e5-small 量化版約 120 MB），但要把全部福利重算、記憶體也緊；先用 Gemini 加關鍵字備援，之後要拿掉這個依賴時只改 `embed()` 的實作。
 
+**前端**（`apps/web`）：`components/ChatBoard.vue` 照 v1 的 ChatBoard 重做；手機是 `/chat` 全頁（底部導航「阿哞」），桌機在福利列表點右下的阿哞開浮動視窗。送訊息用 `fetch` 讀串流（EventSource 只能 GET），`composables/useChat.ts` 解析 SSE。回答裡的引用顯示成編號小標，對應下方福利卡的編號，點擊站內換頁；福利卡顯示燈號、縣市、家人的燈號。輸入區有新對話、歷史對話、家庭模式、「套用個人資料」開關，標題列顯示今天還可以問幾則。
+
 **品質**：
 
-- 檢索評測集（`apps/api/eval/chat-cases.json`）：約 40 個真實問法，各標出應找到的福利，量前 6 筆的召回率，達標才上線（比照 §8.3.1）。
-- 規則解析用表格測（輸入問法 → 條件）。
-- 流程用 FakeLLM 測：串流順序、引用過濾、退回固定格式、次數限制、擁有者檢查。
+- **檢索評測集**：`apps/api/eval/chat-cases.json` 有 42 個真實問法（含 2 個追問），各標出應找到的福利（以 `program_key` 標註）。`pnpm --filter @mou-welfare/api eval:chat [--keyword-only] [--verbose]` 對資料庫唯讀執行（要 `DATABASE_URL`；語意模式另要 `GEMINI_API_KEY`），量前 6 筆至少命中一筆的比例。門檻：語意＋關鍵字 ≥ 90%、只用關鍵字 ≥ 75%；低於門檻以非 0 結束。正確答案下架時會列出，要更新評測集。
+- **結果**（2026-11-23，正式資料）：語意＋關鍵字 97.6% → 加入同義詞後 **100%**（平均召回率 97.2%）；只用關鍵字 88.1% → **100%**（93.7%）。**注意**：同義詞是看了沒命中的題目後才加的，對這份評測集會偏樂觀；之後要從實際的提問（`chat_messages`）抽新的問法加進評測集。
+- 規則解析、關鍵字、引用改寫、prompt 用表格測（`tests/chat-parse.test.ts`）；流程用 FakeLLM 測（`tests/chat.test.ts`）：SSE 順序、引用改寫與過濾、追問、套用個人資料、家庭模式、縣市沒有資料、三種退回固定格式、沒有結果不呼叫 LLM、次數限制（含同時送出）、擁有者與家庭成員檢查、prompt 不含個資。
 - 回答品質抽樣人工檢查。
 
 **實作順序**：
 
-1. 規則解析與混合檢索，加檢索評測集。
-2. 資料表與聊天 API（SSE、次數限制、退回固定格式）。
+1. ✅ 規則解析與混合檢索，加檢索評測集。
+2. ✅ 資料表與聊天 API（SSE、次數限制、退回固定格式）。
 3. 驗證 SSE 經過 Cloudflare 與 Caddy 不被緩衝（§11 P0）。
-4. 前端照 v1 的 ChatBoard 重做（手機 `/chat`、桌機右下浮動視窗）。
+4. ✅ 前端照 v1 的 ChatBoard 重做（手機 `/chat`、桌機右下浮動視窗）。
 5. LINE Bot 共用同一個聊天服務（不串流，收齊後回覆並附福利 Flex 卡片，§8.7）。
 
 ## 9. 資料庫基礎設施（已完成）
@@ -592,7 +608,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 10 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`；`0009_scraper_runs`：`scrape_runs`、`alert_state`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 11 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`；`0009_scraper_runs`：`scrape_runs`、`alert_state`；`0010_chat`：`chat_sessions`、`chat_messages`、`chat_usage`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
@@ -690,10 +706,10 @@ cd ~/apps/mou-welfare-v2/apps/api
 | **P0 骨架與驗證** | monorepo（pnpm）、`packages/shared`、API（Hono + Drizzle + Better Auth + pg-boss）部署到 `api-v2.mou-welfare.com`、Nuxt 骨架部署到 Workers | 第 11 節四項驗證全部通過 |
 | **P1 核心 API** ✅ | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware、管理端 | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出（2026-11-23 管理端 `/v1/admin/*` 也完成） |
 | **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（正式環境 12 縣市 1,471 筆；2026-11-23 以 Gemini 全量結構化完成，可搜尋 985 筆） |
-| **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天設計定案（2026-11-23，§8.9），尚未實作 |
+| **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天（規則解析、混合檢索、SSE、每日 30 則、退回固定格式、前端）完成（2026-11-23，§8.9）；LINE Bot 共用聊天服務待 P4 |
 | **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | Google / LINE / LIFF 登入的程式已完成（2026-11-23，`tests/social.test.ts`）；LINE 與 LIFF 已啟用，Google 待設定金鑰；其餘未開始 |
 | **管理後台** ✅ | 總覽、福利檢核、LLM 用量、使用者（唯讀）、稽核紀錄 | 2026-11-23 上線 `admin.mou-welfare.com`（[admin.md](admin.md)） |
-| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天頁、LINE 分享待 P3 / P4） |
+| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天 2026-11-23 完成；LINE 分享待 P4） |
 
 ---
 

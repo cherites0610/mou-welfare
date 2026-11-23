@@ -62,6 +62,13 @@ describe('GeminiLLM.embed', () => {
     await expect(llm.embed(['a'])).rejects.toMatchObject({ kind: 'provider' })
   })
 
+  it('問題用 RETRIEVAL_QUERY，福利用 RETRIEVAL_DOCUMENT', async () => {
+    models.embedContent.mockResolvedValue({ embeddings: [{ values: Array(768).fill(1) }] })
+    await llm.embed(['a'])
+    await llm.embed(['a'], { purpose: 'chat' }, 'query')
+    expect(models.embedContent.mock.calls.map((c) => c[0].config.taskType)).toEqual(['RETRIEVAL_DOCUMENT', 'RETRIEVAL_QUERY'])
+  })
+
   it('空陣列不呼叫 API', async () => {
     expect(await llm.embed([])).toEqual([])
     expect(models.embedContent).not.toHaveBeenCalled()
@@ -85,5 +92,23 @@ describe('GeminiLLM.stream', () => {
     for await (const s of llm.stream({ system: 's', messages: [{ role: 'user', content: 'q' }, { role: 'assistant', content: 'a' }] })) out.push(s)
     expect(out).toEqual(['哞～', '你好'])
     expect(models.generateContentStream.mock.calls[0]![0].contents.map((c: { role: string }) => c.role)).toEqual(['user', 'model'])
+  })
+
+  it('串流結束時以最後一個 chunk 的 usageMetadata 記錄用量；失敗時記錄錯誤並丟出 LLMError', async () => {
+    const usage: unknown[] = []
+    const rec = new GeminiLLM('key', 'gemini-test', 'embed-test', 1000, async (u) => void usage.push(u))
+    models.generateContentStream.mockResolvedValueOnce(
+      (async function* () {
+        yield { text: 'a' }
+        yield { text: 'b', usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 20, totalTokenCount: 120 } }
+      })(),
+    )
+    for await (const _ of rec.stream({ system: 's', messages: [{ role: 'user', content: 'q' }], meta: { purpose: 'chat' } })) void _
+    expect(usage[0]).toMatchObject({ purpose: 'chat', model: 'gemini-test', inputTokens: 100, outputTokens: 20, ok: true })
+
+    models.generateContentStream.mockRejectedValueOnce(Object.assign(new Error('RESOURCE_EXHAUSTED'), { status: 429 }))
+    const it = rec.stream({ system: 's', messages: [{ role: 'user', content: 'q' }] })
+    await expect(it[Symbol.asyncIterator]().next()).rejects.toMatchObject({ kind: 'quota' })
+    expect(usage[1]).toMatchObject({ purpose: 'chat', ok: false, errorKind: 'quota' })
   })
 })

@@ -15,6 +15,7 @@
     "openapi": "tsx scripts/openapi.ts",
     "check:openapi": "tsx scripts/openapi.ts --check",
     "eval:structure": "tsx --env-file-if-exists=.env scripts/eval-structure.ts",
+    "eval:chat": "tsx --env-file-if-exists=.env scripts/eval-chat.ts",
     "restructure": "tsx --env-file-if-exists=.env scripts/restructure.ts",
     "llm:usage": "tsx --env-file-if-exists=.env scripts/llm-usage.ts"
   },
