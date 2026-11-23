@@ -11,6 +11,8 @@
   // 過渡期網域；正式切換時改為 mou-welfare.com（docs/backend.md §10.3）
   "routes": [{ "pattern": "v2.mou-welfare.com", "custom_domain": true }],
   "vars": {
-    "NUXT_PUBLIC_API_BASE": "https://api-v2.mou-welfare.com"
+    "NUXT_PUBLIC_API_BASE": "https://api-v2.mou-welfare.com",
+    // LIFF app 的 ID（公開值）；空字串＝不啟用 LIFF 自動登入。LIFF 的 Endpoint URL 要和前端網域一致
+    "NUXT_PUBLIC_LIFF_ID": ""
   }
 }

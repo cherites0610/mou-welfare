@@ -76,7 +76,7 @@ const isSelected = (option: string) =>
   isAgeIdentity(option) ? ageIdentity.value === option : form.identities.includes(option)
 const previewIdentities = computed(() => [...(ageIdentity.value ? [ageIdentity.value] : []), ...form.identities])
 
-const previewName = computed(() => form.name || me.value?.email?.split('@')[0] || '未命名用戶')
+const previewName = computed(() => form.name || displayEmail(me.value?.email).split('@')[0] || '未命名用戶')
 
 const toggleIdentity = (option: string) => {
   if (isAgeIdentity(option)) return

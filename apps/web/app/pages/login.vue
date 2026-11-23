@@ -37,15 +37,15 @@ const handleLogin = async () => {
     errorMsg.value = authErrorMessage(error, '登入失敗，請檢查帳號密碼')
     return
   }
-  const redirect = route.query.redirect as string | undefined
-  // 只接受站內路徑，避免開放式重新導向
-  router.push(redirect?.startsWith('/') && !redirect.startsWith('//') ? redirect : '/welfares')
+  router.push(safeRedirect(route.query.redirect))
 }
 
 const goVerify = () => router.push({ path: '/verify', query: { flow: 'register', email: form.email } })
 
-// v2 尚未串接 Google / LINE（P4）
-const comingSoon = () => ElMessage.info('即將開放，請先使用信箱登入')
+// 第三方登入失敗時，Better Auth 轉回這裡並附上 ?error=
+if (typeof route.query.error === 'string') errorMsg.value = oauthErrorMessage(route.query.error)
+const social = (provider: SocialProvider) =>
+  startSocialLogin(provider, { redirect: route.query.redirect as string | undefined })
 </script>
 
 <template>
@@ -96,11 +96,11 @@ const comingSoon = () => ElMessage.info('即將開放，請先使用信箱登入
     <div class="mt-5">
       <p class="text-xs text-gray-400 text-center mb-3">其餘登入方式</p>
       <div class="flex justify-center gap-4">
-        <button @click="comingSoon" aria-label="使用 Google 登入"
+        <button @click="social('google')" aria-label="使用 Google 登入"
           class="w-10 h-10 rounded-full bg-mygreen flex items-center justify-center hover:bg-[#7dab00] transition-colors">
           <Icon icon="logos:google-icon" class="text-lg" />
         </button>
-        <button @click="comingSoon" aria-label="使用 LINE 登入"
+        <button @click="social('line')" aria-label="使用 LINE 登入"
           class="w-10 h-10 rounded-full bg-mygreen flex items-center justify-center hover:bg-[#7dab00] transition-colors">
           <Icon icon="simple-icons:line" class="text-lg text-white" />
         </button>

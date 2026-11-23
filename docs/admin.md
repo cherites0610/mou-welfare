@@ -236,5 +236,4 @@ cd apps/api && ./node_modules/.bin/tsx --env-file=.env scripts/set-role.ts <本�
 - [ ] 把人工判定的結果匯出成評測集的補充案例。
 - [ ] 福利結構化欄位的人工修正（目前只能改狀態），需要先設計「人工修正的欄位不被結構化覆蓋」。
 - [ ] 批次操作（一次判定多筆）。
-- [ ] FAQ 管理（`/v1/admin/faq/*`，目前前台的常見問題寫死在程式中）。
 - [ ] 管理者登入加上第二道驗證（例如 Better Auth 的 two-factor plugin），或限制來源 IP。

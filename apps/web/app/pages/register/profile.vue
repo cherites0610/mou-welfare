@@ -24,9 +24,11 @@ const form = reactive({
   avatarUrl: '',
 })
 
+// 第三方登入的新帳號：預先帶入 LINE / Google 的名稱與頭像
 watchEffect(() => {
-  const img = session.value.data?.user.image
-  if (img && !form.avatarUrl) form.avatarUrl = img
+  const u = session.value.data?.user
+  if (u?.image && !form.avatarUrl) form.avatarUrl = u.image
+  if (u?.name && !form.name) form.name = u.name
 })
 
 const birthdayYear = ref('')

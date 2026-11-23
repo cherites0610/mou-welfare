@@ -8,6 +8,34 @@ import { resetPasswordMail, verificationMail } from './mail/templates.ts'
 
 export const AUTH_BASE_PATH = '/v1/auth'
 
+/**
+ * LINE 沒有提供 email 時（channel 未申請 email 權限，或使用者沒有登錄 email）的替代地址。
+ * Better Auth 的 user 必須有 email；`.invalid` 是保留網域（RFC 2606），一律不寄信。
+ */
+export const PLACEHOLDER_EMAIL_DOMAIN = 'line.invalid'
+export const isPlaceholderEmail = (email: string) => email.toLowerCase().endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`)
+
+type LineProfile = { sub: string; email?: string }
+
+function socialProviders(env: Env) {
+  return {
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET, prompt: 'select_account' as const } }
+      : {}),
+    ...(env.LINE_CHANNEL_ID && env.LINE_CHANNEL_SECRET
+      ? {
+          line: {
+            clientId: env.LINE_CHANNEL_ID,
+            clientSecret: env.LINE_CHANNEL_SECRET,
+            // LINE 回傳的 email 已由 LINE 驗證過；沒有 email 時改用替代地址（未驗證）
+            mapProfileToUser: (p: LineProfile) =>
+              p.email ? { email: p.email, emailVerified: true } : { email: `${p.sub}@${PLACEHOLDER_EMAIL_DOMAIN}`, emailVerified: false },
+          },
+        }
+      : {}),
+  }
+}
+
 export function createAuth(db: Db, env: Env, mailer: Mailer) {
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
@@ -26,6 +54,7 @@ export function createAuth(db: Db, env: Env, mailer: Mailer) {
       revokeSessionsOnPasswordReset: true,
       // R14：Better Auth 對不存在的 email 也回傳相同結果，只是不寄信
       sendResetPassword: async ({ user, url }) => {
+        if (isPlaceholderEmail(user.email)) return
         await mailer.send(resetPasswordMail(user.email, user.name, url))
       },
     },
@@ -34,7 +63,20 @@ export function createAuth(db: Db, env: Env, mailer: Mailer) {
       autoSignInAfterVerification: true,
       expiresIn: 60 * 60,
       sendVerificationEmail: async ({ user, url }) => {
+        if (isPlaceholderEmail(user.email)) return
         await mailer.send(verificationMail(user.email, user.name, url))
+      },
+    },
+    socialProviders: socialProviders(env),
+    account: {
+      accountLinking: {
+        enabled: true,
+        // 用 email 自動合併到既有帳號時，第三方的 email 要已驗證（Google 看 email_verified；LINE 見 mapProfileToUser），
+        // 既有帳號的 email 也必須已驗證（requireLocalEmailVerified 預設 true），避免有人先用別人的 email 註冊等著被合併。
+        // LINE 列為信任：沒有 email 的 LINE 帳號（替代地址）才能在個人設定頁主動綁定；替代地址不會對上任何既有帳號
+        trustedProviders: ['line'],
+        // 個人設定頁主動綁定時（已登入），允許 LINE / Google 的 email 和帳號不同
+        allowDifferentEmails: true,
       },
     },
     // R15：登入、註冊、重設密碼限流（以 CF-Connecting-IP 計算，見 advanced.ipAddress）
@@ -47,6 +89,7 @@ export function createAuth(db: Db, env: Env, mailer: Mailer) {
         '/sign-up/email': { window: 60, max: 5 },
         '/request-password-reset': { window: 300, max: 3 },
         '/send-verification-email': { window: 300, max: 3 },
+        '/sign-in/social': { window: 60, max: 10 },
       },
     },
     user: {
@@ -61,6 +104,8 @@ export function createAuth(db: Db, env: Env, mailer: Mailer) {
       },
     },
     advanced: {
+      // Better Auth 在測試環境預設略過來源與 callbackURL 檢查；明確開啟，讓測試和正式環境的行為一致
+      disableOriginCheck: false,
       // 經 Cloudflare / Caddy 代理時，真實 IP 在 CF-Connecting-IP（限流用，回歸測試 R15）
       ipAddress: { ipAddressHeaders: ['cf-connecting-ip', 'x-forwarded-for'] },
     },

@@ -12,6 +12,8 @@ export default defineNuxtConfig({
     public: {
       // NUXT_PUBLIC_API_BASE 覆寫；正式環境為 https://api-v2.mou-welfare.com
       apiBase: 'http://localhost:5031',
+      // NUXT_PUBLIC_LIFF_ID 覆寫；空字串＝不啟用 LIFF 自動登入（plugins/liff.client.ts）
+      liffId: '',
     },
   },
   // 登入相關與個人頁面只在瀏覽器渲染（session cookie 在 API 網域，SSR 讀不到）
@@ -20,6 +22,7 @@ export default defineNuxtConfig({
     '/register': { ssr: false },
     '/register/**': { ssr: false },
     '/verify': { ssr: false },
+    '/oauth-callback': { ssr: false },
     '/forgot-password': { ssr: false },
     '/reset-password': { ssr: false },
     '/profile': { ssr: false },

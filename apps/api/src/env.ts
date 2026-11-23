@@ -27,6 +27,12 @@ const EnvSchema = z
 
     /** 系統通知（例如 Gemini 額度不足暫停結構化）的收件人；未設定時只記 log */
     ALERT_EMAIL: z.email().optional(),
+    /** 第三方登入（docs/backend.md §8.5.1）。成對設定才會啟用；未設定時該登入方式回 404，前端顯示「即將開放」 */
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+    /** LINE Login channel（LIFF 也掛在同一個 channel，ID Token 的 aud 就是 channel ID） */
+    LINE_CHANNEL_ID: z.string().optional(),
+    LINE_CHANNEL_SECRET: z.string().optional(),
     /** 寄信：resend＝真的寄出；log＝只印在終端機（開發用） */
     MAIL_DRIVER: z.enum(['resend', 'log']).default('log'),
     RESEND_API_KEY: z.string().startsWith('re_').optional(),
@@ -50,6 +56,9 @@ const EnvSchema = z
     }
     if (e.LLM_DRIVER === 'gemini' && !e.GEMINI_API_KEY) {
       ctx.addIssue({ code: 'custom', path: ['GEMINI_API_KEY'], message: 'LLM_DRIVER=gemini 時必填' })
+    }
+    for (const [a, b] of [['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'], ['LINE_CHANNEL_ID', 'LINE_CHANNEL_SECRET']] as const) {
+      if (!e[a] !== !e[b]) ctx.addIssue({ code: 'custom', path: [e[a] ? b : a], message: `${a} 與 ${b} 需同時設定` })
     }
     if (e.STORAGE_DRIVER === 'r2') {
       for (const k of ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_BASE_URL'] as const) {

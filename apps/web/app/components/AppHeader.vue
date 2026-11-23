@@ -15,7 +15,7 @@ const authMenuItems = [{ path: '/profile', name: '用戶', icon: 'mdi:account-ci
 const loggedIn = computed(() => !!session.value.data)
 const desktopMenuItems = computed(() => (loggedIn.value ? [...publicMenuItems, ...authMenuItems] : publicMenuItems))
 const isActive = (path: string) => route.path.startsWith(path)
-const userName = computed(() => session.value.data?.user.email || 'User')
+const userName = computed(() => displayEmail(session.value.data?.user.email) || session.value.data?.user.name || 'User')
 
 const handleLogout = async () => {
   await useAuth().signOut()

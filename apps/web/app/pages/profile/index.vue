@@ -33,6 +33,15 @@ const loadProviders = async () => {
   accounts.value = (data ?? []).map((a) => ({ providerId: a.providerId, accountId: a.accountId }))
 }
 
+// 綁定 Google / LINE 後由 Better Auth 轉回：成功帶 ?linked=，失敗帶 ?error=
+const route = useRoute()
+onMounted(() => {
+  const { linked, error } = route.query
+  if (typeof error === 'string') ElMessage.error(oauthErrorMessage(error))
+  else if (linked === 'google' || linked === 'line') ElMessage.success(`已綁定 ${PROVIDER_LABEL[linked]}`)
+  if (linked || error) navigateTo('/profile', { replace: true })
+})
+
 onMounted(async () => {
   try {
     await Promise.all([refreshMe(), familyStore.load(), loadProviders()])
@@ -75,7 +84,7 @@ watch(
 // --- Helper Functions ---
 const getDisplayName = (user: Me | null) => {
   if (!user) return '讀取中...'
-  return user.name || user.email?.split('@')[0] || '未命名用戶'
+  return user.name || displayEmail(user.email).split('@')[0] || '未命名用戶'
 }
 
 // v1 的年齡組由使用者自選；v2 依生日自動判斷（與資格比對相同的函式）
@@ -317,7 +326,7 @@ const confirmDeleteAccount = async () => {
                 </button>
               </div>
 
-              <p class="text-sm text-gray-400 mt-0.5 truncate">{{ me?.email }}</p>
+              <p v-if="displayEmail(me?.email)" class="text-sm text-gray-400 mt-0.5 truncate">{{ displayEmail(me?.email) }}</p>
 
               <!-- 綁定帳號徽章 -->
               <div v-if="hasLine || hasGoogle" class="flex items-center gap-2 mt-2">
@@ -575,6 +584,28 @@ const confirmDeleteAccount = async () => {
           <h2 class="text-gray-800 font-bold text-lg px-2 md:px-0">帳號管理</h2>
 
           <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden divide-y divide-gray-50">
+
+            <button v-if="!hasLine" @click="linkSocial('line')"
+              class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group">
+              <Icon icon="mingcute:line-app-fill"
+                class="text-xl text-[#06C755] group-hover:scale-110 transition-transform" />
+              <div class="flex-1">
+                <span class="font-bold text-gray-800">綁定 LINE</span>
+                <p class="text-xs text-gray-400 mt-0.5">綁定後可以使用 LINE 登入</p>
+              </div>
+              <Icon icon="mingcute:right-line" class="text-gray-300" />
+            </button>
+
+            <button v-if="!hasGoogle" @click="linkSocial('google')"
+              class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group">
+              <Icon icon="mingcute:google-fill"
+                class="text-xl text-[#4285F4] group-hover:scale-110 transition-transform" />
+              <div class="flex-1">
+                <span class="font-bold text-gray-800">綁定 Google</span>
+                <p class="text-xs text-gray-400 mt-0.5">綁定後可以使用 Google 登入</p>
+              </div>
+              <Icon icon="mingcute:right-line" class="text-gray-300" />
+            </button>
 
             <button v-if="hasLine" @click="openUnlinkDialog('line')"
               class="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition text-left group">

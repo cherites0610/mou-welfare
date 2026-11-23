@@ -237,7 +237,7 @@ worker_heartbeat(name pk, beat_at)                                    -- 背景�
 | 成員 | `GET /v1/families/:id/members`、`PATCH/DELETE /v1/families/:id/members/:userId` | 成員 / admin |
 | 邀請 | `POST /v1/families/:id/invites`、`GET /v1/invites/:code`（加入前預覽：家庭名稱與人數）、`POST /v1/invites/:code/accept` | admin / 登入 |
 | 聊天 | `GET/POST /v1/chat/sessions`、`GET/DELETE /v1/chat/sessions/:id`、`POST /v1/chat/sessions/:id/messages`（SSE 串流） | 登入，且需為 session 擁有者 |
-| FAQ | `GET /v1/faq`；`POST/PATCH/DELETE /v1/admin/faq/*` | 公開 / admin。2026-11-23 起前端常見問題直接寫死在 `apps/web/app/utils/faqs.ts`（v1 的 10 題原文），不呼叫這個端點；端點保留給部署煙霧測試使用，資料表目前是空的 |
+| FAQ | `GET /v1/faq` | 公開。2026-11-23 起前端常見問題直接寫死在 `apps/web/app/utils/faqs.ts`（v1 的 10 題原文），不呼叫這個端點，也不做管理端點；端點保留給部署煙霧測試使用，資料表目前是空的 |
 | 上傳 | `POST /v1/uploads/avatar`（multipart；以內容判斷格式，只收 JPEG/PNG/WebP/GIF，上限 5 MB；壓縮為 512×512 WebP 並移除 EXIF 後存到 R2） | 登入 |
 | LINE | `POST /v1/line/webhook` | **驗證 `x-line-signature`**（HMAC-SHA256，用原始 body 計算） |
 | 爬蟲 | `POST /internal/ingest`、`POST /internal/remove` | **HMAC 簽章加時間戳**，金鑰未設定時一律拒絕 |
@@ -426,6 +426,30 @@ cd ~/apps/mou-welfare-v2/apps/api
 - 寄件人：`哞福利 <noreply@mou-welfare.com>`（2026-11-22 已在 Resend 驗證網域）。未驗證的環境預設用 `onboarding@resend.dev`，此時**只能寄給 Resend 帳號本人**。系統通知（額度不足暫停與恢復）寄到 `ALERT_EMAIL`。
 - 限流（R15，以 `CF-Connecting-IP` 計算）：登入、註冊每 IP 每分鐘 5 次；重設密碼、重寄驗證信每 IP 每 5 分鐘 3 次。目前存在記憶體（單一程序足夠），改為多程序時要換成資料庫儲存。
 
+### 8.5.1 第三方登入（Google、LINE、LIFF）
+
+由 Better Auth 內建的 `google`、`line` provider 處理（`apps/api/src/lib/auth.ts`），金鑰成對設定才會啟用；未設定時 `/sign-in/social` 回 404，前端顯示「即將開放」。
+
+| 方式 | 流程 |
+|---|---|
+| Google、LINE（網頁） | 前端 `signIn.social` → 轉到 Google / LINE → 回到 API 的 `/v1/auth/callback/{google,line}`（在 API 網域設 session cookie）→ 轉回前端 `/oauth-callback`。失敗時轉回 `/login?error=`（綁定時回 `/profile?error=`） |
+| LIFF（LINE 內開啟） | `plugins/liff.client.ts`：只在 LINE 的瀏覽器且 `liff.isInClient()` 時載入 SDK，取 `liff.getIDToken()` 呼叫 `/sign-in/social`（`idToken`）。API 向 LINE 的 `/verify` 驗證，`aud` 必須是 `LINE_CHANNEL_ID`。ID Token 過期時登出 LIFF 重新登入一次 |
+
+- **登入後去哪裡**：`/oauth-callback` 讀 `/v1/me`，生日、性別、縣市都沒填過就導到「填寫個人資料」（預先帶入 LINE / Google 的名稱與頭像），否則回到原頁面（`redirect` 只接受站內路徑）。
+- **合併既有帳號**：第三方的 email 和既有帳號相同時自動合併，但兩邊的 email 都必須已驗證（Better Auth 的 `requireLocalEmailVerified`）。避免有人先用別人的 email 註冊、等對方用 Google 登入時被合併。Google 依 `email_verified`；LINE 回傳的 email 視為已驗證（LINE 登錄 email 時需要驗證碼）。不符合時回 `account_not_linked`，前端提示「先用原本的方式登入，再到個人設定綁定」。
+- **主動綁定**：個人設定的「帳號管理」可以綁定或解除 Google / LINE（`linkSocial`，允許 email 不同）；Better Auth 不允許解除最後一種登入方式。
+- **LINE 沒有 email**（channel 沒申請 email 權限，或使用者沒登錄 email）：改用 `<LINE user ID>@line.invalid`（RFC 2606 保留網域），不寄任何信，畫面上不顯示。
+- `callbackURL` 必須在 `TRUSTED_ORIGINS` 內（Better Auth 在測試環境預設不檢查，`advanced.disableOriginCheck: false` 讓測試也檢查）。`/sign-in/social` 每 IP 每分鐘 10 次。
+- **需要的設定**：
+
+| 項目 | 值 |
+|---|---|
+| Google OAuth client（網頁應用程式） | 已授權的重新導向 URI：`https://api-v2.mou-welfare.com/v1/auth/callback/google`（切換網域後改為 `api.mou-welfare.com`；本機開發 `http://localhost:5031/v1/auth/callback/google`） |
+| LINE Login channel | Callback URL：`https://api-v2.mou-welfare.com/v1/auth/callback/line`；OpenID Connect 申請 email 權限 |
+| LIFF app（掛在同一個 LINE Login channel） | Endpoint URL：`https://v2.mou-welfare.com/`（切換網域後改為 `https://mou-welfare.com/`）；scope `openid`、`profile`、`email` |
+| API（`api.env`） | `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`LINE_CHANNEL_ID`、`LINE_CHANNEL_SECRET` |
+| 前端（`apps/web/wrangler.jsonc` 的 `vars`） | `NUXT_PUBLIC_LIFF_ID`（公開值） |
+
 ### 8.6 圖片上傳
 
 - 以 sharp 處理：依 EXIF 轉正 → 512×512 裁切（依顯著區域） → WebP 品質 80 → 移除全部中繼資料（含 GPS）。
@@ -518,10 +542,11 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 ### 10.3 從 v1 切換到 v2
 
+不搬移 v1 的資料（使用者、家庭、收藏），v1 的使用者在 v2 重新註冊。
+
 1. v2 在 `api-v2.mou-welfare.com` 和 Workers 的預覽網址上完成測試。確認正式資料庫沒有範例福利（`program_key like 'mock:%'` 為 0 筆；2026-11-23 已刪除）。
-2. 搬移 v1 資料（範圍見第 11 節）。
-3. 切換網域：`mou-welfare.com` 指向 Workers；Caddy 的 `api.mou-welfare.com` 改代理到 5030。
-4. 觀察一週，沒有問題就停掉 v1：pm2 刪除 `mou-welfare-api`，停用 Redis，刪除 v1 的兩個 worktree，Caddyfile 移除 v1 設定。
+2. 切換網域：`mou-welfare.com` 指向 Workers；Caddy 的 `api.mou-welfare.com` 改代理到 5030。
+3. 觀察一週，沒有問題就停掉 v1：pm2 刪除 `mou-welfare-api`，停用 Redis，刪除 v1 的兩個 worktree，Caddyfile 移除 v1 設定。
 
 ### 10.4 v1 正式環境現況（2026-11-18 修復後）
 
@@ -556,13 +581,13 @@ cd ~/apps/mou-welfare-v2/apps/api
 - [x] ~~GitHub Actions 自動部署的 SSH 金鑰與 5 個 secrets~~：2026-11-22 完成。
 - [ ] **v1 資料庫連線**：2026-11-23 發現 `postgres.cherites.org` 無法解析，v1 API 讀資料庫全部失敗（見 §10.4）。確認 DNS 紀錄是否被刪除或過期。
 - [x] ~~Gemini 儲值~~：2026-11-23 完成，已移除 `LLM_DRIVER=rules`，全量結構化完成；AI Studio 用量上限設為每月新台幣 300 元。
+- [ ] **第三方登入的金鑰**：建立 Google OAuth client、LINE Login channel 與 LIFF app（設定值見 §8.5.1），透過 key.cherites.org 提供 `GOOGLE_CLIENT_ID`／`SECRET`、`LINE_CHANNEL_ID`／`SECRET`，以及 LIFF ID。程式已完成（2026-11-23），金鑰設定後即啟用。
 - [ ] **人工檢核被判為非福利的 455 筆**：在管理後台依縣市檢核（[admin.md](admin.md) §4.3），屏東縣 191 筆最多。
 
 **之後再決定**
 - [ ] `pg_hba.conf` 加入規則，限制 `mou_welfare` 只能連自己的資料庫。
 - [ ] 關閉 5432 對外開放：API 和資料庫在同一台，爬蟲也透過 API 推資料，所以資料庫只需要聽 localhost（另外兩個專案若需要遠端連線，可改用 Tailscale，主機上已有）。
 - [ ] pgvector 要不要升級：改用 PostgreSQL 官方的 PGDG 套件庫，可以裝到較新的版本（目前 0.6.0 已夠用）。
-- [ ] 從 v1 資料庫 `mou-welfare` 搬資料（使用者、家庭、收藏）的範圍和方式。
 - [ ] v1 前端的 `VITE_LIFF_ID`（知道的話可以重新 build v1，讓 LINE 內自動登入恢復）。
 - [ ] 外部監控：定時檢查 `/health`，並在結構化工作持續失敗（`structure_error` 增加）時通知。（Gemini 額度不足已會寄信到 `ALERT_EMAIL`，§8.4.1）
 - [ ] 爬蟲排程：目前手動執行（`docs/scraper.md` §10）。
@@ -584,7 +609,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | **P1 核心 API** ✅ | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware、管理端 | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出（2026-11-23 管理端 `/v1/admin/*` 也完成） |
 | **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（正式環境 12 縣市 1,471 筆；2026-11-23 以 Gemini 全量結構化完成，可搜尋 985 筆） |
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天未開始 |
-| **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | — |
+| **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | Google / LINE / LIFF 登入的程式已完成（2026-11-23，`tests/social.test.ts`），待設定金鑰；其餘未開始 |
 | **管理後台** ✅ | 總覽、福利檢核、LLM 用量、使用者（唯讀）、稽核紀錄 | 2026-11-23 上線 `admin.mou-welfare.com`（[admin.md](admin.md)） |
 | **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天頁、LINE 分享待 P3 / P4） |
 
