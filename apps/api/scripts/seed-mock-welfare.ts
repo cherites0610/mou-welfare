@@ -1,7 +1,7 @@
 // 前端開發用的範例福利：欄位完全照 LLM 結構化後的格式（features/welfare/structure.ts），並涵蓋各種版面情況。
 // 全部置頂（pinned_at），在列表最前面；名稱加上「【範例】」，program_key 以 mock: 開頭，不會和爬蟲資料混淆。
 // 內容參考真實的福利公告改寫，金額與條件僅供版面測試，不代表實際規定。
-// ⚠️ 2026-11-23 已寫入正式資料庫，v2 正式上線前必須用 --remove 刪除（docs/backend.md 第 11 節）。
+// 只用於本機開發資料庫，不要寫入正式資料庫（2026-11-23 曾寫入，同日已刪除）。
 //
 //   pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts           # 寫入或更新
 //   pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts --remove  # 全部刪除

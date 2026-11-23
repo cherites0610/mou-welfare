@@ -1,8 +1,7 @@
 # 後端設計文件（v2）
 
 > 狀態：實作中（P2 資料流已上線；P1 核心 API、家庭與帳號管理已完成；前端個人設定相關頁面已上線，見第 12 節）
-> 最後更新：2026-11-23（福利列表與詳情頁、置頂欄位、範例資料、個人設定頁、v1 資料庫連線異常）
-> ⚠️ **正式資料庫目前有 7 筆假的範例福利**（2026-11-23 寫入，名稱開頭「【範例】」、`program_key` 以 `mock:` 開頭、全部置頂）。**v2 正式上線（切換網域）前必須刪除**，指令見第 11 節第一項。
+> 最後更新：2026-11-23（結構化評測集與回測、Gemini 額度保護與用量紀錄、開始 LLM 全量結構化、刪除範例資料）
 
 > 相關文件：[爬蟲設計](scraper.md)、[v1 文件](v1/)
 
@@ -462,9 +461,9 @@ cd ~/apps/mou-welfare-v2/apps/api
 | Caddy | ✅ `api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*` |
 | DNS | ✅ `api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied） |
 | 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）與前端（Workers），再做正式環境煙霧測試；最近一次（`6a7ec4b`，2026-11-23）API 已套用新 migration、前端新頁面皆回 200 |
-| 範例資料 | 前端開發用 7 筆範例福利（`apps/api/scripts/seed-mock-welfare.ts`）：欄位照 LLM 結構化格式手寫，名稱加「【範例】」、`program_key` 以 `mock:` 開頭、全部置頂。寫入：`pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts`；刪除加 `--remove`。⚠️ **2026-11-23 已寫入正式資料庫**（方便在 v2.mou-welfare.com 檢視前端），**正式上線前必須刪除**，見第 11 節 |
+| 範例資料 | 前端開發用 7 筆範例福利（`apps/api/scripts/seed-mock-welfare.ts`）：欄位照 LLM 結構化格式手寫，名稱加「【範例】」、`program_key` 以 `mock:` 開頭、全部置頂。寫入：`pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts`；刪除加 `--remove`。2026-11-23 曾寫入正式資料庫供檢視前端，**同日已刪除**（`removed 7 mock programs`）；之後只在本機開發資料庫使用 |
 | 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,471 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,008 筆），見 `docs/scraper.md` §10.3 |
-| 結構化 | ⚠️ 目前全部由**關鍵字規則**結構化（`LLM_DRIVER=rules`），沒有 embedding。原因：Gemini 帳戶的預付額度用完（API 回 `402 RESOURCE_EXHAUSTED`，2026-11-22 實測）。儲值後把 `api.env` 的 `LLM_DRIVER` 刪除或改為 `gemini` 並重啟，啟動時的 backfill 會把規則結構化的福利全部重新排入 |
+| 結構化 | 🟡 2026-11-23 開始用 Gemini（`gemini-3.5-flash-lite`）全量結構化：962 筆完成（active 665、rejected 268、expired 29），約 2.26 美元、26 分鐘；之後預付額度用完，**自動暫停**（§8.4.1，已驗證：第一個 402 後停止取工作、暫停後 0 次呼叫、寄出通知）。尚有 509 筆維持規則版（38 筆在佇列、471 筆待恢復時由 backfill 排入）。儲值後最多 10 分鐘內自動恢復 |
 | 爬蟲排程 | ⏸ 還沒有排程；目前在主機上手動執行（`~/.config/mou-welfare/scraper.env` 提供 `API_BASE`、`INGEST_HMAC_KEY`），見 `docs/scraper.md` §10.2 |
 
 **事故紀錄**
@@ -484,7 +483,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 ### 10.3 從 v1 切換到 v2
 
-1. v2 在 `api-v2.mou-welfare.com` 和 Workers 的預覽網址上完成測試。**刪除正式資料庫裡的範例福利**（見第 11 節第一項），確認列表最上面不再出現「【範例】」。
+1. v2 在 `api-v2.mou-welfare.com` 和 Workers 的預覽網址上完成測試。確認正式資料庫沒有範例福利（`program_key like 'mock:%'` 為 0 筆；2026-11-23 已刪除）。
 2. 搬移 v1 資料（範圍見第 11 節）。
 3. 切換網域：`mou-welfare.com` 指向 Workers；Caddy 的 `api.mou-welfare.com` 改代理到 5030。
 4. 觀察一週，沒有問題就停掉 v1：pm2 刪除 `mou-welfare-api`，停用 Redis，刪除 v1 的兩個 worktree，Caddyfile 移除 v1 設定。
@@ -507,11 +506,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 ## 11. 待辦與待確認
 
 **⚠️ 上線前必做**
-- [ ] **刪除正式資料庫的範例福利**（2026-11-23 寫入 7 筆，`mock:*`，名稱開頭「【範例】」，全部置頂）：
-  ```bash
-  cd ~/apps/mou-welfare-v2/apps/api && ./node_modules/.bin/tsx --env-file=$HOME/.config/mou-welfare/api.env scripts/seed-mock-welfare.ts --remove
-  ```
-  執行後應顯示 `removed 7 mock programs`，並確認 `https://v2.mou-welfare.com/welfares` 最上面不再是「【範例】」。本機開發資料庫的範例可以保留。
+- [x] ~~刪除正式資料庫的範例福利~~：2026-11-23 已刪除（`removed 7 mock programs`，列表總數回到 1,471）。
 
 **需要你處理**（金鑰一律透過 https://key.cherites.org 的一次性連結提供，見 `~/Project/keydrop`）
 - [x] ~~到 Cloudflare Dashboard 啟用 R2~~（已完成）
