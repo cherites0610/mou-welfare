@@ -112,6 +112,23 @@ def test_正文區塊是空的_不能把選單當正文() -> None:
     assert ext.published_at == date(2024, 1, 26)
 
 
+def test_A族News_Content頁_正文在area_essay() -> None:
+    # 嘉義市（臺南、桃園、宜蘭相同）：News_Content.aspx 的正文在 div.area-essay，不在 div.area-editor。
+    # 2026-11-23 排程第一次執行時只抽到「發布單位、上版日期」34 字，嘉義市 49 頁被隔離
+    from scraper.adapters.crawl import CmsA
+
+    ext = extract_html(
+        fixture("chiayi/news_content.html"),
+        "https://social.chiayi.gov.tw/News_Content.aspx?n=1101&s=404270",
+        hint="中低收入老人特別照顧津貼",
+        body=CmsA.DEFAULTS["body"],
+        content=CmsA.DEFAULTS["content"],
+    )
+    assert len(ext.content_md) > 500
+    assert "受理申請地點" in ext.content_md and "請領資格" in ext.content_md
+    assert ext.content_md.count("受理申請地點") == 1  # 區塊沒有重複
+
+
 def test_連結文字去掉開啟新視窗() -> None:
     assert dedupe_halves("申請天然災害災害救助(開啟新視窗)") == "申請天然災害災害救助"
     assert dedupe_halves("身心障礙者租賃房屋租金補助(另開新視窗)") == "身心障礙者租賃房屋租金補助"

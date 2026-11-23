@@ -201,8 +201,9 @@ class CmsA(LinkCrawler):
         "detail": rf"(cp\.aspx\?n={_A_ID}(&s={_A_ID})?|News_Content\.aspx\?n={_A_ID}&s={_A_ID}(&sms={_A_ID})?)$",
         "region": "div.page-content",
         "body": "div.page-content, div.area-editor, div.file-download-multiple",
-        # 正文：日期資訊 + 編輯區；不含 page-content 裡同分類的項目清單
-        "content": "div.list-text.detail, div.area-editor.user-edit, div.area-editor.system-info",
+        # 正文：日期資訊 + 編輯區（cp.aspx）或文章區（News_Content.aspx 的 div.area-essay）；
+        # 不含 page-content 裡同分類的項目清單。兩種區塊不會互相包含（2026-11-23 抽查 7 站 21 頁）
+        "content": "div.list-text.detail, div.area-editor.user-edit, div.area-editor.system-info, div.area-essay",
     }
 
     def is_hub(self, url: str, details: list[Link]) -> bool:
