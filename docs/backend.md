@@ -463,7 +463,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）與前端（Workers），再做正式環境煙霧測試；最近一次（`6a7ec4b`，2026-11-23）API 已套用新 migration、前端新頁面皆回 200 |
 | 範例資料 | 前端開發用 7 筆範例福利（`apps/api/scripts/seed-mock-welfare.ts`）：欄位照 LLM 結構化格式手寫，名稱加「【範例】」、`program_key` 以 `mock:` 開頭、全部置頂。寫入：`pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts`；刪除加 `--remove`。2026-11-23 曾寫入正式資料庫供檢視前端，**同日已刪除**（`removed 7 mock programs`）；之後只在本機開發資料庫使用 |
 | 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,471 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,008 筆），見 `docs/scraper.md` §10.3 |
-| 結構化 | 🟡 2026-11-23 開始用 Gemini（`gemini-3.5-flash-lite`）全量結構化：962 筆完成（active 665、rejected 268、expired 29），約 2.26 美元、26 分鐘；之後預付額度用完，**自動暫停**（§8.4.1，已驗證：第一個 402 後停止取工作、暫停後 0 次呼叫、寄出通知）。尚有 509 筆維持規則版（38 筆在佇列、471 筆待恢復時由 backfill 排入）。儲值後最多 10 分鐘內自動恢復 |
+| 結構化 | ✅ 2026-11-23 全部 1,471 筆以 Gemini（`gemini-3.5-flash-lite`、prompt `3ff526b52226`）完成結構化與 embedding：active 985、rejected 455、expired 31。共 1,476 次結構化呼叫（3 次 schema 重試、2 筆因重試做了兩次）、輸入 8.04M／輸出 0.44M tokens、約 3.52 美元，實際處理約 37 分鐘。中途預付額度用完一次，**自動暫停與恢復皆已在正式環境驗證**（§8.4.1）。被判為非個人福利的比例：屏東縣 63%、新北市 45%、花蓮縣 38%，待人工抽查 |
 | 爬蟲排程 | ⏸ 還沒有排程；目前在主機上手動執行（`~/.config/mou-welfare/scraper.env` 提供 `API_BASE`、`INGEST_HMAC_KEY`），見 `docs/scraper.md` §10.2 |
 
 **事故紀錄**
