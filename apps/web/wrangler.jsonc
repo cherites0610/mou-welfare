@@ -9,11 +9,7 @@
   "assets": { "directory": ".output/public", "binding": "ASSETS" },
   "observability": { "enabled": true },
   // 過渡期網域；正式切換時改為 mou-welfare.com（docs/backend.md §10.3）
-  // v2.mou-welfare.com 是切換前的網址，LIFF 與已分享的連結還會用到，先保留
-  "routes": [
-    { "pattern": "mou-welfare.com", "custom_domain": true },
-    { "pattern": "v2.mou-welfare.com", "custom_domain": true }
-  ],
+  "routes": [{ "pattern": "mou-welfare.com", "custom_domain": true }],
   "vars": {
     "NUXT_PUBLIC_API_BASE": "https://api.mou-welfare.com",
     // LIFF app 的 ID（公開值）；空字串＝不啟用 LIFF 自動登入。LIFF 的 Endpoint URL 要和前端網域一致

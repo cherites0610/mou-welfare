@@ -59,9 +59,9 @@
 ```
 
 **網域**
-- `mou-welfare.com`：Nuxt（Cloudflare Workers）。2026-11-24 起由 v2 提供；切換前的 `v2.mou-welfare.com` 暫時保留（LIFF 與已分享的連結）。
+- `mou-welfare.com`：Nuxt（Cloudflare Workers）。2026-11-24 起由 v2 提供（切換前的 `v2.mou-welfare.com` 同日移除）。
 - `admin.mou-welfare.com`：管理後台（Cloudflare Workers 靜態檔，[admin.md](admin.md)）
-- `api.mou-welfare.com`：主機上的 Caddy，代理到 v2 API（2026-11-24 起）。切換前的 `api-v2.mou-welfare.com` 也代理到同一個程序，暫時保留。
+- `api.mou-welfare.com`：主機上的 Caddy，代理到 v2 API（2026-11-24 起；切換前的 `api-v2.mou-welfare.com` 同日移除）。
 
 ---
 
@@ -474,7 +474,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 項目 | 值 |
 |---|---|
 | Google OAuth client（網頁應用程式） | 已授權的重新導向 URI：`https://api.mou-welfare.com/v1/auth/callback/google`（本機開發 `http://localhost:5031/v1/auth/callback/google`） |
-| LINE Login channel | Callback URL：`https://api.mou-welfare.com/v1/auth/callback/line`（2026-11-24 加入；`api-v2` 那條可以之後刪除）；OpenID Connect 申請 email 權限 |
+| LINE Login channel | Callback URL：`https://api.mou-welfare.com/v1/auth/callback/line`（2026-11-24 起；`api-v2` 那條要刪除）；OpenID Connect 申請 email 權限 |
 | LIFF app（掛在同一個 LINE Login channel） | Endpoint URL：`https://mou-welfare.com/`；scope `openid`、`profile`、`email` |
 | API（`api.env`） | `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`LINE_CHANNEL_ID`、`LINE_CHANNEL_SECRET` |
 | 前端（`apps/web/wrangler.jsonc` 的 `vars`） | `NUXT_PUBLIC_LIFF_ID`（公開值） |
@@ -595,8 +595,8 @@ cd ~/apps/mou-welfare-v2/apps/api
 |---|---|
 | 程式位置 | `~/apps/mou-welfare-v2/`（部署用的 checkout，**和開發用的 `~/Project/mou-welfare` 分開**，避免再次影響正式環境） |
 | 程序 | pm2：`mou-welfare-v2-api`（port 5030，只聽 127.0.0.1），背景工作在同一程序內（`WORKER_MODE=inline`）；設定寫在 `ecosystem.config.cjs`，`pm2 save` 確保開機會自動啟動 |
-| HTTPS | Caddy：`api.mou-welfare.com api-v2.mou-welfare.com { reverse_proxy 127.0.0.1:5030 { flush_interval -1 } }` |
-| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（額度不足、爬蟲異常、結構化錯誤等，§8.4.2；已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定；2026-11-23 起已移除 `LLM_DRIVER=rules`，用 Gemini 結構化）；`TRUSTED_ORIGINS=https://mou-welfare.com,https://v2.mou-welfare.com,https://admin.mou-welfare.com`（CORS 與 Better Auth 共用）。完整定義見 `apps/api/src/env.ts` |
+| HTTPS | Caddy：`api.mou-welfare.com { reverse_proxy 127.0.0.1:5030 { flush_interval -1 } }` |
+| 環境變數 | `~/.config/mou-welfare/api.env`（權限 600，不進版控）：`DATABASE_URL`、`BETTER_AUTH_SECRET`、`GOOGLE_*`、`LINE_*`、`GEMINI_API_KEY`、`INGEST_HMAC_KEY`；寄信 `MAIL_DRIVER=resend`、`RESEND_API_KEY`、`EMAIL_FROM`（已設定）；系統通知收件人 `ALERT_EMAIL`（額度不足、爬蟲異常、結構化錯誤等，§8.4.2；已設定）；上傳 `STORAGE_DRIVER=r2`、`R2_ACCOUNT_ID`、`R2_ACCESS_KEY_ID`、`R2_SECRET_ACCESS_KEY`、`R2_BUCKET`、`R2_PUBLIC_BASE_URL`（已設定：bucket `mou-welfare-uploads`，公開網址 `https://file.mou-welfare.com`，專用 R2 token）；`GEMINI_API_KEY`（已設定；2026-11-23 起已移除 `LLM_DRIVER=rules`，用 Gemini 結構化）；`TRUSTED_ORIGINS=https://mou-welfare.com,https://admin.mou-welfare.com`（CORS 與 Better Auth 共用）。完整定義見 `apps/api/src/env.ts` |
 | 資料庫連線 | `postgresql://mou_welfare@localhost:5432/mou_welfare` |
 | Migration | 部署腳本中執行 `drizzle-kit migrate`，成功後才重啟程序 |
 | 部署流程 | 在主機上執行 `~/apps/mou-welfare-v2/ops/deploy-api.sh`：拉取 `origin/main` → `pnpm install --frozen-lockfile` → build → migration → `pm2 reload`（不中斷服務）→ 煙霧測試（`/health` 為 ok、`/v1/faq` 可回應）；**失敗時自動退回上一版**。migration 不會自動回復，因此必須維持向前相容。GitHub Actions（`deploy.yml`）在 CI 通過後透過 SSH 傳入 commit SHA 觸發：authorized_keys 以 `command="…/deploy-api.sh --from-ssh"` 限定這把金鑰只能執行部署，`--from-ssh` 模式只接受完整的 40 碼 SHA（其他內容、包括空白一律拒絕）。設定見 `docs/deploy-setup.md` |
@@ -610,8 +610,8 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
 | 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 11 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`；`0009_scraper_runs`：`scrape_runs`、`alert_state`；`0010_chat`：`chat_sessions`、`chat_messages`、`chat_usage`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
-| Caddy | ✅ `api.mou-welfare.com`、`api-v2.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*`（切換前為 `Caddyfile.bak-202611241039`） |
-| DNS | ✅ `api.mou-welfare.com`、`api-v2.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied）；`mou-welfare.com` 是 Workers 自訂網域 |
+| Caddy | ✅ `api.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*`（切換前為 `Caddyfile.bak-202611241039`） |
+| DNS | ✅ `api.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied）；`mou-welfare.com`、`admin.mou-welfare.com` 是 Workers 自訂網域 |
 | 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）、前端與管理後台（Workers），再做正式環境煙霧測試（API `/health`、前台 `/login`、後台 `/login`）；最近一次成功為 `68b79fd`（2026-11-23） |
 | 範例資料 | 前端開發用 7 筆範例福利（`apps/api/scripts/seed-mock-welfare.ts`）：欄位照 LLM 結構化格式手寫，名稱加「【範例】」、`program_key` 以 `mock:` 開頭、全部置頂。寫入：`pnpm --filter @mou-welfare/api exec tsx --env-file=.env scripts/seed-mock-welfare.ts`；刪除加 `--remove`。2026-11-23 曾寫入正式資料庫供檢視前端，**同日已刪除**（`removed 7 mock programs`）；之後只在本機開發資料庫使用 |
 | 福利資料 | ✅ 2026-11-22 共 13 個來源、**12 縣市、1,471 筆福利**（第一批：金門、新北、基隆、臺中開放資料 463 筆；第二批：臺北、桃園、臺南、嘉義市、屏東、宜蘭、花蓮、彰化、桃園開放資料 1,008 筆），見 `docs/scraper.md` §10.3 |
@@ -630,8 +630,8 @@ cd ~/apps/mou-welfare-v2/apps/api
 |---|---|
 | 部署 | `pnpm --filter @mou-welfare/web build && pnpm --filter @mou-welfare/web run deploy`（要加 `run`：pnpm 有同名的內建指令 `deploy`；`apps/web/wrangler.jsonc`，Worker 名稱 `mou-welfare-web`）。GitHub Actions（`deploy.yml`）在 CI 通過後自動部署，設定見 `docs/deploy-setup.md` |
 | 呼叫 API | 環境變數 `NUXT_PUBLIC_API_BASE`（`https://api.mou-welfare.com`）。瀏覽器以 `credentials: 'include'` 呼叫，API 以 CORS 只允許 `TRUSTED_ORIGINS` 帶 cookie。session cookie 屬於 API 網域，所以登入相關與個人頁面設為只在瀏覽器渲染（`routeRules` 的 `ssr: false`）；公開頁面（福利列表、詳情）維持 SSR |
-| 網域 | `mou-welfare.com`（Workers 自訂網域，2026-11-24 起）；`v2.mou-welfare.com` 暫時保留 |
-| 目前狀態 | ✅ 2026-11-19 部署，2026-11-22 起由 GitHub Actions 自動部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 已加入 `https://v2.mou-welfare.com` |
+| 網域 | `mou-welfare.com`（Workers 自訂網域，2026-11-24 起） |
+| 目前狀態 | ✅ 2026-11-19 部署，2026-11-22 起由 GitHub Actions 自動部署，外部檢查各頁 200、`/welfares` 為 SSR；瀏覽器實測跨網域呼叫 API 正常。API 的 `TRUSTED_ORIGINS` 為 `https://mou-welfare.com,https://admin.mou-welfare.com` |
 | 管理後台 | `apps/admin`，Worker `mou-welfare-admin`，網域 `admin.mou-welfare.com`；部署方式見 [admin.md](admin.md) §8 |
 | 已完成頁面 | 登入註冊流程；2026-11-23 依 v1 介面完成：福利列表 `/welfares`（搜尋、地區／服務／家庭篩選、自動篩選、進階篩選、無限捲動；第一頁 SSR）、福利詳情 `/welfares/:id`（資格分析、AI 摘要、申請條件、補助內容、附件、原文；SSR 含 JSON-LD；網址加 `?review=1` 顯示資料檢核）、個人設定 `/profile`（家庭管理、邀請 QR Code、帳號管理：綁定與解除 LINE / Google、設定密碼、刪除帳號）、第三方登入落地頁 `/oauth-callback`（LINE 登入與 LIFF 自動登入見 §8.5.1）、編輯個人資料 `/profile/edit`、收藏 `/favorites`、常見問題 `/question`（SSR，含 FAQPage JSON-LD）、服務條款 `/terms`、隱私權政策 `/private` |
 
@@ -643,13 +643,14 @@ cd ~/apps/mou-welfare-v2/apps/api
 2. ✅ 刪除 Cloudflare DNS 裡 `mou-welfare.com` 指向主機的紀錄（Workers 自訂網域需要），推送 `6728f03`：Workers 加上 `mou-welfare.com`，前端改呼叫 `api.mou-welfare.com`，`/family` 轉到 `/profile`，煙霧測試與外部監控改用新網域。從刪除 DNS 到部署完成期間網站無法連線（推送後約 6 分鐘完成）。
 3. ✅ Caddy：移除 v1 的 `mou-welfare.com`（靜態檔）與 `api.mou-welfare.com`（port 5009），`api.mou-welfare.com` 改代理到 5030，`api-v2` 保留。`api.env` 的 `BETTER_AUTH_URL`、`scraper.env` 的 `API_BASE` 改為 `https://api.mou-welfare.com`（修改前的檔案為 `*.bak-cutover`）。
 4. ✅ 移除 v1：pm2 刪除 `mou-welfare-api` 並 `pm2 save`；停用 Redis（只有 v1 在用）；刪除 worktree `~/Project/mou-welfare-v1`、`~/Project/mou-welfare-v1-web`（程式在 git tag `v1-api`、`v1-web`）。
-5. 待處理：LIFF Endpoint 改為 `https://mou-welfare.com/`；LINE 官方帳號的 Messaging API webhook 關閉或改成自動回覆（v1 的 LINE Bot 已停，v2 的在 P4）。
+5. ✅ 同日移除：v1 的資料庫 `mou-welfare`、v1 的本機檔案（`~/Project/mou-welfare-v1-local`）；舊網域 `v2.mou-welfare.com`（Workers 設定）、`api-v2.mou-welfare.com`（Caddy）、`TRUSTED_ORIGINS` 裡的 `v2.mou-welfare.com`。
+6. 待處理（Cloudflare、LINE、GCP 後台）：刪除 DNS 紀錄 `api-v2.mou-welfare.com`、`mou-welfare.cherites.org`、`api.mou-welfare.cherites.org`，以及 Workers 上的自訂網域 `v2.mou-welfare.com`；LINE Login 刪除 `api-v2` 的 Callback URL；LIFF Endpoint 改為 `https://mou-welfare.com/`；Messaging API webhook 關閉或改成自動回覆（v1 的 LINE Bot 已停，v2 的在 P4）；GCP 刪除 v1 的 Vertex AI Search 並停用服務帳號金鑰；重新發行 v1 用過的 LINE Messaging token。
 
 **影響**：已登入 v2 的人要重新登入一次（session cookie 屬於 API 網域）。v1 的福利網址（`/welfares/{v1 的 id}`）在 v2 找不到。
 
 ### 10.4 v1（已移除）
 
-v1 的 API（NestJS，pm2 `mou-welfare-api`，port 5009）與前端（Vue，Caddy 靜態檔）2026-11-24 停用並移除，程式保留在 git tag `v1-api`、`v1-web`，文件在 `docs/v1/`。v1 的資料庫沒有刪除。
+v1 的 API（NestJS，pm2 `mou-welfare-api`，port 5009）與前端（Vue，Caddy 靜態檔）2026-11-24 停用並移除，程式保留在 git tag `v1-api`、`v1-web`，文件在 `docs/v1/`。v1 的資料庫同日刪除。
 
 **預估月費**：前端與管理後台用 Cloudflare Workers（先用免費方案，SSR 若超出 CPU 限制再升級 Paid，每月 5 美元）；R2 在免費額度內；主機為現有資源；Gemini 依用量計費（預付制；額度用完時結構化自動暫停，儲值後自動恢復，§8.4.1；AI Studio 用量上限每月新台幣 300 元）。
 
