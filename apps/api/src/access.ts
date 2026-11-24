@@ -4,6 +4,7 @@ import type { MiddlewareHandler } from 'hono'
 import type { Auth, SessionUser } from './lib/auth.ts'
 import { apiError } from './lib/errors.ts'
 import { SIGNATURE_HEADER, TIMESTAMP_HEADER, verify } from './lib/hmac.ts'
+import { LINE_SIGNATURE_HEADER, verifyLineSignature } from './lib/line.ts'
 
 export type Access =
   | 'public' // 不需登入
@@ -11,7 +12,7 @@ export type Access =
   | 'user' // 需登入
   | 'admin' // 管理端：需登入、Email 已驗證且 role = 'admin'（docs/admin.md）
   | 'hmac' // 爬蟲：HMAC 簽章（lib/hmac.ts）
-  | 'line' // LINE webhook：x-line-signature（P4 實作）
+  | 'line' // LINE webhook：x-line-signature（lib/line.ts）
 
 /** key 格式：`METHOD /path`，path 使用 Hono 路由語法；`*` 代表所有 method */
 export const ROUTE_ACCESS = {
@@ -58,6 +59,7 @@ export const ROUTE_ACCESS = {
   'GET /v1/admin/scraper/runs/:id': 'admin',
   'POST /internal/ingest': 'hmac',
   'POST /internal/remove': 'hmac',
+  'POST /v1/line/webhook': 'line',
   'POST /internal/scrape-runs': 'hmac',
 } as const satisfies Record<string, Access>
 
@@ -87,6 +89,8 @@ export type AccessOptions = {
   resolve?: (method: string, path: string) => Access
   /** 爬蟲推送的 HMAC 金鑰；沒有就拒絕所有 hmac 路由 */
   hmacKey?: string | undefined
+  /** LINE Bot 的 channel secret；沒有就拒絕 webhook */
+  lineSecret?: string | undefined
   now?: () => number
 }
 
@@ -119,8 +123,14 @@ export function accessControl(auth: Auth, opts: AccessOptions = {}): MiddlewareH
       return next()
     }
     if (access === 'line') {
-      // LINE webhook 的簽章驗證在 P4 實作；實作前一律拒絕，避免重蹈 v1 的「未驗證就放行」
-      return apiError(c, 401, 'unauthorized', '簽章驗證尚未啟用')
+      // 沒有設定 channel secret 就一律拒絕，避免重蹈 v1 的「未驗證就放行」
+      if (!opts.lineSecret) return apiError(c, 401, 'unauthorized', '簽章驗證未設定')
+      const body = new Uint8Array(await c.req.arrayBuffer())
+      if (!verifyLineSignature(opts.lineSecret, body, c.req.header(LINE_SIGNATURE_HEADER))) {
+        return apiError(c, 401, 'unauthorized', '簽章驗證失敗')
+      }
+      c.set('user', null)
+      return next()
     }
     const session = await auth.api.getSession({ headers: c.req.raw.headers })
     if (!session) return apiError(c, 401, 'unauthorized', '請先登入')

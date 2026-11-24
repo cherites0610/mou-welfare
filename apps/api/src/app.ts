@@ -11,6 +11,7 @@ import { familyRoutes } from './features/family/routes.ts'
 import { favoriteRoutes } from './features/favorite/routes.ts'
 import { healthRoutes } from './features/health/routes.ts'
 import { ingestRoutes } from './features/ingest/routes.ts'
+import { lineRoutes } from './features/line/routes.ts'
 import { scraperAdminRoutes, scraperInternalRoutes } from './features/scraper/routes.ts'
 import { meRoutes } from './features/me/routes.ts'
 import { uploadRoutes } from './features/upload/routes.ts'
@@ -65,7 +66,7 @@ export function createApp(deps: Deps) {
     onError: (c) => apiError(c, 413, 'invalid_request', '推送內容太大'),
   })
   app.use('*', (c, next) => (c.req.path.startsWith('/internal/') ? internalLimit(c, next) : next()))
-  app.use('*', accessControl(deps.auth, { hmacKey: deps.env.INGEST_HMAC_KEY }))
+  app.use('*', accessControl(deps.auth, { hmacKey: deps.env.INGEST_HMAC_KEY, lineSecret: deps.env.LINE_BOT_CHANNEL_SECRET }))
 
   app.on(['GET', 'POST'], `${AUTH_BASE_PATH}/*`, (c) => deps.auth.handler(c.req.raw))
 
@@ -81,6 +82,7 @@ export function createApp(deps: Deps) {
   app.route('/', chatRoutes)
   app.route('/', ingestRoutes)
   app.route('/', scraperInternalRoutes)
+  app.route('/', lineRoutes)
 
   app.doc31('/openapi.json', {
     openapi: '3.1.0',

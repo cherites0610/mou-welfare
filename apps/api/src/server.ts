@@ -3,6 +3,7 @@ import { createApp } from './app.ts'
 import { createDb } from './db/client.ts'
 import { loadEnv } from './env.ts'
 import { type Jobs, startJobs } from './jobs/index.ts'
+import { lineBotOf } from './lib/line.ts'
 import { createStructurer } from './jobs/structure.ts'
 import { dbUsageRecorder } from './lib/llm/index.ts'
 import { createAuth } from './lib/auth.ts'
@@ -19,7 +20,7 @@ const auth = createAuth(db, env, mailer)
 const boss = await createBoss(env.DATABASE_URL)
 const { structurer, llm } = createStructurer(env, dbUsageRecorder(db))
 const app = createApp({ db, auth, env, mailer, storage, queue: new BossQueue(boss), llm })
-const jobs: Jobs | null = env.WORKER_MODE === 'inline' ? await startJobs({ db, boss, structurer, llm, mailer, alertTo: env.ALERT_EMAIL }) : null
+const jobs: Jobs | null = env.WORKER_MODE === 'inline' ? await startJobs({ db, boss, structurer, llm, mailer, alertTo: env.ALERT_EMAIL, line: lineBotOf(env) }) : null
 
 const server = serve({ fetch: app.fetch, hostname: env.HOST, port: env.PORT }, (info) => {
   console.log(`api listening on http://${info.address}:${info.port} (jobs: ${env.WORKER_MODE}, structurer: ${structurer.kind})`)

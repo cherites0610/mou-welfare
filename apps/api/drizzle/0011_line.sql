@@ -1,0 +1,1 @@
+ALTER TABLE "chat_sessions" ADD COLUMN "channel" text DEFAULT 'web' NOT NULL;

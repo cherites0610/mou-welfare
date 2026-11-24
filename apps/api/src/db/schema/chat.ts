@@ -26,6 +26,8 @@ export const chatSessions = pgTable(
     /** 最近一次使用的家庭模式；家庭刪除後清空 */
     familyId: uuid('family_id').references(() => families.id, { onDelete: 'set null' }),
     title: text('title').notNull().default(''),
+    /** web＝網站；line＝LINE Bot（同一個使用者共用每日次數，網站的歷史對話也看得到） */
+    channel: text('channel', { enum: ['web', 'line'] }).notNull().default('web'),
     filters: jsonb('filters').$type<ChatFiltersJson | null>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

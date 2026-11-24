@@ -45,6 +45,6 @@ describe('R10 不能透過註冊端點寫入身分、角色等欄位', () => {
 })
 
 describe.todo('R1 沒有 email 的 LINE 帳號登入不能取得既有使用者的 session（P4：LINE / LIFF）')
-// R6、R9 見 tests/family.test.ts；R7 見 tests/chat.test.ts（「別人的對話一律 404」）
-describe.todo('R11 LINE webhook 簽章錯誤回傳 401 且不排入工作（P4）')
+// R6、R9 見 tests/family.test.ts；R7 見 tests/chat.test.ts（「別人的對話一律 404」）；
+// R11 見 tests/line.test.ts（「沒有簽章、簽章錯誤、內容被改過 → 401，不排入佇列」、沒有設定 channel secret 時一律 401）
 describe.todo('R13 OAuth state 不符時拒絕登入（P4）')

@@ -33,6 +33,16 @@ const EnvSchema = z
     /** LINE Login channel（LIFF 也掛在同一個 channel，ID Token 的 aud 就是 channel ID） */
     LINE_CHANNEL_ID: z.string().optional(),
     LINE_CHANNEL_SECRET: z.string().optional(),
+    /**
+     * LINE Bot（Messaging API channel，docs/backend.md §8.7）。成對設定才會啟用；未設定時 webhook 一律回 401。
+     * Messaging API channel 要和 LINE Login channel 在同一個 provider，使用者 ID 才會相同（才能認出已登入的使用者）
+     */
+    LINE_BOT_CHANNEL_SECRET: z.string().optional(),
+    LINE_BOT_ACCESS_TOKEN: z.string().optional(),
+    /** LINE Bot 引導登入用的 LIFF app ID（公開值，和前端的 NUXT_PUBLIC_LIFF_ID 相同） */
+    LINE_LIFF_ID: z.string().optional(),
+    /** 使用者網站，LINE Bot 的福利卡片連到這裡 */
+    WEB_BASE_URL: z.url().default('https://mou-welfare.com'),
     /** 寄信：resend＝真的寄出；log＝只印在終端機（開發用） */
     MAIL_DRIVER: z.enum(['resend', 'log']).default('log'),
     RESEND_API_KEY: z.string().startsWith('re_').optional(),
@@ -57,7 +67,11 @@ const EnvSchema = z
     if (e.LLM_DRIVER === 'gemini' && !e.GEMINI_API_KEY) {
       ctx.addIssue({ code: 'custom', path: ['GEMINI_API_KEY'], message: 'LLM_DRIVER=gemini 時必填' })
     }
-    for (const [a, b] of [['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'], ['LINE_CHANNEL_ID', 'LINE_CHANNEL_SECRET']] as const) {
+    for (const [a, b] of [
+      ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET'],
+      ['LINE_CHANNEL_ID', 'LINE_CHANNEL_SECRET'],
+      ['LINE_BOT_CHANNEL_SECRET', 'LINE_BOT_ACCESS_TOKEN'],
+    ] as const) {
       if (!e[a] !== !e[b]) ctx.addIssue({ code: 'custom', path: [e[a] ? b : a], message: `${a} 與 ${b} 需同時設定` })
     }
     if (e.STORAGE_DRIVER === 'r2') {

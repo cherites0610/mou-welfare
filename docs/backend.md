@@ -487,9 +487,22 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 ### 8.7 LINE Bot
 
-- **驗證**：webhook 收到後先驗證簽章，把事件排入 pg-boss 佇列後立即回應 200，回覆由背景工作處理：優先用 reply token 回覆（有時效限制），來不及時改用 push API。
-- **已綁定的使用者**：交給聊天服務回答，回覆文字加上福利 Flex carousel。
-- **未綁定的使用者**：引導到 LIFF 登入，並推薦福利。
+LINE 官方帳號的對話（`features/line/`，2026-11-24 實作）。和網站的聊天共用同一個聊天服務（§8.9），不串流：收齊回答後一次回覆。
+
+| 步驟 | 做法 |
+|---|---|
+| webhook | `POST /v1/line/webhook`。`access.ts` 以 channel secret 驗證 `x-line-signature`（原始 body 的 HMAC-SHA256），沒有設定 secret 時一律 401（R11）。通過後把每個事件排入 pg-boss 的 `line-event`，立即回 200；沒有事件的請求（LINE 驗證 webhook 網址時）也回 200 |
+| 佇列 | `line-event` 不重試（重試會重複扣次數、重複回覆）；LINE 重送同一個事件時以 `webhookEventId` 當 `singletonKey` 去重。背景工作同時處理 4 則（大多時間在等 LLM） |
+| 誰在問 | Messaging API 的使用者 ID 和 LINE Login 的相同（**兩個 channel 必須在同一個 provider**），所以 `account` 表有 `provider_id = 'line'`、`account_id = 使用者 ID` 的就是用 LINE 登入過的人 |
+| 已登入的人 | 交給 `sendMessage`：套用個人資料（燈號、居住縣市）、和網站共用每日 30 則、對話存成 `chat_sessions.channel = 'line'`（網站的歷史對話也看得到）。隔 30 分鐘沒說話就開新對話，否則追問沿用上一輪的條件 |
+| 還沒登入的人 | 不呼叫 LLM、不寫入對話：用規則解析與關鍵字檢索列出福利，附上 LIFF 登入按鈕（`https://liff.line.me/{LINE_LIFF_ID}`）。在 LINE 裡用 LIFF 登入後，下一則訊息就會認得 |
+| 回覆格式 | 文字：Markdown 轉成純文字，`[[福利 id]]` 換成卡片編號 `[n]`，上限 4,900 字。福利卡片：Flex carousel（名稱、縣市、截止日、燈號、摘要、「查看詳情」連到 `WEB_BASE_URL/welfares/:id`），最多 6 張 |
+| 送出 | 先送「輸入中」動畫，回答好後用 reply token 回覆；reply token 過期（LLM 回答久一點時）改用 push |
+| 其他事件 | 加入好友：打招呼，還沒登入的附登入按鈕。貼圖、圖片：請使用者改用文字。群組與聊天室不回覆（不知道是誰在問，也不該把個人的資格比對貼到群組）；standby 模式不回覆 |
+
+**設定**：`api.env` 的 `LINE_BOT_CHANNEL_SECRET`、`LINE_BOT_ACCESS_TOKEN`（Messaging API channel 的長期 channel access token）成對設定才啟用；`LINE_LIFF_ID`（公開值）、`WEB_BASE_URL`（預設 `https://mou-welfare.com`）。LINE Official Account Manager 關閉「自動回應訊息」，Messaging API 的 Webhook URL 設為 `https://api.mou-welfare.com/v1/line/webhook` 並開啟「Use webhook」。
+
+**測試**：`tests/line.test.ts`（簽章與佇列、已登入與未登入、次數用完、追問與開新對話、reply 過期改用 push、加入好友、非文字、群組與 standby、文字轉換），FakeLineBot 與 FakeLLM，不連 LINE 與 Gemini。
 
 ---
 
@@ -561,7 +574,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 2. ✅ 資料表與聊天 API（SSE、次數限制、退回固定格式）。
 3. ✅ 驗證 SSE 經過 Cloudflare 與 Caddy 不被緩衝（§11 P0；2026-11-24 在正式環境登入後實測，文字逐段出現）。
 4. ✅ 前端照 v1 的 ChatBoard 重做（手機 `/chat`、桌機右下浮動視窗）。
-5. LINE Bot 共用同一個聊天服務（不串流，收齊後回覆並附福利 Flex 卡片，§8.7）。
+5. ✅ LINE Bot 共用同一個聊天服務（不串流，收齊後回覆並附福利 Flex 卡片，§8.7；2026-11-24）。
 
 ## 9. 資料庫基礎設施（已完成）
 
@@ -608,7 +621,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 項目 | 狀態 |
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
-| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 11 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`；`0009_scraper_runs`：`scrape_runs`、`alert_state`；`0010_chat`：`chat_sessions`、`chat_messages`、`chat_usage`） |
+| 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 12 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`；`0009_scraper_runs`：`scrape_runs`、`alert_state`；`0010_chat`：`chat_sessions`、`chat_messages`、`chat_usage`；`0011_line`：`chat_sessions.channel`） |
 | pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
 | Caddy | ✅ `api.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*`（切換前為 `Caddyfile.bak-202611241039`） |
 | DNS | ✅ `api.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied）；`mou-welfare.com`、`admin.mou-welfare.com` 是 Workers 自訂網域 |
@@ -705,8 +718,8 @@ v1 的 API（NestJS，pm2 `mou-welfare-api`，port 5009）與前端（Vue，Cadd
 | **P0 骨架與驗證** | monorepo（pnpm）、`packages/shared`、API（Hono + Drizzle + Better Auth + pg-boss）部署到 `api-v2.mou-welfare.com`、Nuxt 骨架部署到 Workers | 第 11 節四項驗證全部通過 |
 | **P1 核心 API** ✅ | 個人資料、福利搜尋與詳情、資格比對、收藏、FAQ、權限 middleware、管理端 | 單元測試涵蓋比對邏輯和權限 helper；OpenAPI 文件產出（2026-11-23 管理端 `/v1/admin/*` 也完成） |
 | **P2 資料流** ✅ | `/internal/ingest`、`/internal/remove`（HMAC）、pg-boss 結構化（Gemini / 規則備案）、embedding、和爬蟲 P0 對接 | 爬蟲推送 3 個縣市的資料，可以搜尋得到（正式環境 12 縣市 1,471 筆；2026-11-23 以 Gemini 全量結構化完成，可搜尋 985 筆） |
-| **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天（規則解析、混合檢索、SSE、每日 30 則、退回固定格式、前端）完成（2026-11-23，§8.9）；LINE Bot 共用聊天服務待 P4 |
-| **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | Google / LINE / LIFF 登入的程式已完成（2026-11-23，`tests/social.test.ts`）；LINE 與 LIFF 已啟用，Google 待設定金鑰；其餘未開始 |
+| **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天（規則解析、混合檢索、SSE、每日 30 則、退回固定格式、前端）完成（2026-11-23，§8.9）；LINE Bot 共用聊天服務 2026-11-24 完成（§8.7） |
+| **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | Google / LINE / LIFF 登入的程式已完成（2026-11-23，`tests/social.test.ts`）；LINE 與 LIFF 已啟用，Google 待設定金鑰；LINE Bot 對話 2026-11-24 完成（§8.7）；通知與 cron 未開始 |
 | **管理後台** ✅ | 總覽、福利檢核、LLM 用量、使用者（唯讀）、稽核紀錄 | 2026-11-23 上線 `admin.mou-welfare.com`（[admin.md](admin.md)） |
 | **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | ✅ 2026-11-24 切換網域、v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天 2026-11-23 完成；LINE 分享待 P4） |
 

@@ -1,6 +1,6 @@
 # 測試規範（v2）
 
-> 狀態：規範定案；CI 與自動部署已運作（API 測試 269 個、爬蟲測試 125 個；2026-11-24）
+> 狀態：規範定案；CI 與自動部署已運作（API 測試 287 個、爬蟲測試 125 個；2026-11-24）
 > 最後更新：2026-11-23
 > 適用範圍：`apps/api`、`apps/web`、`apps/admin`、`packages/shared`、`services/scraper`
 > 相關文件：[後端設計](backend.md)、[爬蟲設計](scraper.md)
@@ -99,7 +99,7 @@ const matrix = [
 | R8 | 任何登入者都能修改或刪除任何家庭 | 已涵蓋在權限矩陣（`tests/family.test.ts` 的「權限矩陣：家庭」：匿名／外人／成員／管理者） |
 | R9 | 可以直接把任何人加進任何家庭 | 只能透過邀請碼加入；邀請碼過期、已使用、不存在時回傳 4xx（已實作：`tests/family.test.ts`，含同一碼同時使用只有一人成功） |
 | R10 | `PATCH /users/:id` 可以修改 `lineId` / `googleId` | 更新個人資料時帶這兩個欄位，會被忽略或拒絕，資料庫內容不變 |
-| R11 | LINE webhook 沒驗證簽章 | 沒有簽章、簽章錯誤、body 被竄改，都回傳 401，而且不會排入任何工作 |
+| R11 | LINE webhook 沒驗證簽章 | 沒有簽章、簽章錯誤、body 被竄改，都回傳 401，而且不會排入任何工作；沒有設定 channel secret 時一律 401（已實作：`tests/line.test.ts`） |
 | R12 | `/upload` 不用登入 | 未登入回傳 401；非圖片格式或超過大小限制回傳 4xx |
 | R13 | OAuth 的 `state` 沒驗證 | state 不符時拒絕登入（Better Auth 內建，測試要確認有啟用） |
 | R14 | 忘記密碼的回應會透露 email 是否已註冊 | 已註冊和未註冊的 email，回應內容和狀態碼完全相同 |
@@ -119,6 +119,7 @@ const matrix = [
 - **爬蟲執行紀錄與系統檢查**（`tests/scraper.test.ts`）：回報需要 HMAC、格式錯誤 400；開始 → 每站 → 結束的狀態變化，全部正常不寄信；有站點不正常時狀態為 `warning` 並寄信一次（重複回報不重寄）；後台各站取最近一次結果與最後正常時間、詳情含隔離清單、一般使用者 403；系統檢查的中斷（4 小時沒有回報）、逾期（寄一次、24 小時內不重寄、恢復後解除）、沒有執行紀錄時不算逾期、結構化錯誤增加才寄信。爬蟲端（`services/scraper/tests/test_push.py`）測回報的順序與內容，以及一站丟出例外時記為 `failed`、其他站照常執行。
 - **第三方登入**（`tests/social.test.ts`，LINE 的 `/verify` 以 stub 的 fetch 取代）：未設定金鑰回 404、ID 與 secret 必須成對；Google 授權網址的 `redirect_uri`、`callbackURL` 不在 `TRUSTED_ORIGINS` 時 403；LIFF ID Token 建立新帳號、重複登入不重建、沒有 email 時用 `.invalid` 替代地址且不寄信、`aud` 不符拒絕、與已驗證帳號合併、與**未驗證**帳號不合併、沒有密碼的帳號收信設定密碼後可用密碼登入（docs/backend.md §8.5.1）。
 - **阿哞聊天**（docs/backend.md §8.9）：規則解析（縣市別名、身分口語、追問判斷、條件合併）、二字詞關鍵字、引用改寫（標註被切在兩段之間）、prompt 不含生日以表格測（`tests/chat-parse.test.ts`）；流程以 FakeLLM 測（`tests/chat.test.ts`）：SSE 順序 `sources → delta → done`、清單外的引用移除、存下訊息與條件、用量記為 `chat`、追問沿用主題、不套用個人資料、家庭模式燈號、居住縣市沒有資料、退回固定格式（沒有 LLM、額度暫停、串流中途失敗）、沒有結果不呼叫 LLM、每日 30 則（含同時送出不超過、刪除對話不歸零、臺北時間換日）、擁有者與家庭成員檢查、prompt 不含姓名／email／生日。Gemini 串流的用量紀錄與 `RETRIEVAL_QUERY` 在 `tests/gemini.test.ts`。檢索品質另以評測集（`pnpm --filter @mou-welfare/api eval:chat`）量測。
+- **LINE Bot**（docs/backend.md §8.7）：以 FakeLineBot 與 FakeLLM 測（`tests/line.test.ts`）：webhook 簽章（R11）與排入佇列、LINE 驗證用的空請求、已登入的人交給聊天服務（引用換成卡片編號、福利卡片的連結、對話存成 `line`、和網站共用次數）、套用個人資料的燈號、追問沿用與隔 30 分鐘開新對話、次數用完不呼叫 LLM、reply token 過期改用 push、還沒登入的人不呼叫 LLM 只列福利並附 LIFF 登入、加入好友、非文字訊息、群組與 standby 不回覆、Markdown 轉純文字與長度上限。
 - **管理端**（`tests/admin.test.ts`）：人工判定立即生效並寫入稽核紀錄；已過截止日的判為福利仍為 `expired`；取消判定會排入重新結構化；列表篩選；使用者列表不含生日與身分、查看詳情寫入 `user.view`；總覽與用量的統計。
 - **結構化回測**（不在 CI，會呼叫真實的 Gemini）：`pnpm --filter @mou-welfare/api eval:structure`，98 筆評測集與門檻見 `docs/backend.md` §8.3.1。改 prompt、換模型、改 schema 或 `buildInput` 時必須跑，結果附在 PR。
 - **環境變數**：缺少必要的變數時，應用程式拒絕啟動，並在錯誤訊息裡列出缺少的變數名稱。

@@ -4,7 +4,10 @@ import { sql } from 'drizzle-orm'
 import { z } from 'zod'
 import type { Db } from '../db/client.ts'
 import { workerHeartbeat } from '../db/schema/index.ts'
+import { handleLineEvent, type LineEvent } from '../features/line/service.ts'
 import type { Structurer } from '../features/welfare/structure.ts'
+import type { Env } from '../env.ts'
+import type { LineBot } from '../lib/line.ts'
 import { type LLM, LLMError } from '../lib/llm/index.ts'
 import type { Mailer } from '../lib/mail/index.ts'
 import { type Boss, BossQueue } from '../lib/queue.ts'
@@ -30,6 +33,8 @@ export async function startJobs(opts: {
   probeMs?: number
   /** 系統檢查（jobs/monitor.ts）的間隔；0＝不執行（測試用） */
   monitorMs?: number
+  /** LINE Bot（docs/backend.md §8.7）；未設定時不處理 line-event */
+  line?: { bot: LineBot; env: Pick<Env, 'LINE_LIFF_ID' | 'WEB_BASE_URL'> } | null
 }): Promise<Jobs> {
   const { db, boss, structurer, llm } = opts
   const notify = createNotify(opts.mailer, opts.alertTo)
@@ -87,6 +92,15 @@ export async function startJobs(opts: {
   const monitorMs = opts.monitorMs ?? MONITOR_MS
   const monitorTimers = monitorMs > 0 ? [setTimeout(monitor, 60_000), setInterval(monitor, monitorMs)] : []
 
+  // LINE Bot：同時處理幾則（大多時間在等 LLM），失敗不重試（lib/queue.ts）
+  const line = opts.line
+  if (line) {
+    await boss.work<{ event: LineEvent }>('line-event', { batchSize: 1, pollingIntervalSeconds: 0.5, localConcurrency: 4 }, async ([job]) => {
+      if (!job) return
+      return { outcome: await handleLineEvent({ db, llm, line: line.bot, env: line.env }, job.data.event) }
+    })
+  }
+
   // TODO(P4)：notify、deadline-reminder、expire、cleanup 等 cron
 
   const beat = () =>
@@ -103,6 +117,7 @@ export async function startJobs(opts: {
       if (probeTimer) clearInterval(probeTimer)
       for (const t of monitorTimers) clearTimeout(t)
       await boss.offWork('welfare-structure')
+      if (line) await boss.offWork('line-event')
     },
   }
 }
