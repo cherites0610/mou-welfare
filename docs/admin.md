@@ -25,7 +25,7 @@
 ```
 瀏覽器 ── admin.mou-welfare.com（Cloudflare Workers，只有靜態檔）
    │
-   └─ fetch（credentials: include）──▶ api-v2.mou-welfare.com /v1/admin/*（Hono，access = 'admin'）
+   └─ fetch（credentials: include）──▶ api.mou-welfare.com /v1/admin/*（Hono，access = 'admin'）
                                           └─ Postgres：welfare_programs、llm_calls、admin_audit …
 ```
 
@@ -238,7 +238,7 @@ cd apps/api && ./node_modules/.bin/tsx --env-file=.env scripts/set-role.ts <本�
 
 - GitHub Actions `deploy.yml` 的 `admin` 工作在 CI 通過後執行：
   1. 安裝 `@mou-welfare/admin` 的相依套件。
-  2. 建置，`NUXT_PUBLIC_API_BASE=https://api-v2.mou-welfare.com`、`NUXT_PUBLIC_WEB_BASE=https://v2.mou-welfare.com`。
+  2. 建置，`NUXT_PUBLIC_API_BASE=https://api.mou-welfare.com`、`NUXT_PUBLIC_WEB_BASE=https://mou-welfare.com`。
   3. `wrangler deploy`。
 
   使用和前台相同的 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。
@@ -246,7 +246,7 @@ cd apps/api && ./node_modules/.bin/tsx --env-file=.env scripts/set-role.ts <本�
 - 手動部署：
 
   ```bash
-  NUXT_PUBLIC_API_BASE=https://api-v2.mou-welfare.com NUXT_PUBLIC_WEB_BASE=https://v2.mou-welfare.com pnpm --filter @mou-welfare/admin build
+  NUXT_PUBLIC_API_BASE=https://api.mou-welfare.com NUXT_PUBLIC_WEB_BASE=https://mou-welfare.com pnpm --filter @mou-welfare/admin build
   pnpm --filter @mou-welfare/admin run deploy
   ```
 

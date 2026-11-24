@@ -219,7 +219,7 @@ PR 開啟 / 更新
       全部通過才能合併
 
 合併到 main
- ├─ 部署 API 到主機（staging：api-v2.mou-welfare.com）→ 煙霧測試 → 失敗就回滾
+ ├─ 部署 API 到主機（api.mou-welfare.com）→ 煙霧測試 → 失敗就回滾
  ├─ 部署 web 到 Workers 的預覽環境
  └─ 對 staging 跑 E2E 和 SEO 測試
 
@@ -248,7 +248,7 @@ API 執行 `pm2 reload` 之後：
 1. `GET /health` 回傳 200，而且回應內容包含資料庫連線狀態和目前的 migration 版本。
 2. 用一個公開端點實際查詢資料庫，例如 `GET /v1/faq`。
 3. 背景工作在 30 秒內回報心跳（`/health` 的 `jobs.lastBeatSecondsAgo`；`WORKER_MODE=separate` 時檢查獨立的 worker 程序）。
-4. GitHub Actions 部署後另外檢查：`api-v2.mou-welfare.com/health` 為 ok、`v2.mou-welfare.com/login` 與 `admin.mou-welfare.com/login`（跟隨轉址）回 200。
+4. GitHub Actions 部署後另外檢查：`api.mou-welfare.com/health` 為 ok、`mou-welfare.com/login` 與 `admin.mou-welfare.com/login`（跟隨轉址）回 200。
 
 LLM 額度暫停（`/health` 的 `llm.paused`）**不算**部署失敗。
 

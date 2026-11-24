@@ -35,7 +35,7 @@ Repo → Settings → Secrets and variables → Actions → New repository secre
 ## 3. 驗證
 
 Actions → deploy → Run workflow。`api`、`web`、`admin` 三個 job 都應該實際執行（不再顯示「略過」），
-`smoke` 會檢查 `https://api-v2.mou-welfare.com/health`、`https://v2.mou-welfare.com/login`
+`smoke` 會檢查 `https://api.mou-welfare.com/health`、`https://mou-welfare.com/login`
 與 `https://admin.mou-welfare.com/login`（後台是靜態檔，`/login` 會 307 轉到 `/login/`，所以用 `curl -L`）。
 
 ## 4. 各 job 的內容
