@@ -73,6 +73,12 @@ export const TOPICS = [
     pattern: '租屋|租金|住宅|購屋|修繕',
   },
   {
+    slug: 'social-housing',
+    name: '社會住宅',
+    intro: '中央與各縣市的社會住宅招租、包租代管，租金低於市價，適合租屋族與弱勢家庭。',
+    pattern: '社會住宅|社宅|包租代管',
+  },
+  {
     slug: 'employment',
     name: '就業與失業',
     intro: '找工作、失業與職業訓練相關的補助與服務。',
@@ -83,6 +89,12 @@ export const TOPICS = [
     name: '醫療補助',
     intro: '看病、住院與健保相關的補助，例如醫療費用、健保費與看護補助。',
     pattern: '醫療|健保|看護|住院',
+  },
+  {
+    slug: 'senior-allowance',
+    name: '敬老金與老人津貼',
+    intro: '長輩可以領的錢，例如重陽敬老金、老人生活津貼、國民年金與老農津貼。',
+    pattern: '敬老|重陽|老人.*津貼|老年.*(年金|津貼)|老農',
   },
   {
     slug: 'long-term-care',

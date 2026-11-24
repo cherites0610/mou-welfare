@@ -42,6 +42,7 @@ export const ROUTE_ACCESS = {
   'POST /v1/welfare/simulate': 'public',
   'GET /v1/sitemap': 'public',
   'GET /v1/topics': 'public',
+  'GET /v1/highlights': 'public',
   'POST /v1/uploads/avatar': 'user',
   'GET /v1/chat/sessions': 'user',
   'POST /v1/chat/sessions': 'user',

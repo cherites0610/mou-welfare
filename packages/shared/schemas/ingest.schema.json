@@ -22,7 +22,8 @@
           "enum": [
             "cms",
             "opendata",
-            "portal"
+            "portal",
+            "curated"
           ]
         }
       },

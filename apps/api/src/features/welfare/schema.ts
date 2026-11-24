@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi'
-import { CATEGORIES, CITIES, GENDERS, IDENTITIES, TOPIC_SLUGS } from '@mou-welfare/shared'
+import { CATEGORIES, CITIES, GENDERS, IDENTITIES, NATIONAL, TOPIC_SLUGS } from '@mou-welfare/shared'
 
 /** 逗號分隔的白名單值，例如 `city=臺北市,新北市` */
 const csvOf = (allowed: readonly string[], name: string) =>
@@ -19,7 +19,7 @@ export const splitCsv = (v: string | undefined) => (v ? v.split(',').map((x) => 
 
 export const SearchQuery = z.object({
   q: z.string().trim().min(1).max(50).optional(),
-  city: csvOf(CITIES, 'city'),
+  city: csvOf([...CITIES, NATIONAL], 'city'),
   category: csvOf(CATEGORIES, 'category'),
   topic: z.enum(TOPIC_SLUGS).optional().openapi({ description: '人生階段主題（packages/shared/src/topics.ts）' }),
   page: z.coerce.number().int().min(1).max(1000).default(1),

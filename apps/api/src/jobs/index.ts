@@ -14,6 +14,7 @@ import { type Boss, BossQueue } from '../lib/queue.ts'
 import { createNotify } from '../lib/notify.ts'
 import { LLMPause, PROBE_MS } from './llm-pause.ts'
 import { MONITOR_MS, runMonitor } from './monitor.ts'
+import { syncCurated } from './curated.ts'
 import { backfill, structureProgram } from './structure.ts'
 
 export const HEARTBEAT_NAME = 'jobs'
@@ -39,6 +40,9 @@ export async function startJobs(opts: {
   const { db, boss, structurer, llm } = opts
   const notify = createNotify(opts.mailer, opts.alertTo)
   const queue = new BossQueue(boss)
+
+  // 精選福利（src/curated）：失敗不影響啟動
+  await syncCurated(db, queue).catch((e) => console.error('[curated]', e))
 
   const queueBackfill = async () => {
     const queued = await backfill(db, queue, structurer)

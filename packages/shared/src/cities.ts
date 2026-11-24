@@ -25,3 +25,6 @@ export const CITIES = [
 ] as const
 
 export type City = (typeof CITIES)[number]
+
+/** 中央政府的全國性福利（福利資料的 city 欄位）：依縣市篩選時一併列出 */
+export const NATIONAL = '全國'

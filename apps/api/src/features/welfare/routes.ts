@@ -1,8 +1,8 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import type { AppEnv } from '../../app.ts'
 import { familyMode } from '../family/service.ts'
-import { FamilyIdQuery, SearchQuery, SimulateBody, splitCsv, WelfareDetailSchema, WelfareListSchema } from './schema.ts'
-import { getProgram, listSitemap, profileOf, searchPrograms, topicCounts } from './service.ts'
+import { FamilyIdQuery, SearchQuery, SimulateBody, splitCsv, WelfareDetailSchema, WelfareListSchema, WelfareSummarySchema } from './schema.ts'
+import { getProgram, highlights, listSitemap, profileOf, searchPrograms, topicCounts } from './service.ts'
 
 const ErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) })
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
@@ -57,10 +57,24 @@ const topics = createRoute({
       z.object({
         data: z.object({
           cities: z.array(z.object({ city: z.string(), total: z.number().int(), categories: z.record(z.string(), z.number().int()) })),
+          national: z.object({ total: z.number().int(), categories: z.record(z.string(), z.number().int()) }),
           topics: z.array(z.object({ slug: z.string(), total: z.number().int() })),
         }),
       }),
       '各主題的福利筆數',
+    ),
+  },
+})
+
+const highlightsRoute = createRoute({
+  method: 'get',
+  path: '/v1/highlights',
+  tags: ['welfare'],
+  summary: '列表頂端的精選區塊：精選福利（置頂）與 30 天內截止的福利',
+  responses: {
+    200: json(
+      z.object({ data: z.object({ featured: z.array(WelfareSummarySchema), closingSoon: z.array(WelfareSummarySchema) }) }),
+      '精選與即將截止的福利',
     ),
   },
 })
@@ -98,6 +112,11 @@ export const welfareRoutes = new OpenAPIHono<AppEnv>()
   .openapi(topics, async (c) => {
     const data = await topicCounts(c.var.deps.db)
     c.header('Cache-Control', 'public, max-age=3600')
+    return c.json({ data }, 200)
+  })
+  .openapi(highlightsRoute, async (c) => {
+    const data = await highlights(c.var.deps.db)
+    c.header('Cache-Control', 'public, max-age=600')
     return c.json({ data }, 200)
   })
   .openapi(simulate, async (c) => {

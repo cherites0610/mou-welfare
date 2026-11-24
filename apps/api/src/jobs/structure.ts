@@ -71,8 +71,11 @@ export async function structureProgram(
   }
 
   // 人工判定優先（docs/admin.md）：判為 rejected 就維持 rejected；判為 active 時仍依截止日變 expired
+  // 精選福利（src/curated）的截止日是人工寫的，不用結構化的結果
+  const curatedDeadline = p.sourceKind === 'curated' ? p.sourceFields.deadline : undefined
+  const deadline = typeof curatedDeadline === 'string' ? curatedDeadline : r.deadline
   const individual = p.statusOverride ? p.statusOverride === 'active' : r.isIndividualWelfare
-  const status = !individual ? 'rejected' : r.deadline && r.deadline < today ? 'expired' : 'active'
+  const status = !individual ? 'rejected' : deadline && deadline < today ? 'expired' : 'active'
   // 只在內容沒有再被更新的情況下寫回；被更新的話，新的工作會處理
   const updated = await db
     .update(w)
@@ -83,7 +86,7 @@ export async function structureProgram(
       identities: r.identities,
       requirements: r.requirements,
       rewards: r.rewards,
-      deadline: r.deadline,
+      deadline,
       embedding,
       status,
       structuredHash: p.contentHash,

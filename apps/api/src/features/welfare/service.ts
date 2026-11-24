@@ -7,10 +7,11 @@ import {
   type MatchProfile,
   type MatchResult,
   match,
+  NATIONAL,
   TOPICS,
   topicFromSlug,
 } from '@mou-welfare/shared'
-import { and, arrayOverlaps, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm'
+import { and, arrayOverlaps, asc, count, desc, eq, gte, ilike, inArray, isNotNull, lte, or, type SQL, sql } from 'drizzle-orm'
 import type { Db } from '../../db/client.ts'
 import { favorites, PUBLIC_STATUSES, welfareAttachments, welfarePrograms as w } from '../../db/schema/index.ts'
 import { type FamilyMatch, type FamilyProfile, matchFamily } from '../family/service.ts'
@@ -66,7 +67,8 @@ const topicMatch = (pattern: string) => sql`(${w.name} ~ ${pattern} or ${w.summa
 
 function filters(p: SearchParams): SQL | undefined {
   const conds: SQL[] = [eq(w.status, 'active')]
-  if (p.cities?.length) conds.push(inArray(w.city, p.cities))
+  // 全國性福利（中央）住哪裡都能申請：依縣市篩選時一併列出；只篩「全國」時只列全國
+  if (p.cities?.length) conds.push(inArray(w.city, [...new Set([...p.cities, NATIONAL])]))
   // R3：多類別福利以任一類別篩選都要找得到（陣列重疊，不是 IN）
   if (p.categories?.length) conds.push(arrayOverlaps(w.categories, p.categories))
   if (p.q) {
@@ -177,7 +179,7 @@ export function profileOf(u: { birthday?: string | null; gender?: string | null;
   return u ? { birthday: u.birthday ?? null, gender: u.gender ?? null, identities: u.identities ?? [] } : null
 }
 
-/** 主題頁用的筆數（只算上架中）：縣市 × 類別、人生階段主題 */
+/** 主題頁用的筆數（只算上架中）：縣市 × 類別（不含全國性福利，另列在 national）、人生階段主題 */
 export async function topicCounts(db: Db) {
   const active = eq(w.status, 'active')
   const [cityRows, pairs, [topicRow]] = await Promise.all([
@@ -191,12 +193,30 @@ export async function topicCounts(db: Db) {
       .from(w)
       .where(active),
   ])
+  const byCity = (city: string) => ({
+    total: cityRows.find((r) => r.city === city)?.n ?? 0,
+    categories: Object.fromEntries(pairs.filter((p) => p.city === city).map((p) => [p.category, Number(p.n)])),
+  })
   return {
-    cities: cityRows.map((r) => ({
-      city: r.city,
-      total: r.n,
-      categories: Object.fromEntries(pairs.filter((p) => p.city === r.city).map((p) => [p.category, Number(p.n)])),
-    })),
+    cities: cityRows.filter((r) => r.city !== NATIONAL).map((r) => ({ city: r.city, ...byCity(r.city) })),
+    national: byCity(NATIONAL),
     topics: TOPICS.map((t) => ({ slug: t.slug, total: Number(topicRow?.[t.slug] ?? 0) })),
   }
+}
+
+/** 列表頂端的精選區塊：置頂的精選福利、30 天內截止的福利 */
+export async function highlights(db: Db, today: Date = new Date()) {
+  const day = today.toISOString().slice(0, 10)
+  const soon = new Date(today.getTime() + 30 * 86_400_000).toISOString().slice(0, 10)
+  const [featured, closing] = await Promise.all([
+    db.select(summaryColumns).from(w).where(and(eq(w.status, 'active'), isNotNull(w.pinnedAt))).orderBy(desc(w.pinnedAt)).limit(8),
+    db
+      .select(summaryColumns)
+      .from(w)
+      .where(and(eq(w.status, 'active'), gte(w.deadline, day), lte(w.deadline, soon)))
+      .orderBy(asc(w.deadline), asc(w.id))
+      .limit(12),
+  ])
+  const toSummary = (r: (typeof featured)[number]): WelfareSummary => ({ ...r, match: null, familyMatches: null })
+  return { featured: featured.map(toSummary), closingSoon: closing.map(toSummary) }
 }

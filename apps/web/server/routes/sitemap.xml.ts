@@ -7,11 +7,13 @@ const STATIC_PAGES = ['/welfares', '/topics', '/question', '/terms', '/private']
 
 type TopicCounts = {
   cities: { city: string; total: number; categories: Record<string, number> }[]
+  national: { total: number }
   topics: { slug: string; total: number }[]
 }
 
 function topicPages(counts: TopicCounts): string[] {
   const pages = counts.topics.filter((t) => t.total).map((t) => `/topics/${t.slug}`)
+  if (counts.national.total) pages.push('/national')
   for (const c of counts.cities) {
     if (!c.total || !(CITIES as readonly string[]).includes(c.city)) continue
     const base = `/cities/${CITY_SLUGS[c.city as City]}`

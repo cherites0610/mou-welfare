@@ -1,4 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { NATIONAL } from '@mou-welfare/shared'
+import { syncCurated } from '../src/jobs/curated.ts'
+import { structureProgram } from '../src/jobs/structure.ts'
+import { RuleStructurer } from '../src/features/welfare/structure.ts'
+import { welfarePrograms } from '../src/db/schema/index.ts'
 import { addAttachment, createProgram } from './factories.ts'
 import { resetDb, setupApp, signUp } from './helpers.ts'
 
@@ -170,6 +175,69 @@ describe('主題（topic）', () => {
     expect(data.cities).toEqual([{ city: '臺北市', total: 2, categories: { 老人福利: 2, 身心障礙福利: 1 } }])
     expect(data.topics.find((x: { slug: string }) => x.slug === 'assistive-devices').total).toBe(1)
     expect(data.topics.find((x: { slug: string }) => x.slug === 'funeral').total).toBe(0)
+  })
+})
+
+describe('全國性福利與精選', () => {
+  it('依縣市篩選時一併列出全國性福利；只篩全國時只列全國', async () => {
+    const tp = await createProgram(t.db, { city: '臺北市' })
+    const nat = await createProgram(t.db, { city: NATIONAL })
+    await createProgram(t.db, { city: '新北市' })
+    const ids = async (q: string) => (await json(await get(`/v1/welfare?${q}`))).data.map((x: { id: string }) => x.id).sort()
+    expect(await ids(`city=${encodeURIComponent('臺北市')}`)).toEqual([tp.id, nat.id].sort())
+    expect(await ids(`city=${encodeURIComponent(NATIONAL)}`)).toEqual([nat.id])
+  })
+
+  it('GET /v1/topics：全國性福利另列，不算進縣市', async () => {
+    await createProgram(t.db, { city: NATIONAL, categories: ['老人福利'] })
+    const { data } = await json(await get('/v1/topics'))
+    expect(data.cities).toEqual([])
+    expect(data.national).toEqual({ total: 1, categories: { 老人福利: 1 } })
+  })
+
+  it('GET /v1/highlights：置頂的精選與 30 天內截止的', async () => {
+    const day = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString().slice(0, 10)
+    const pinned = await createProgram(t.db, { pinnedAt: new Date() })
+    await createProgram(t.db, { pinnedAt: new Date(), status: 'expired' })
+    const soon = await createProgram(t.db, { deadline: day(5) })
+    const sooner = await createProgram(t.db, { deadline: day(1) })
+    await createProgram(t.db, { deadline: day(60) })
+    await createProgram(t.db, { deadline: day(-1) })
+    const { data } = await json(await get('/v1/highlights'))
+    expect(data.featured.map((x: { id: string }) => x.id)).toEqual([pinned.id])
+    expect(data.closingSoon.map((x: { id: string }) => x.id)).toEqual([sooner.id, soon.id])
+  })
+
+  it('精選福利同步：判為福利、精選的置頂；內容沒變不重新結構化；從清單移除的下架', async () => {
+    const item = {
+      slug: 'demo',
+      title: '示範的全國性福利',
+      city: NATIONAL,
+      sourceUrl: 'https://example.gov.tw/demo',
+      publishedAt: null,
+      deadline: '2099-12-31',
+      featured: true,
+      contentMd: '示範內容，截止日期：2030年1月1日。'.repeat(10),
+    }
+    await syncCurated(t.db, t.queue, [item])
+    const [row] = await t.db.select().from(welfarePrograms)
+    expect(row).toMatchObject({ programKey: 'curated:demo', city: NATIONAL, sourceKind: 'curated', statusOverride: 'active' })
+    expect(row!.pinnedAt).not.toBeNull()
+    // 結構化不覆蓋人工寫的截止日，也不會把精選福利判成雜訊
+    expect(await structureProgram(t.db, new RuleStructurer(), null, row!.id)).toBe('done')
+    const [done] = await t.db.select().from(welfarePrograms)
+    expect(done).toMatchObject({ deadline: '2099-12-31', status: 'active' })
+
+    const jobs = t.queue.jobs.length
+    await syncCurated(t.db, t.queue, [item])
+    expect(t.queue.jobs.length).toBe(jobs)
+    const [again] = await t.db.select().from(welfarePrograms)
+    expect(again!.pinnedAt).toEqual(row!.pinnedAt)
+
+    await syncCurated(t.db, t.queue, [{ ...item, featured: false }])
+    expect((await t.db.select().from(welfarePrograms))[0]!.pinnedAt).toBeNull()
+    await syncCurated(t.db, t.queue, [])
+    expect((await t.db.select().from(welfarePrograms))[0]!.status).toBe('removed')
   })
 })
 

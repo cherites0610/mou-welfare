@@ -3,7 +3,8 @@ import { z } from 'zod'
 // 爬蟲 → API 的推送格式（docs/scraper.md §7）。
 // 爬蟲端以 schemas/ingest.schema.json 驗證輸出；API 端以同一份 Zod schema 驗證輸入。
 
-export const SourceKind = z.enum(['cms', 'opendata', 'portal'])
+// curated：人工整理的精選福利（apps/api/src/curated），不經過爬蟲
+export const SourceKind = z.enum(['cms', 'opendata', 'portal', 'curated'])
 
 export const IngestAttachment = z.object({
   name: z.string().min(1),

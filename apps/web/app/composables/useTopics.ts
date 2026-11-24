@@ -3,6 +3,8 @@ import { CATEGORY_SLUGS, CITIES, CITY_SLUGS, type Category, type City, TOPICS } 
 
 export type TopicCounts = {
   cities: { city: string; total: number; categories: Record<string, number> }[]
+  /** 全國性福利（中央）：依縣市篩選時也會列出，所以縣市頁的筆數要加上 */
+  national: { total: number; categories: Record<string, number> }
   topics: { slug: string; total: number }[]
 }
 
@@ -18,12 +20,15 @@ export async function useTopicCounts() {
   return computed(() => {
     const counts = data.value
     const byCity = new Map(counts?.cities.map((c) => [c.city, c]))
+    const national = counts?.national ?? { total: 0, categories: {} }
+    const pairTotal = (c: City, cat: Category) => (byCity.get(c)?.categories[cat] ?? 0) + (national.categories[cat] ?? 0)
     return {
       loaded: !!counts,
-      /** 有資料的縣市，依 CITIES 的順序 */
-      cities: CITIES.filter((c) => byCity.get(c)?.total).map((c) => ({ city: c, total: byCity.get(c)!.total })),
-      cityTotal: (c: City) => byCity.get(c)?.total ?? 0,
-      pairTotal: (c: City, cat: Category) => byCity.get(c)?.categories[cat] ?? 0,
+      national,
+      /** 有自己資料的縣市（依 CITIES 的順序）；筆數含全國性福利 */
+      cities: CITIES.filter((c) => byCity.get(c)?.total).map((c) => ({ city: c, total: byCity.get(c)!.total + national.total })),
+      /** 縣市 × 類別的筆數（含全國性福利）；縣市自己沒有這個類別時為 0（不列連結） */
+      pairTotal: (c: City, cat: Category) => (byCity.get(c)?.categories[cat] ? pairTotal(c, cat) : 0),
       topics: TOPICS.map((t) => ({ ...t, total: counts?.topics.find((x) => x.slug === t.slug)?.total ?? 0 })),
     }
   })

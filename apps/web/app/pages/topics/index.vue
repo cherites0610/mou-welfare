@@ -26,6 +26,15 @@ const counts = await useTopicCounts()
       <p class="mt-2 text-gray-600">不知道從哪裡找起？從你現在遇到的情況，或你住的縣市開始看。</p>
     </header>
 
+    <NuxtLink v-if="counts.national.total" to="/national"
+      class="flex items-center justify-between gap-3 p-4 rounded-xl bg-green-50 border border-green-100 hover:border-mygreen transition">
+      <span>
+        <span class="font-bold text-gray-800">全國性福利</span>
+        <span class="block text-sm text-gray-500 mt-1">中央政府的補助，住哪裡都能申請（{{ counts.national.total }} 筆）</span>
+      </span>
+      <Icon icon="mingcute:right-line" class="text-gray-400 text-xl shrink-0" />
+    </NuxtLink>
+
     <section>
       <h2 class="font-bold text-gray-800 mb-3">人生階段</h2>
       <ul class="grid grid-cols-2 md:grid-cols-4 gap-3">

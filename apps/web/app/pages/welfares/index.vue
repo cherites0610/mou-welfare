@@ -39,6 +39,10 @@ const filters = computed<FilterState & { q: string }>(() => ({
   identities: csv(route.query.ids),
 }))
 const queryKey = computed(() => JSON.stringify(filters.value))
+const noFilters = computed(() => {
+  const f = filters.value
+  return !f.q && !f.cities.length && !f.categories.length && !f.family && !f.isAuto && !f.identities.length
+})
 
 /** 用到個人資料（自動篩選、家庭）時才帶登入 cookie；其餘一律匿名查詢，讓排序與伺服器端渲染的第一頁一致 */
 async function fetchPage(page: number): Promise<WelfareList> {
@@ -189,6 +193,7 @@ const toggleChat = () => {
     <WelfareFilterBar :initial="filters" @change="handleFilterChange" class="shrink-0" />
 
     <div class="flex-1 overflow-y-auto">
+      <HighlightStrip v-if="noFilters" />
       <ul v-infinite-scroll="loadMore" :infinite-scroll-disabled="loading || noMore" :infinite-scroll-distance="50"
         :infinite-scroll-immediate="false"
         class="mx-auto pb-10">
