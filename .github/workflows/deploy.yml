@@ -156,3 +156,15 @@ jobs:
           code=$(curl -sL -m 15 -o /dev/null -w '%{http_code}' https://admin.mou-welfare.com/login)
           [ "$code" = "200" ] || { echo "::error::admin.mou-welfare.com/login returned $code"; exit 1; }
           echo "admin ok ($code)"
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            apps/web/e2e
+            .nvmrc
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: SEO（sitemap、robots.txt、canonical、og、noindex）
+        env:
+          SEO_MIN_PROGRAMS: '500'
+        run: node apps/web/e2e/seo-check.cjs https://mou-welfare.com

@@ -180,6 +180,7 @@ const matrix = [
 另外要驗證 `sitemap.xml` 包含所有 `active` 狀態的福利，而且不包含已下架的福利。
 
 - 已實作：`apps/web/e2e/seo-check.cjs [網站網址]`（直接抓 HTML，不執行 JavaScript）：首頁 301、`robots.txt`、`sitemap.xml`、列表頁 canonical / description / h1 / 詳情頁連結、詳情頁 canonical（不帶查詢參數）/ `og:*` / JSON-LD、登入類頁面不收錄、不存在的福利 404。sitemap 只含 `active` 由 API 測試（`tests/welfare.test.ts`）驗證。
+- 自動執行：每次部署後的 smoke test，以及每天台灣時間 06:41 的排程（`.github/workflows/seo-check.yml`）；正式環境要求 sitemap 至少 500 筆（`SEO_MIN_PROGRAMS`）。失敗時 GitHub 寄信給 repo 擁有者。
 - 已過期的福利頁面保留（使用者收藏或分享的連結仍可開），但加上 `noindex, follow`。
 
 ---

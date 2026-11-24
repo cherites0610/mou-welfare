@@ -1,6 +1,8 @@
 // SEO 檢查（docs/testing.md §7.3）：不執行 JavaScript，直接看伺服器端渲染的 HTML。
 // 用法：node apps/web/e2e/seo-check.cjs [網站網址，預設 https://mou-welfare.com]
+// SEO_MIN_PROGRAMS：sitemap 至少要有幾筆福利（預設 1；正式環境的自動檢查設 500，資料被大量下架時會發現）
 const base = (process.argv[2] || 'https://mou-welfare.com').replace(/\/$/, '')
+const minPrograms = Number(process.env.SEO_MIN_PROGRAMS || 1)
 const failures = []
 const check = (ok, msg) => {
   console.log(`${ok ? '✓' : '✗'} ${msg}`)
@@ -20,7 +22,7 @@ const has = (html, re) => re.test(head(html))
   const sm = await get('/sitemap.xml')
   const xml = await sm.text()
   const ids = [...xml.matchAll(/\/welfares\/([0-9a-f-]{36})</g)].map((m) => m[1])
-  check(sm.status === 200 && ids.length > 0, `sitemap.xml 列出 ${ids.length} 筆福利`)
+  check(sm.status === 200 && ids.length >= minPrograms, `sitemap.xml 列出 ${ids.length} 筆福利（至少 ${minPrograms}）`)
 
   const list = await (await get('/welfares')).text()
   check(has(list, /rel="canonical" href="[^"]+\/welfares"/), '列表頁 canonical')

@@ -1,0 +1,29 @@
+# 每天檢查正式站的 SEO（docs/testing.md §7.3）。失敗時 GitHub 會寄信通知 repo 擁有者。
+# 部署後的 smoke test 也會跑同一支檢查；這個排程是為了抓到部署以外的變化（API 掛掉、資料被大量下架、Cloudflare 設定被改）。
+name: seo-check
+
+on:
+  schedule:
+    - cron: '41 22 * * *' # 台灣時間每天 06:41
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            apps/web/e2e
+            .nvmrc
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: SEO 檢查
+        env:
+          SEO_MIN_PROGRAMS: '500'
+        run: node apps/web/e2e/seo-check.cjs https://mou-welfare.com
