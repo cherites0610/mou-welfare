@@ -1,7 +1,7 @@
 # 後端設計文件（v2）
 
 > 狀態：實作中（P1 核心 API、P2 資料流與 LLM 結構化、家庭與帳號管理、LINE / LIFF 登入、管理後台已上線；Google 登入待設定金鑰；前端除 LINE Bot 外已上線，見第 12 節）
-> 最後更新：2026-11-23（LLM 全量結構化完成、用量紀錄與額度保護、結構化回測、管理後台上線）
+> 最後更新：2026-11-24（聊天 SSE 經過 Cloudflare 正式環境實測通過）
 
 > 相關文件：[管理後台](admin.md)、[爬蟲設計](scraper.md)、[測試規範](testing.md)、[自動部署設定](deploy-setup.md)、[v1 文件](v1/)
 
@@ -128,7 +128,7 @@ mou-welfare/
 | 主機資源 | 2 vCPU、1.9 GB RAM、1.9 GB swap；同時跑 Postgres、v1 API、lexicon API、Caddy、Redis（v1 用）。2026-11-18 時已用約 1 GB，swap 用了 234 MB | v2 預設只跑一個程序（背景工作在 API 程序內，實測 150 MB），以 pm2 `max_memory_restart: 300M` 限制；v1 下線後停掉 v1 API 和 Redis，可以釋放約 200 MB；持續觀察 swap 使用量 |
 | 單點故障 | 主機掛了，API 就停 | 每日備份本機加 R2；記錄重建步驟（見第 10 節）；Nuxt 在 Cloudflare，API 掛掉時頁面仍能顯示錯誤提示 |
 | 長時間工作 | LLM 結構化、批次通知 | 一律放進 pg-boss 佇列，由同一程序內的背景工作處理；結構化一次處理一筆（實測每筆約 1.3 秒，全量 1,471 筆約 37 分鐘），避免影響 API 回應。工作量變大時改 `WORKER_MODE=separate` 拆成獨立程序（不需改程式） |
-| 聊天串流 | SSE 長連線經過 Cloudflare 和 Caddy | Caddy 的 `reverse_proxy` 對 SSE 加 `flush_interval -1`；API 網域若開啟 Cloudflare 代理，要確認串流不會被緩衝 |
+| 聊天串流 | SSE 長連線經過 Cloudflare 和 Caddy | 回應加 `cache-control: no-transform`、`x-accel-buffering: no`；2026-11-24 正式環境實測逐段出現，沒有被緩衝 |
 | Nuxt on Workers | 伺服器端渲染時呼叫 API 會跨區到東京 | 熱門頁面（福利列表、詳情）用 Nuxt 的路由規則做 SWR 快取；登入後的個人化資料改由瀏覽器端呼叫 |
 | 真實客戶端 IP | 經過 Cloudflare 和 Caddy，IP 會被換掉 | Caddy 設定 `trusted_proxies` 為 Cloudflare 的 IP 段；Better Auth 的限流讀 `CF-Connecting-IP` |
 | 背景工作模式 | 預設 `WORKER_MODE=inline`：pg-boss 在 API 程序內處理佇列與 cron，省下一個程序（約 120 MB）；代價是 API 重啟時進行中的工作會中斷 | pg-boss 自動重試，工作設計為冪等（重複執行結果不變）；`/health` 回報 `jobs.mode` 與心跳 |
@@ -559,7 +559,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 
 1. ✅ 規則解析與混合檢索，加檢索評測集。
 2. ✅ 資料表與聊天 API（SSE、次數限制、退回固定格式）。
-3. 驗證 SSE 經過 Cloudflare 與 Caddy 不被緩衝（§11 P0）。
+3. ✅ 驗證 SSE 經過 Cloudflare 與 Caddy 不被緩衝（§11 P0；2026-11-24 在正式環境登入後實測，文字逐段出現）。
 4. ✅ 前端照 v1 的 ChatBoard 重做（手機 `/chat`、桌機右下浮動視窗）。
 5. LINE Bot 共用同一個聊天服務（不串流，收齊後回覆並附福利 Flex 卡片，§8.7）。
 
@@ -694,7 +694,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 **P0 原型必須驗證**
 - [ ] Nuxt 在 Workers 上做伺服器端渲染並呼叫東京的 API，熱門頁面的 TTFB（目標 p95 < 500ms，有快取時 < 100ms）。
 - [ ] Better Auth 的 cookie 在 `mou-welfare.com`（Workers）和 `api.mou-welfare.com`（主機）之間能正常共用，包括 LIFF 的 ID Token 登入。
-- [ ] SSE 串流經過 Cloudflare 和 Caddy 不會被緩衝。
+- [x] SSE 串流經過 Cloudflare 和 Caddy 不會被緩衝（2026-11-24 正式環境實測）。
 - [x] ~~v2 的記憶體用量~~：2026-11-18 實測，合併為單一程序後為 150 MB（原本 api 加 worker 兩個程序合計 272 MB）。
 
 ---
