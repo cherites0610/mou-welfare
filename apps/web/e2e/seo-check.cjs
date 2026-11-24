@@ -37,6 +37,23 @@ const has = (html, re) => re.test(head(html))
     check(!has(detail, /name="robots"/), '上架中的詳情頁沒有 noindex')
   }
 
+  // 主題頁（縣市、縣市 × 類別、人生階段）：sitemap 有列、伺服器端渲染出標題與福利連結
+  const topicPages = [...xml.matchAll(/<loc>[^<]+?(\/(?:topics|cities)\/[^<]+)<\/loc>/g)].map((m) => m[1])
+  check(topicPages.length >= 10, `sitemap.xml 列出 ${topicPages.length} 個主題頁`)
+  const hub = await (await get('/topics')).text()
+  check(has(hub, /rel="canonical" href="[^"]+\/topics"/) && /href="\/cities\/[a-z-]+"/.test(hub), '主題入口頁 canonical 與縣市連結')
+  for (const p of [topicPages.find((x) => x.startsWith('/topics/')), topicPages.find((x) => /^\/cities\/[a-z-]+\/[a-z-]+$/.test(x))]) {
+    if (!p) continue
+    const res = await get(p)
+    const html = await res.text()
+    check(
+      res.status === 200 && has(html, new RegExp(`rel="canonical" href="[^"]+${p}"`)) && /<h1[^>]*>/.test(html) && /href="\/welfares\/[0-9a-f-]{36}/.test(html),
+      `主題頁 ${p}：canonical、h1、福利連結`,
+    )
+  }
+  const noTopic = await get('/cities/no-such-city')
+  check(noTopic.status === 404, `不存在的縣市回 404（${noTopic.status}）`)
+
   for (const p of ['/login', '/register', '/favorites', '/profile']) {
     const html = await (await get(p)).text()
     check(has(html, /name="robots" content="noindex/) || /^Disallow: \/(login|register|favorites|profile)$/m.test(robots), `${p} 不收錄`)

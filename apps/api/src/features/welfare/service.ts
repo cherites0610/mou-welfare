@@ -7,6 +7,8 @@ import {
   type MatchProfile,
   type MatchResult,
   match,
+  TOPICS,
+  topicFromSlug,
 } from '@mou-welfare/shared'
 import { and, arrayOverlaps, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm'
 import type { Db } from '../../db/client.ts'
@@ -17,6 +19,7 @@ export type SearchParams = {
   q?: string | undefined
   cities?: string[] | undefined
   categories?: string[] | undefined
+  topic?: string | undefined
   page: number
   limit: number
 }
@@ -58,6 +61,9 @@ export function satisfiableIdentities(profile: MatchProfile, today: Date): Ident
   return [...out]
 }
 
+// 主題的關鍵字是程式裡的常數（不是使用者輸入），以參數傳給 PostgreSQL 的正規表示式比對
+const topicMatch = (pattern: string) => sql`(${w.name} ~ ${pattern} or ${w.summary} ~ ${pattern})`
+
 function filters(p: SearchParams): SQL | undefined {
   const conds: SQL[] = [eq(w.status, 'active')]
   if (p.cities?.length) conds.push(inArray(w.city, p.cities))
@@ -67,6 +73,8 @@ function filters(p: SearchParams): SQL | undefined {
     const pattern = `%${escapeLike(p.q)}%`
     conds.push(or(ilike(w.name, pattern), ilike(w.summary, pattern))!)
   }
+  const topic = p.topic ? topicFromSlug(p.topic) : undefined
+  if (topic) conds.push(topicMatch(topic.pattern))
   return and(...conds)
 }
 
@@ -167,4 +175,28 @@ export async function listSitemap(db: Db) {
 
 export function profileOf(u: { birthday?: string | null; gender?: string | null; identities?: string[] | null } | null) {
   return u ? { birthday: u.birthday ?? null, gender: u.gender ?? null, identities: u.identities ?? [] } : null
+}
+
+/** 主題頁用的筆數（只算上架中）：縣市 × 類別、人生階段主題 */
+export async function topicCounts(db: Db) {
+  const active = eq(w.status, 'active')
+  const [cityRows, pairs, [topicRow]] = await Promise.all([
+    db.select({ city: w.city, n: count() }).from(w).where(active).groupBy(w.city),
+    db.execute<{ city: string; category: string; n: number }>(
+      sql`select ${w.city} as city, c as category, count(*)::int as n
+          from ${w}, unnest(${w.categories}) as c where ${active} group by 1, 2`,
+    ),
+    db
+      .select(Object.fromEntries(TOPICS.map((t) => [t.slug, sql<number>`count(*) filter (where ${topicMatch(t.pattern)})::int`])))
+      .from(w)
+      .where(active),
+  ])
+  return {
+    cities: cityRows.map((r) => ({
+      city: r.city,
+      total: r.n,
+      categories: Object.fromEntries(pairs.filter((p) => p.city === r.city).map((p) => [p.category, Number(p.n)])),
+    })),
+    topics: TOPICS.map((t) => ({ slug: t.slug, total: Number(topicRow?.[t.slug] ?? 0) })),
+  }
 }

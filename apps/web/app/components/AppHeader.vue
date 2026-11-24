@@ -8,6 +8,7 @@ const session = useSession()
 
 const publicMenuItems = [
   { path: '/welfares', name: '首頁', icon: 'mdi:home-search-outline' },
+  { path: '/topics', name: '依主題找', icon: 'mdi:shape-outline' },
   { path: '/question', name: '常見問題', icon: 'mdi:frequently-asked-questions' },
 ]
 const authMenuItems = [{ path: '/profile', name: '用戶', icon: 'mdi:account-circle-outline' }]

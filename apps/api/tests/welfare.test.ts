@@ -145,6 +145,34 @@ describe('GET /v1/sitemap', () => {
   })
 })
 
+describe('主題（topic）', () => {
+  it('依主題關鍵字比對名稱與摘要', async () => {
+    const a = await createProgram(t.db, { name: '生育津貼' })
+    const b = await createProgram(t.db, { name: '弱勢家庭補助', summary: '懷孕期間每月補助' })
+    await createProgram(t.db, { name: '老人假牙補助' })
+    const body = await json(await get('/v1/welfare?topic=pregnancy'))
+    expect(body.data.map((x: { id: string }) => x.id).sort()).toEqual([a.id, b.id].sort())
+    expect(body.meta.total).toBe(2)
+  })
+
+  it('不支援的主題回 400', async () => {
+    expect((await get('/v1/welfare?topic=unknown')).status).toBe(400)
+  })
+
+  it('GET /v1/topics：縣市 × 類別與主題的筆數，只算上架中', async () => {
+    await createProgram(t.db, { city: '臺北市', categories: ['老人福利', '身心障礙福利'], name: '輔具補助' })
+    await createProgram(t.db, { city: '臺北市', categories: ['老人福利'] })
+    await createProgram(t.db, { city: '新北市', categories: ['老人福利'], name: '輔具租借', status: 'rejected' })
+    const res = await get('/v1/topics')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toContain('max-age')
+    const { data } = await json(res)
+    expect(data.cities).toEqual([{ city: '臺北市', total: 2, categories: { 老人福利: 2, 身心障礙福利: 1 } }])
+    expect(data.topics.find((x: { slug: string }) => x.slug === 'assistive-devices').total).toBe(1)
+    expect(data.topics.find((x: { slug: string }) => x.slug === 'funeral').total).toBe(0)
+  })
+})
+
 describe('POST /v1/welfare/simulate', () => {
   const simulate = (body: object) =>
     t.app.request('/v1/welfare/simulate', {

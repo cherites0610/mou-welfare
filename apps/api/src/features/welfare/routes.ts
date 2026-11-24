@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import type { AppEnv } from '../../app.ts'
 import { familyMode } from '../family/service.ts'
 import { FamilyIdQuery, SearchQuery, SimulateBody, splitCsv, WelfareDetailSchema, WelfareListSchema } from './schema.ts'
-import { getProgram, listSitemap, profileOf, searchPrograms } from './service.ts'
+import { getProgram, listSitemap, profileOf, searchPrograms, topicCounts } from './service.ts'
 
 const ErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) })
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
@@ -47,6 +47,24 @@ const sitemap = createRoute({
   },
 })
 
+const topics = createRoute({
+  method: 'get',
+  path: '/v1/topics',
+  tags: ['welfare'],
+  summary: '主題頁用的福利筆數（縣市 × 類別、人生階段主題，只算上架中）',
+  responses: {
+    200: json(
+      z.object({
+        data: z.object({
+          cities: z.array(z.object({ city: z.string(), total: z.number().int(), categories: z.record(z.string(), z.number().int()) })),
+          topics: z.array(z.object({ slug: z.string(), total: z.number().int() })),
+        }),
+      }),
+      '各主題的福利筆數',
+    ),
+  },
+})
+
 const simulate = createRoute({
   method: 'post',
   path: '/v1/welfare/simulate',
@@ -59,7 +77,7 @@ const simulate = createRoute({
 export const welfareRoutes = new OpenAPIHono<AppEnv>()
   .openapi(list, async (c) => {
     const q = c.req.valid('query')
-    const params = { q: q.q, cities: splitCsv(q.city), categories: splitCsv(q.category), page: q.page, limit: q.limit }
+    const params = { q: q.q, cities: splitCsv(q.city), categories: splitCsv(q.category), topic: q.topic, page: q.page, limit: q.limit }
     const family = await familyMode(c.var.deps.db, q.familyId, c.var.user?.id ?? null)
     const { data, total } = await searchPrograms(c.var.deps.db, params, profileOf(c.var.user), new Date(), family)
     return c.json({ data, meta: { page: q.page, limit: q.limit, total } }, 200)
@@ -77,9 +95,14 @@ export const welfareRoutes = new OpenAPIHono<AppEnv>()
     c.header('Cache-Control', 'public, max-age=3600')
     return c.json({ data: rows.map((r) => ({ id: r.id, updatedAt: r.updatedAt.toISOString() })) }, 200)
   })
+  .openapi(topics, async (c) => {
+    const data = await topicCounts(c.var.deps.db)
+    c.header('Cache-Control', 'public, max-age=3600')
+    return c.json({ data }, 200)
+  })
   .openapi(simulate, async (c) => {
     const b = c.req.valid('json')
-    const params = { q: b.q, cities: splitCsv(b.city), categories: splitCsv(b.category), page: b.page, limit: b.limit }
+    const params = { q: b.q, cities: splitCsv(b.city), categories: splitCsv(b.category), topic: b.topic, page: b.page, limit: b.limit }
     const profile = { birthday: b.profile.birthday ?? null, gender: b.profile.gender ?? null, identities: b.profile.identities ?? [] }
     const { data, total } = await searchPrograms(c.var.deps.db, params, profile)
     return c.json({ data, meta: { page: b.page, limit: b.limit, total } }, 200)

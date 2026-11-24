@@ -2271,6 +2271,23 @@
             "type": "string",
             "description": "逗號分隔，可選值：兒童及青少年福利、婦女與幼兒福利、老人福利、社會救助福利、身心障礙福利、其他福利"
           },
+          "topic": {
+            "type": "string",
+            "enum": [
+              "pregnancy",
+              "childcare",
+              "education",
+              "housing",
+              "employment",
+              "medical",
+              "long-term-care",
+              "assistive-devices",
+              "transport",
+              "emergency",
+              "funeral"
+            ],
+            "description": "人生階段主題（packages/shared/src/topics.ts）"
+          },
           "profile": {
             "$ref": "#/components/schemas/ProfileInput"
           },
@@ -5512,6 +5529,29 @@
           },
           {
             "schema": {
+              "type": "string",
+              "enum": [
+                "pregnancy",
+                "childcare",
+                "education",
+                "housing",
+                "employment",
+                "medical",
+                "long-term-care",
+                "assistive-devices",
+                "transport",
+                "emergency",
+                "funeral"
+              ],
+              "description": "人生階段主題（packages/shared/src/topics.ts）"
+            },
+            "required": false,
+            "description": "人生階段主題（packages/shared/src/topics.ts）",
+            "name": "topic",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "integer",
               "minimum": 1,
               "maximum": 1000,
@@ -5821,6 +5861,83 @@
                           "updatedAt"
                         ]
                       }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/topics": {
+      "get": {
+        "tags": [
+          "welfare"
+        ],
+        "summary": "主題頁用的福利筆數（縣市 × 類別、人生階段主題，只算上架中）",
+        "responses": {
+          "200": {
+            "description": "各主題的福利筆數",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "cities": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "city": {
+                                "type": "string"
+                              },
+                              "total": {
+                                "type": "integer"
+                              },
+                              "categories": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "required": [
+                              "city",
+                              "total",
+                              "categories"
+                            ]
+                          }
+                        },
+                        "topics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "slug": {
+                                "type": "string"
+                              },
+                              "total": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "slug",
+                              "total"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "cities",
+                        "topics"
+                      ]
                     }
                   },
                   "required": [

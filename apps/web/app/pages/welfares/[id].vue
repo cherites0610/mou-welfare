@@ -3,6 +3,7 @@
      內容在伺服器端渲染（SEO）；登入者在瀏覽器端再取一次，附上資格分析、收藏狀態與家人比對。 -->
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
+import { type Category, CATEGORIES, type City, CITIES } from '@mou-welfare/shared'
 import type { WelfareDetail } from '~/utils/welfare'
 
 // 詳情頁有自己的手機版標題列與底部「前往申辦」按鈕：不套用含底部導覽列的版面（v1 的底部導覽列會蓋住按鈕）
@@ -92,6 +93,24 @@ useHead(() => {
     ],
   }
 })
+
+// 縣市與類別的主題頁連結（麵包屑與「更多相關福利」，也讓搜尋引擎從詳情頁找到主題頁）
+const city = computed(() => (CITIES as readonly string[]).includes(base.value?.city ?? '') ? (base.value!.city as City) : null)
+const relatedLinks = computed(() => {
+  const c = city.value
+  if (!c) return []
+  const cats = (base.value?.categories ?? []).filter((x): x is Category => (CATEGORIES as readonly string[]).includes(x))
+  return [
+    ...cats.map((cat) => ({ label: `更多${c}${cat}`, to: cityCategoryPath(c, cat) })),
+    { label: `${c}所有福利`, to: cityPath(c) },
+    { label: '依主題找福利', to: '/topics' },
+  ]
+})
+
+// 分享到 LINE：長輩多半用 LINE，讓子女查到後直接傳給家人
+const lineShareUrl = computed(
+  () => `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(`${cfg.siteUrl}/welfares/${id.value}`)}`,
+)
 
 // --- 互動邏輯 ---
 // 從列表點進來就返回列表（保留篩選條件）；直接開網址時回到列表首頁
@@ -186,8 +205,12 @@ const fileIcon = (name: string) => {
       </div>
 
       <div class="hidden md:flex max-w-4xl mx-auto pt-8 px-6 items-center gap-2 text-gray-400 text-sm font-medium">
-        <span class="cursor-pointer hover:text-mygreen transition-colors" @click="router.push('/welfares')">首頁</span>
+        <NuxtLink to="/welfares" class="hover:text-mygreen transition-colors">首頁</NuxtLink>
         <Icon icon="mingcute:right-line" class="text-xs" />
+        <template v-if="city">
+          <NuxtLink :to="cityPath(city)" class="hover:text-mygreen transition-colors">{{ city }}</NuxtLink>
+          <Icon icon="mingcute:right-line" class="text-xs" />
+        </template>
         <span class="text-gray-800">福利詳情</span>
       </div>
 
@@ -253,6 +276,11 @@ const fileIcon = (name: string) => {
               </div>
 
               <div class="hidden md:flex items-center gap-3">
+                <a :href="lineShareUrl" target="_blank" rel="noopener noreferrer"
+                  class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 active:scale-95">
+                  <Icon icon="simple-icons:line" class="text-xl text-[#06C755]" />
+                  分享到 LINE
+                </a>
                 <button @click="toggleFavorite"
                   class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center gap-2 active:scale-95 group">
                   <Icon :icon="isFavorite ? 'mdi:heart' : 'mdi:heart-outline'"
@@ -445,10 +473,21 @@ const fileIcon = (name: string) => {
           </div>
         </div>
 
+        <nav v-if="relatedLinks.length" aria-label="相關福利" class="flex flex-wrap gap-2">
+          <NuxtLink v-for="l in relatedLinks" :key="l.to" :to="l.to"
+            class="px-4 py-2 rounded-full bg-white border border-gray-100 text-sm text-gray-600 hover:border-mygreen hover:text-mygreen transition-colors">
+            {{ l.label }}
+          </NuxtLink>
+        </nav>
+
       </div>
 
       <div
         class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-100 p-4 flex gap-3 md:hidden z-40 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
+        <a :href="lineShareUrl" target="_blank" rel="noopener noreferrer" aria-label="分享到 LINE"
+          class="w-14 shrink-0 rounded-xl border border-gray-200 flex items-center justify-center active:scale-95 transition-transform">
+          <Icon icon="simple-icons:line" class="text-2xl text-[#06C755]" />
+        </a>
         <button @click="goToSource"
           class="flex-1 bg-mygreen text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-200 active:scale-95 transition-transform flex items-center justify-center gap-2">
           前往申辦

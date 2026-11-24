@@ -177,6 +177,10 @@ const toggleChat = () => {
           </div>
         </template>
       </el-input>
+      <NuxtLink to="/topics" aria-label="依主題找福利" title="依主題找福利"
+        class="text-3xl transition-all duration-300 hover:text-mygreen-400 hover:scale-110 active:scale-90">
+        <Icon icon="mingcute:layout-grid-line" />
+      </NuxtLink>
       <Icon @click="collect" icon="mdi:heart-outline"
         class="text-3xl cursor-pointer transition-all duration-300 hover:text-mygreen-400 hover:scale-110 active:scale-90" />
       <Icon @click="question" icon="mingcute:question-line" class="text-3xl md:hidden" />

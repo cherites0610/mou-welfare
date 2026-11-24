@@ -236,7 +236,7 @@ alert_state(key pk, value, sent_at)                                   -- 系統�
 | 登入 | `/v1/auth/*`（由 Better Auth 處理：Email 密碼、Google、LINE、LIFF ID Token、驗證信、重設密碼） | 公開 |
 | 個人 | `GET/PATCH /v1/me`（含 `isSubscribed` 訂閱通知、`createdAt`）、`DELETE /v1/me`（body 必須有 `"confirm":"DELETE"`；有密碼的帳號另需 `password`） | 登入 |
 | 收藏 | `GET /v1/me/favorites?familyId=`、`PUT/DELETE /v1/me/favorites/:programId` | 登入 |
-| 福利 | `GET /v1/welfare?q=&city=&category=&familyId=&page=`、`GET /v1/welfare/:id?familyId=`、`GET /v1/sitemap`（上架中福利的 id 與更新時間，前端產生 `sitemap.xml` 用） | 公開；**帶比對結果時以登入身分為準**，不再接受從前端傳 `userId`；帶 `familyId` 時必須登入（401）且為成員（403）。列表只有 `active`；詳情只開放 `active` 與 `expired`（標示已過期），`pending`、`rejected`、`removed` 一律 404，收藏也一樣 |
+| 福利 | `GET /v1/welfare?q=&city=&category=&topic=&familyId=&page=`、`GET /v1/welfare/:id?familyId=`、`GET /v1/sitemap`（上架中福利的 id 與更新時間，前端產生 `sitemap.xml` 用）、`GET /v1/topics`（主題頁用的筆數：縣市 × 類別、人生階段主題）。`topic` 是人生階段主題（`packages/shared/src/topics.ts`，以關鍵字比對名稱與摘要），前端的主題頁 `/topics/:slug`、`/cities/:city`、`/cities/:city/:category` 用它產生可被搜尋引擎收錄的清單頁 | 公開；**帶比對結果時以登入身分為準**，不再接受從前端傳 `userId`；帶 `familyId` 時必須登入（401）且為成員（403）。列表只有 `active`；詳情只開放 `active` 與 `expired`（標示已過期），`pending`、`rejected`、`removed` 一律 404，收藏也一樣 |
 | 試算 | `POST /v1/welfare/simulate`（手動輸入身分試算；`identities` 可直接指定年齡組與性別，對應前端的「進階篩選」） | 公開 |
 | 家庭 | `GET/POST /v1/families`、`GET/PATCH/DELETE /v1/families/:id` | 登入；查看需為成員，修改或刪除需為 admin |
 | 成員 | `GET /v1/families/:id/members`、`PATCH/DELETE /v1/families/:id/members/:userId` | 成員 / admin |
@@ -731,7 +731,7 @@ v1 的 API（NestJS，pm2 `mou-welfare-api`，port 5009）與前端（Vue，Cadd
 | **P3 家庭與聊天** | 家庭、邀請碼、聊天 RAG 串流 | 家庭、邀請碼、家庭模式比對、刪除帳號已完成（2026-11-22，`tests/family.test.ts`）；聊天（規則解析、混合檢索、SSE、每日 30 則、退回固定格式、前端）完成（2026-11-23，§8.9）；LINE Bot 共用聊天服務 2026-11-24 完成（§8.7） |
 | **P4 LINE 與通知** | LINE webhook、LIFF 登入、Email 和 LINE 通知、cron 工作 | Google / LINE / LIFF 登入的程式已完成（2026-11-23，`tests/social.test.ts`）；LINE 與 LIFF 已啟用，Google 待設定金鑰；LINE Bot 對話 2026-11-24 完成（§8.7）；通知與 cron 未開始 |
 | **管理後台** ✅ | 總覽、福利檢核、LLM 用量、使用者（唯讀）、稽核紀錄 | 2026-11-23 上線 `admin.mou-welfare.com`（[admin.md](admin.md)） |
-| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | ✅ 2026-11-24 切換網域、v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天 2026-11-23 完成；LINE 分享待 P4） |
+| **P5 前端串接與上線** | Nuxt 串接 API、SEO（sitemap、JSON-LD）、依第 10.3 節切換網域 | ✅ 2026-11-24 切換網域、v1 停用（2026-11-23：登入註冊、個人設定、編輯個人資料、收藏、常見問題、服務條款、隱私權已依 v1 介面完成；福利列表與詳情也已完成；聊天 2026-11-23 完成；2026-11-24 主題頁（縣市、縣市 × 類別、人生階段）與詳情頁「分享到 LINE」） |
 
 ---
 
