@@ -212,3 +212,42 @@ def test_計數器標籤只給螢幕閱讀器時_整個移除() -> None:
     assert a.content_md == b.content_md
     assert "4273" not in a.content_md
     assert "名額 50人" in a.content_md
+
+
+def test_臺北點閱數在正文區塊裡_整個移除() -> None:
+    # 臺北：頁尾的 div.list-text.detail.bottom-detail 也符合 A 族的正文區塊；「點閱數：」標籤抽取後不見，
+    # 只剩「2051」，每次瀏覽加一（2026-11-24 連抓兩次 2050 → 2051）
+    def page(hits: int) -> str:
+        return (
+            '<html><body><div class="area-editor user-edit"><p>'
+            + "身心障礙者財產信託說明與申請方式。" * 6
+            + "</p></div>"
+            '<div class="list-text detail bottom-detail"><ul>'
+            f'<li><span><i class="mark">點閱數：</i><span id="hitcount">{hits}</span></span></li>'
+            '<li><span><i class="mark">資料更新：</i>115-01-06 15:58</span></li></ul></div></body></html>'
+        )
+
+    content = "div.list-text.detail, div.area-editor.user-edit"
+    a = extract_html(page(2050), "https://dosw.gov.taipei/cp.aspx?n=X", content=content)
+    b = extract_html(page(2051), "https://dosw.gov.taipei/cp.aspx?n=X", content=content)
+    assert a.content_md == b.content_md
+    assert "2050" not in a.content_md and "115-01-06" in a.content_md
+
+
+def test_頁首的今天日期與時間_整個移除() -> None:
+    # 新北：正文區塊抓不到、退回整頁抽取的頁面，頁首時鐘會被收進正文，每次爬取都不同（2026-11-24 3 頁）
+    def page(clock: str) -> str:
+        return (
+            f'<html><body><div class="calendar"><p>115 - 11 - 24</p><p>{clock}</p></div>'
+            "<main><h1>社區照顧關懷據點</h1><p>"
+            + "服務時間為每月第一週的星期二 8:00-12:00，請先電話預約。"
+            * 4
+            + "</p>"
+            "</main></body></html>"
+        )
+
+    a = extract_html(page("星期二&nbsp;07 : 31"), "https://www.sw.ntpc.gov.tw/x").content_md
+    b = extract_html(page("星期二&nbsp;08 : 30"), "https://www.sw.ntpc.gov.tw/x").content_md
+    assert a == b
+    assert "07 : 31" not in a and "115 - 11 - 24" not in a
+    assert "星期二 8:00-12:00" in a  # 正文裡的時間不受影響

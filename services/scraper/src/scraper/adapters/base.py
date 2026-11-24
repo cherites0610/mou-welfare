@@ -19,6 +19,8 @@ class RawItem:
     html: str | None = None  # 網頁來源
     fields: dict[str, Any] | None = None  # 結構化來源（開放資料）
     link: str | None = None  # 給使用者看的原始網址（沒有就用 url）
+    # 網站暫時出問題、這次抓不完整（截斷、逾時、分頁籤缺一頁）：保留上次的狀態，不重新處理也不算沒出現
+    incomplete: bool = False
 
 
 @dataclass
@@ -32,6 +34,8 @@ class Adapter(ABC):
         self.site = site
         self.fetcher = fetcher
         self.stats = AdapterStats()
+        # 有列表／目錄頁或資料集因為網站暫時出問題沒抓到：這次看不到的網址可能只是沒被找到，不能判定下架
+        self.listing_complete = True
 
     @abstractmethod
     def list_items(self) -> Iterator[RawItem]: ...

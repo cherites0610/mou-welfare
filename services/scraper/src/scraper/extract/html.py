@@ -148,18 +148,50 @@ def _trafilatura(html: str, url: str) -> str:
     return md or ""
 
 
-# 計數器的標籤只給螢幕閱讀器（sr-only），抽取後只剩「4279人」，normalize._VOLATILE_RE 認不出來（彰化）
-_COUNTER_LABEL = re.compile(r"^\s*(?:瀏覽|點閱|觀看|閱覽|下載)\s*(?:人數|人次|次數|數)\s*[:：]?\s*$")
+# 抽取後標籤不見、只剩數字的計數器，normalize._VOLATILE_RE 認不出來：
+# - 彰化：<span class="sr-only">瀏覽人數：</span>4273人（標籤只給螢幕閱讀器）
+# - 臺北：<i class="mark">點閱數：</i><span id="hitcount">2051</span>（在正文區塊 div.list-text.detail 裡，
+#   抽取後只剩「2051」；每次瀏覽都會加一，連我們自己抓的那次也算）
+_COUNTER_LABEL = re.compile(r"^\s*(?:累計)?(?:瀏覽|點閱|觀看|閱覽|下載)\s*(?:人數|人次|次數|數)\s*[:：]?\s*$")
+_COUNTER_LABEL_NODES = ".sr-only, .visually-hidden, .mark"
+_COUNTER_VALUE_NODES = '[id*="hitcount"], [class*="hitcount"]'
 
 
-def _drop_counters(doc: LexborHTMLParser) -> int:
-    """移除瀏覽／點閱計數器（含隱藏標籤的那個元素整個拿掉），否則每次爬取 hash 都不同、後端每次重做結構化。"""
+# 頁首的「今天日期＋現在時間」（新北：<div class="calendar"><p>115 - 11 - 24</p><p>星期二 08 : 35</p></div>）。
+# 正文區塊抓不到、退回整頁抽取時會被收進正文，每次爬取都不同。整個元素只有日期與時間才算，
+# 正文裡的「每月第一週的星期二8:00-12:00」不受影響
+_CLOCK = re.compile(
+    r"^\s*(?:\d{2,4}\s*[-/.年]\s*\d{1,2}\s*[-/.月]\s*\d{1,2}\s*日?\s*)?"
+    r"(?:\(?(?:星期|週|周)[一二三四五六日天]\)?)\s*\d{1,2}\s*:\s*\d{2}(?:\s*:\s*\d{2})?\s*$"
+)
+
+
+def drop_counters(doc: LexborHTMLParser) -> int:
+    """移除瀏覽／點閱計數器與頁首時鐘（整個元素拿掉），否則每次爬取 hash 都不同、後端每次重做結構化。"""
     dropped = 0
-    for label in doc.css(".sr-only, .visually-hidden"):
+    for label in doc.css(_COUNTER_LABEL_NODES):
         if _COUNTER_LABEL.match(label.text() or ""):
             (label.parent or label).decompose()
             dropped += 1
+    for node in doc.css(_COUNTER_VALUE_NODES):
+        node.decompose()
+        dropped += 1
+    # 先找出全部再移除（移除後的節點不能再碰）；外層和裡面都符合時只拿掉外層
+    clocks = [n for n in doc.css("div, p, span, li, time") if _CLOCK.match(n.text(separator=" ") or "")]
+    ids = {n.mem_id for n in clocks}
+    for node in [n for n in clocks if not ids & _ancestors(n)]:
+        node.decompose()
+        dropped += 1
     return dropped
+
+
+def _ancestors(node: LexborNode) -> set[int]:
+    out: set[int] = set()
+    parent = node.parent
+    while parent is not None:
+        out.add(parent.mem_id)
+        parent = parent.parent
+    return out
 
 
 def extract_html(
@@ -171,7 +203,7 @@ def extract_html(
     for node in doc.css("script, style, noscript"):
         node.decompose()
     # 有移除計數器時，整頁抽取也要用移除後的內容；沒有時沿用原始 HTML，其他站的抽取結果（與 hash）不變
-    page = doc.html or html if _drop_counters(doc) else html
+    page = doc.html or html if drop_counters(doc) else html
     text = ""
     region_nodes = doc.css(content) if content else []
     if region_nodes:

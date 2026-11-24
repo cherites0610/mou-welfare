@@ -206,6 +206,11 @@ class SiteRun:
         self._ready: list[Ready] = []
         for raw in self.adapter.list_items():
             r.seen += 1
+            if raw.incomplete:
+                # 錯誤已記在 adapter.stats.errors；不在狀態表的新網址就等下次再處理
+                if self.state.keep(raw.url, self.run_id):
+                    r.unchanged += 1
+                continue
             try:
                 ready = self.process(raw)
             except Exception as e:  # 單一頁面的錯誤不影響整站
@@ -231,7 +236,8 @@ class SiteRun:
                 self.state.settle(ready.url, "active", ready.hash)
                 self.state.mark_pushed(ready.url, ready.hash)
                 r.pushed += 1
-            if not self.limit:  # 只跑部分內容時無法判斷下架
+            # 只跑部分內容、或有列表頁暫時抓不到時，無法判斷下架（金門的目錄頁被截斷時，底下 22 筆會全部看不到）
+            if not self.limit and self.adapter.listing_complete:
                 removed = self.state.sweep(self.site.id, self.run_id)
                 r.removed = len(removed)
                 try:

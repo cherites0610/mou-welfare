@@ -36,6 +36,7 @@ class OpenData(Adapter):
                 res = self.fetcher.get(ds.url)
             except FetchError as e:
                 self.stats.errors.append(f"{e.reason} {ds.url}")
+                self.listing_complete = False
                 continue
             self.stats.pages += 1
             try:

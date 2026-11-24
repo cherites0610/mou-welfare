@@ -1,5 +1,5 @@
 import pytest
-from conftest import MockWeb, html
+from conftest import MockWeb, html, truncated
 
 from scraper.fetch import USER_AGENT, Fetcher, FetchError, RobotsDenied
 
@@ -37,7 +37,7 @@ def test_5xx_重試後成功() -> None:
         return (503, "busy", "text/plain") if calls["n"] < 3 else html("ok")
 
     with MockWeb(default=flaky).fetcher(retries=3) as f:
-        assert f.get(f"{BASE}/x").text == "ok"
+        assert f.get(f"{BASE}/x").text == "ok</html>"
     assert calls["n"] == 3
 
 
@@ -82,7 +82,7 @@ def test_主機連不上時之後立刻失敗() -> None:
         calls.append(str(req.url))
         if req.url.host == "down.example":
             raise httpx.ConnectTimeout("timed out", request=req)
-        return httpx.Response(200, text="ok", headers={"content-type": "text/html"})
+        return httpx.Response(200, text="<p>ok</p></html>", headers={"content-type": "text/html"})
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
     f = Fetcher(delay=0, client=client, sleep=lambda _: None, retries=1)
@@ -94,3 +94,29 @@ def test_主機連不上時之後立刻失敗() -> None:
         f.get("https://down.example/another.pdf")
     assert e.value.reason == "host_down" and len(calls) == n  # 沒有再連線
     assert f.get("https://up.example/x").status == 200  # 其他主機不受影響
+
+
+def test_html被截斷時重試_仍截斷就回傳不完整() -> None:
+    calls = {"n": 0}
+
+    def flaky(url: str) -> tuple[int, str, str] | None:
+        if url.endswith("/robots.txt"):
+            return None
+        calls["n"] += 1
+        return truncated() if calls["n"] < 2 else html("<p>ok</p>")
+
+    with MockWeb(default=flaky).fetcher(retries=3) as f:
+        assert f.get(f"{BASE}/x").complete
+    assert calls["n"] == 2
+
+    web = MockWeb(default=lambda url: None if url.endswith("robots.txt") else truncated())
+    with web.fetcher(retries=1) as f:
+        res = f.get(f"{BASE}/y")
+    assert res.status == 200 and not res.complete
+    assert web.requests.count(f"{BASE}/y") == 2
+
+
+def test_不是html不檢查結尾() -> None:
+    web = MockWeb({f"{BASE}/a.pdf": (200, b"%PDF-1.4", "application/pdf")})
+    with web.fetcher() as f:
+        assert f.get(f"{BASE}/a.pdf").complete

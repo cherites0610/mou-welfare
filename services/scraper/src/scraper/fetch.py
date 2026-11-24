@@ -4,13 +4,16 @@
 - 遵守 robots.txt（取不到 robots.txt 時視為允許）。
 - User-Agent 寫明身分與聯絡方式。
 - 逾時、連線錯誤、429、5xx 會以指數退避重試。
+- HTML 沒有結尾標籤（`</html>`／`</body>`）視為截斷並重試；重試用完仍截斷時回傳 `complete=False`
+  （金門偶爾回 200，但頁面在 <head> 中途就結束，Content-Length 也是截斷後的長度）。
 - 同一主機連續 3 次連不上（連線逾時或拒絕），這次執行就不再連它，避免每個請求都等到逾時
   （宜蘭的附件主機有一個 IP 不通，曾讓單一頁面卡住 10 分鐘以上）。
 """
 
+import re
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
 
@@ -21,6 +24,10 @@ RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
 MAX_BYTES = 15 * 1024 * 1024  # 附件上限：超過就不下載
 CONNECT_TIMEOUT = 10.0
 HOST_DOWN_AFTER = 3  # 連續幾次連線失敗後視為主機無法連線
+# 這兩種是頁面本身的狀況；其他（逾時、連線錯誤、5xx、截斷、主機連不上）是網站暫時出問題，
+# 內文頁抓不到時保留上次的狀態，不算這次沒出現（連續沒出現會被當成下架）
+PERMANENT_REASONS = frozenset({"too_large", "robots_disallow"})
+_HTML_END = re.compile(rb"</(?:html|body)\s*>", re.IGNORECASE)
 
 
 class FetchError(Exception):
@@ -42,6 +49,7 @@ class Response:
     content_type: str
     content: bytes
     encoding: str | None
+    complete: bool = True  # False＝HTML 被截斷（重試後仍是如此）
 
     @property
     def text(self) -> str:
@@ -123,6 +131,7 @@ class Fetcher:
         host = urlsplit(url).netloc
         attempts = (self.retries if retries is None else retries) + 1
         reason = "unknown"
+        truncated: Response | None = None
         for attempt in range(attempts):
             if self._connect_failures.get(host, 0) >= HOST_DOWN_AFTER:
                 raise FetchError(url, "host_down")
@@ -144,16 +153,23 @@ class Fetcher:
                         body.extend(chunk)
                         if len(body) > max_bytes:
                             raise FetchError(url, "too_large")
-                    return Response(
+                    response = Response(
                         url=str(res.url),
                         status=res.status_code,
                         content_type=res.headers.get("content-type", "").lower(),
                         content=bytes(body),
                         encoding=res.encoding,
                     )
+                    if response.status < 400 and "html" in response.content_type and not _HTML_END.search(body):
+                        reason = "truncated"
+                        truncated = replace(response, complete=False)
+                        continue
+                    return response
             except (httpx.ConnectError, httpx.ConnectTimeout) as e:
                 reason = type(e).__name__
                 self._connect_failures[host] = self._connect_failures.get(host, 0) + 1
             except (httpx.TimeoutException, httpx.TransportError) as e:
                 reason = type(e).__name__
+        if truncated is not None:
+            return truncated
         raise FetchError(url, reason)

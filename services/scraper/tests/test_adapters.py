@@ -1,7 +1,7 @@
 import json
 from urllib.parse import parse_qs, urlsplit
 
-from conftest import MockWeb, fixture, html
+from conftest import MockWeb, fixture, html, truncated
 
 from scraper.adapters import adapter_class, get_adapter
 from scraper.adapters.crawl import CmsA, CmsB
@@ -283,3 +283,74 @@ def test_頁數上限() -> None:
         items = list(a.list_items())
     assert a.stats.pages == 5 and len(items) == 4
     assert any(e.startswith("max_pages 5") for e in a.stats.errors)
+
+
+def test_內文頁截斷或暫時抓不到_輸出不完整的項目() -> None:
+    links = "".join(
+        f'<a href="{KINMEN}/News_Content.aspx?n=1&s={i}">{t}</a>' for i, t in ((1, "甲"), (2, "乙"), (3, "丙"))
+    )
+    list_page = f'<div class="page-content">{links}</div>'
+    web = MockWeb(
+        {
+            f"{KINMEN}/News.aspx?n=1": html(list_page),
+            f"{KINMEN}/News_Content.aspx?n=1&s=1": truncated(),
+            f"{KINMEN}/News_Content.aspx?n=1&s=2": (503, "busy", "text/plain"),
+            f"{KINMEN}/News_Content.aspx?n=1&s=3": html('<div class="area-editor"><p>內容</p></div>'),
+        }
+    )
+    with web.fetcher(retries=0) as f:
+        adapter = get_adapter(site(seeds=[{"url": "/News.aspx?n=1", "label": "x"}]), f)
+        items = {i.url.rsplit("=", 1)[-1]: i for i in adapter.list_items()}
+    assert items["1"].incomplete and items["2"].incomplete and not items["3"].incomplete
+    assert any(e.startswith("truncated ") for e in adapter.stats.errors)
+
+
+def test_分頁籤有一頁暫時抓不到_整筆不完整() -> None:
+    hub_url = f"{KINMEN}/cp.aspx?n=69B652E4C1464FFE"
+    tab1, tab2 = f"{hub_url}&s=0EEE26C0CEE0BF66", f"{hub_url}&s=6A8898109FBF4DEC"
+    hub = f'<div class="page-content"><a href="{tab1}">服務內容</a><a href="{tab2}">應備文件</a></div>'
+    web = MockWeb({hub_url: html(hub), tab1: html('<div class="area-editor"><p>內容</p></div>'), tab2: truncated()})
+    cfg = site(seeds=[{"url": "/cp.aspx?n=69B652E4C1464FFE", "label": "x"}], merge_tabs=True)
+    with web.fetcher(retries=0) as f:
+        items = list(get_adapter(cfg, f).list_items())
+    assert [(i.url, i.incomplete) for i in items] == [(hub_url, True)]
+
+
+def test_分頁籤合併時移除各頁的點閱數() -> None:
+    hub_url = f"{KINMEN}/cp.aspx?n=69B652E4C1464FFE"
+    tab1 = f"{hub_url}&s=0EEE26C0CEE0BF66"
+    hub = f'<div class="page-content"><a href="{tab1}">服務內容</a></div>'
+
+    def tab(hits: int) -> tuple[int, str, str]:
+        counter = f'<li><span><i class="mark">點閱數：</i><span id="hitcount">{hits}</span></span></li>'
+        return html(f'<div class="area-editor"><p>內容</p></div><div class="list-text detail"><ul>{counter}</ul></div>')
+
+    def merged(hits: int) -> str:
+        web = MockWeb({hub_url: html(hub), tab1: tab(hits)})
+        with web.fetcher() as f:
+            cfg = site(seeds=[{"url": "/cp.aspx?n=69B652E4C1464FFE", "label": "x"}], merge_tabs=True)
+            [item] = list(get_adapter(cfg, f).list_items())
+        return item.html or ""
+
+    assert merged(2050) == merged(2051) and "2050" not in merged(2050)
+
+
+def test_列表頁截斷_標記列表不完整() -> None:
+    web = MockWeb({f"{KINMEN}/News.aspx?n=1": truncated()})
+    with web.fetcher(retries=0) as f:
+        adapter = get_adapter(site(seeds=[{"url": "/News.aspx?n=1", "label": "x"}]), f)
+        assert list(adapter.list_items()) == []
+    assert not adapter.listing_complete
+
+
+def test_分頁籤回403時整筆不完整_回404時略過那一頁() -> None:
+    hub_url = f"{KINMEN}/cp.aspx?n=69B652E4C1464FFE"
+    tab1, tab2 = f"{hub_url}&s=0EEE26C0CEE0BF66", f"{hub_url}&s=6A8898109FBF4DEC"
+    hub = html(f'<div class="page-content"><a href="{tab1}">服務內容</a><a href="{tab2}">應備文件</a></div>')
+    ok = html('<div class="area-editor"><p>內容</p></div>')
+    cfg = site(seeds=[{"url": "/cp.aspx?n=69B652E4C1464FFE", "label": "x"}], merge_tabs=True)
+    for status, incomplete in ((403, True), (404, False)):
+        web = MockWeb({hub_url: hub, tab1: ok, tab2: (status, "", "text/html")})
+        with web.fetcher(retries=0) as f:
+            [item] = list(get_adapter(cfg, f).list_items())
+        assert item.incomplete is incomplete

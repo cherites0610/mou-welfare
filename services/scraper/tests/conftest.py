@@ -18,7 +18,15 @@ def fixture(name: str) -> str:
 
 
 def html(body: str, status: int = 200) -> Route:
+    """完整的 HTML 回應；片段會補上結尾標籤（沒有結尾的 HTML 會被當成截斷，見 fetch.py）。"""
+    if "</html" not in body.lower() and "</body" not in body.lower():
+        body += "</html>"
     return (status, body, "text/html; charset=utf-8")
+
+
+def truncated(body: str = "<html><head><title>x</title>") -> Route:
+    """伺服器回 200 但頁面中途就結束（金門偶爾會這樣）"""
+    return (200, body, "text/html; charset=utf-8")
 
 
 class MockWeb:

@@ -16,10 +16,11 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from selectolax.lexbor import LexborHTMLParser
 
 from scraper.adapters.base import Adapter, RawItem
-from scraper.extract.html import dedupe_halves
-from scraper.fetch import FetchError
+from scraper.extract.html import dedupe_halves, drop_counters
+from scraper.fetch import PERMANENT_REASONS, FetchError
 
 Link = tuple[str, str]  # (網址, 連結文字)
+GONE_STATUS = frozenset({404, 410})  # 網頁確實不存在；其他 4xx 當成這次暫時抓不到
 
 
 class LinkCrawler(Adapter):
@@ -39,6 +40,7 @@ class LinkCrawler(Adapter):
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self.unavailable: set[str] = set()  # 這次因為網站暫時出問題沒抓到的網址
         follow, detail = self._setting("follow"), self._setting("detail")
         if not detail:
             raise ValueError(f"{self.site.id}: 缺少 detail 規則")
@@ -107,10 +109,18 @@ class LinkCrawler(Adapter):
             res = self.fetcher.get(url)
         except FetchError as e:
             self.stats.errors.append(f"{e.reason} {url}")
+            if e.reason not in PERMANENT_REASONS:
+                self.unavailable.add(url)
             return None
         self.stats.pages += 1
+        if not res.complete:
+            self.stats.errors.append(f"truncated {url}")
+            self.unavailable.add(url)
+            return None
         if res.status >= 400:
             self.stats.errors.append(f"http_{res.status} {url}")
+            if res.status not in GONE_STATUS:  # 401、403、429 等是存取問題，不是網頁不見了
+                self.unavailable.add(url)
             return None
         if "html" not in res.content_type:
             return None
@@ -134,6 +144,11 @@ class LinkCrawler(Adapter):
             visited.add(url)
             fetched = self.fetch_doc(url)
             if fetched is None:
+                if url in self.unavailable:
+                    # 內文頁也可能是目錄（A 族 cp.aspx?n=X），抓不到就不知道底下有哪些項目
+                    self.listing_complete = False
+                    if self.is_detail(url):
+                        yield RawItem(url=url, title_hint=hint, incomplete=True)
                 continue
             html, doc = fetched
             links = self.links(doc, url)
@@ -178,6 +193,8 @@ class LinkCrawler(Adapter):
             visited.add(page_url)
             fetched = self.fetch_doc(page_url)
             if fetched is None:
+                if page_url in self.unavailable:
+                    self.listing_complete = False
                 return
             new = [(u, t) for u, t in self.links(fetched[1], page_url) if self.is_detail(u) and u not in known]
             if not new:
@@ -218,10 +235,14 @@ class CmsA(LinkCrawler):
         for tab_url, tab_name in tabs:
             fetched = self.fetch_doc(tab_url)
             if fetched is None:
+                if tab_url in self.unavailable:
+                    # 少一個分頁籤的話合併結果不同，會被當成內容改變、用不完整的內容重新結構化
+                    return RawItem(url=url, title_hint=hint, incomplete=True)
                 continue
             doc = fetched[1]
             for node in doc.css("script, style, noscript"):
                 node.decompose()
+            drop_counters(doc)  # 各分頁籤的計數器（臺北）
             content = "".join(n.html or "" for n in doc.css(self._setting("content") or "div.area-editor"))
             sections.append(f"<section><h2>{html_escape(tab_name)}</h2>{content}</section>")
             files += [n.html or "" for n in doc.css("div.file-download-multiple")]

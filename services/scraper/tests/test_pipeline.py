@@ -175,3 +175,40 @@ def test_kinmen_fixture_end_to_end() -> None:
     raw = [RawItem(url=url, title_hint="中低收入老人生活津貼", html=fixture("kinmen/cp_item.html"))]
     _, sink = run(raw, State(":memory:"), "r1", web=MockWeb(default=html("")))
     assert sink.items[0].published_at == date(2024, 2, 22)
+
+
+def test_抓得不完整_保留上次狀態_不推送也不判定下架() -> None:
+    state = State(":memory:")
+    run(items(12), state, "r1")
+    broken = [*items(11), RawItem(url="https://s.example/11", incomplete=True)]
+    for run_id in ("r2", "r3", "r4"):
+        r, sink = run(broken, state, run_id)
+        assert (r.updated, r.pushed, sink.removed) == (0, 0, [])
+    # 網站恢復後內容沒變：不重新處理
+    r, sink = run(items(12), state, "r5")
+    assert (r.unchanged, r.pushed) == (12, 0)
+
+
+def test_第一次就抓不完整的新網址_先略過() -> None:
+    state = State(":memory:")
+    r, sink = run([RawItem(url="https://s.example/x", incomplete=True), *items(11)], state, "r1")
+    assert (r.new, r.pushed) == (11, 11)
+    assert state.db.execute("SELECT count(*) FROM pages WHERE url = 'https://s.example/x'").fetchone()[0] == 0
+
+
+def test_列表頁暫時抓不到_不判定下架() -> None:
+    class Partial(FakeAdapter):
+        def list_items(self) -> Iterator[RawItem]:
+            self.listing_complete = False
+            yield from self.items
+
+    state = State(":memory:")
+    run(items(12), state, "r1")
+    for run_id in ("r2", "r3"):
+        sink = Sink()
+        with MockWeb().fetcher() as f:
+            SiteRun(SITE, Partial(SITE, f, items(11)), f, state, run_id=run_id, today=TODAY).run(sink)
+        assert sink.removed == []
+    # 列表不完整的那幾次不算沒出現；恢復正常後要再連續 2 次沒看到才下架
+    assert run(items(11), state, "r4")[1].removed == []
+    assert run(items(11), state, "r5")[1].removed == ["https://s.example/11"]

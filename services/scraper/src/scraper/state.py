@@ -84,6 +84,15 @@ class State:
             return Change.UNCHANGED
         return Change.UPDATED
 
+    def keep(self, url: str, run_id: str) -> bool:
+        """這次抓得不完整：只記下看到了（不算沒出現），內容與 hash 維持上次的。回傳狀態表裡有沒有這個網址。"""
+        cur = self.db.execute(
+            "UPDATE pages SET last_seen = ?, last_run = ?, miss_count = 0 WHERE url = ? AND status != 'removed'",
+            (_now(), run_id, url),
+        )
+        self.db.commit()
+        return cur.rowcount > 0
+
     def settle(self, url: str, status: str, content_hash: str, reason: str | None = None) -> None:
         """處理完成：記下結果與當下的 hash。"""
         self.db.execute(
