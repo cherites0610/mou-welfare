@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>哞福利 v2 系統架構</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:  #f7f7f5;
+      --color-ink:    #1f2328;
+      --color-muted:  #5c6366;
+      --color-accent: #5d7a00;
+      --font-sans:    'Geist', 'Noto Sans TC', 'PingFang TC', system-ui, sans-serif;
+      --font-serif:   'Instrument Serif', 'Noto Serif', 'Noto Serif TC', serif;
+      --font-mono:    'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1280px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    .note { font-size: 0.8rem; color: var(--color-muted); margin-top: 1rem; line-height: 1.6; }
+    svg { width: 100%; min-width: 1280px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · 哞福利 v2</p>
+    <h1>哞福利 v2 系統架構</h1>
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="mou-welfare-architecture-title mou-welfare-architecture-desc">
+        <title id="mou-welfare-architecture-title">哞福利 v2 系統架構</title>
+        <desc id="mou-welfare-architecture-desc">哞福利 v2 的系統架構：前台與管理後台跑在 Cloudflare Workers，透過 HTTPS 呼叫自有主機上的 Hono API；API 連接 Postgres、Gemini 與 R2，並接收爬蟲推送與 LINE webhook。</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5c6366"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5d7a00"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2a6db0"/></marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f7f7f5"/>
+<!-- zones -->
+<rect x="308" y="160" width="280" height="356" rx="8" fill="rgba(31,35,40,0.02)" stroke="rgba(31,35,40,0.1)" stroke-width="0.8"/>
+<text x="320" y="180" fill="#6b7280" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">Cloudflare</text>
+<rect x="676" y="160" width="488" height="356" rx="8" fill="rgba(31,35,40,0.02)" stroke="rgba(31,35,40,0.1)" stroke-width="0.8"/>
+<text x="688" y="180" fill="#6b7280" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">自有主機（騰訊雲東京）</text>
+<!-- arrows -->
+<path d="M 252,220 H 340" fill="none" stroke="#2a6db0" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<path d="M 252,244 H 288 Q 296,244 296,252 V 296 Q 296,304 304,304 H 340" fill="none" stroke="#2a6db0" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<path d="M 556,232 H 628 Q 636,232 636,240 V 268 Q 636,276 644,276 H 716" fill="none" stroke="#5d7a00" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+<path d="M 556,304 H 716" fill="none" stroke="#2a6db0" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<path d="M 716,332 H 668 Q 660,332 660,340 V 444 Q 660,452 652,452 H 556" fill="none" stroke="#2a6db0" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<path d="M 940,304 H 996" fill="none" stroke="#5c6366" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M 892,248 V 104" fill="none" stroke="#2a6db0" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<path d="M 792,420 V 360" fill="none" stroke="#2a6db0" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<path d="M 252,600 H 856 Q 864,600 864,592 V 360" fill="none" stroke="#2a6db0" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<!-- arrow labels -->
+<rect x="278" y="200" width="36" height="12" rx="2" fill="#f7f7f5"/>
+<text x="296" y="209" fill="#2a6db0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">HTTPS</text>
+<rect x="568" y="212" width="48" height="12" rx="2" fill="#f7f7f5"/>
+<text x="592" y="221" fill="#5d7a00" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SSR+CSR</text>
+<rect x="564" y="284" width="60" height="12" rx="2" fill="#f7f7f5"/>
+<text x="594" y="293" fill="#2a6db0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">/V1/ADMIN</text>
+<rect x="576" y="432" width="44" height="12" rx="2" fill="#f7f7f5"/>
+<text x="598" y="441" fill="#2a6db0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">S3 PUT</text>
+<rect x="952" y="284" width="28" height="12" rx="2" fill="#f7f7f5"/>
+<text x="966" y="293" fill="#6b7280" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">SQL</text>
+<rect x="900" y="196" width="68" height="12" rx="2" fill="#f7f7f5"/>
+<text x="934" y="205" fill="#2a6db0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">LLM · EMBED</text>
+<rect x="704" y="384" width="80" height="12" rx="2" fill="#f7f7f5"/>
+<text x="744" y="393" fill="#2a6db0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">INGEST · HMAC</text>
+<rect x="456" y="580" width="48" height="12" rx="2" fill="#f7f7f5"/>
+<text x="480" y="589" fill="#2a6db0" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">WEBHOOK</text>
+<!-- nodes -->
+<rect x="116" y="200" width="136" height="64" rx="6" fill="#f7f7f5"/>
+<rect x="116" y="200" width="136" height="64" rx="6" fill="rgba(92,99,102,0.10)" stroke="#6b7280" stroke-width="1"/>
+<rect x="124" y="206" width="32" height="12" rx="2" fill="transparent" stroke="rgba(107,114,128,0.40)" stroke-width="0.8"/>
+<text x="140" y="215" fill="#6b7280" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">USER</text>
+<text x="184" y="237" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">使用者</text>
+<text x="184" y="253" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">browser · LIFF</text>
+<rect x="116" y="568" width="136" height="64" rx="6" fill="#f7f7f5"/>
+<rect x="116" y="568" width="136" height="64" rx="6" fill="rgba(31,35,40,0.03)" stroke="rgba(31,35,40,0.3)" stroke-width="1"/>
+<rect x="124" y="574" width="28" height="12" rx="2" fill="transparent" stroke="rgba(31,35,40,0.22)" stroke-width="0.8"/>
+<text x="138" y="583" fill="#6b7280" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+<text x="184" y="605" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">LINE Platform</text>
+<text x="184" y="621" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Messaging API</text>
+<rect x="340" y="200" width="216" height="64" rx="6" fill="#f7f7f5"/>
+<rect x="340" y="200" width="216" height="64" rx="6" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+<rect x="348" y="206" width="40" height="12" rx="2" fill="transparent" stroke="rgba(31,35,40,0.4)" stroke-width="0.8"/>
+<text x="368" y="215" fill="#1f2328" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">WORKER</text>
+<text x="448" y="237" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">前台</text>
+<text x="448" y="253" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Nuxt SSR · mou-welfare.com</text>
+<rect x="340" y="272" width="216" height="64" rx="6" fill="#f7f7f5"/>
+<rect x="340" y="272" width="216" height="64" rx="6" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+<rect x="348" y="278" width="40" height="12" rx="2" fill="transparent" stroke="rgba(31,35,40,0.4)" stroke-width="0.8"/>
+<text x="368" y="287" fill="#1f2328" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">WORKER</text>
+<text x="448" y="309" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">管理後台</text>
+<text x="448" y="325" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Nuxt SPA · admin.mou-welfare.com</text>
+<rect x="340" y="420" width="216" height="64" rx="6" fill="#f7f7f5"/>
+<rect x="340" y="420" width="216" height="64" rx="6" fill="rgba(31,35,40,0.05)" stroke="#5c6366" stroke-width="1"/>
+<rect x="348" y="426" width="20" height="12" rx="2" fill="transparent" stroke="rgba(92,99,102,0.50)" stroke-width="0.8"/>
+<text x="358" y="435" fill="#5c6366" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">R2</text>
+<text x="448" y="457" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">物件儲存</text>
+<text x="448" y="473" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">file.mou-welfare.com</text>
+<rect x="716" y="248" width="224" height="112" rx="6" fill="#f7f7f5"/>
+<rect x="716" y="248" width="224" height="112" rx="6" fill="rgba(93,122,0,0.08)" stroke="#5d7a00" stroke-width="1"/>
+<rect x="724" y="254" width="28" height="12" rx="2" fill="transparent" stroke="rgba(93,122,0,0.50)" stroke-width="0.8"/>
+<text x="738" y="263" fill="#5d7a00" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">API</text>
+<text x="828" y="301" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">Hono API</text>
+<text x="828" y="317" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">api.mou-welfare.com</text>
+<text x="828" y="333" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Caddy → :5030 · pg-boss</text>
+<rect x="996" y="272" width="136" height="64" rx="6" fill="#f7f7f5"/>
+<rect x="996" y="272" width="136" height="64" rx="6" fill="rgba(31,35,40,0.05)" stroke="#5c6366" stroke-width="1"/>
+<rect x="1004" y="278" width="20" height="12" rx="2" fill="transparent" stroke="rgba(92,99,102,0.50)" stroke-width="0.8"/>
+<text x="1014" y="287" fill="#5c6366" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+<text x="1064" y="309" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">Postgres 16</text>
+<text x="1064" y="325" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">mou_welfare · :5432</text>
+<rect x="732" y="420" width="120" height="64" rx="6" fill="#f7f7f5"/>
+<rect x="732" y="420" width="120" height="64" rx="6" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+<rect x="740" y="426" width="32" height="12" rx="2" fill="transparent" stroke="rgba(31,35,40,0.4)" stroke-width="0.8"/>
+<text x="756" y="435" fill="#1f2328" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">CRON</text>
+<text x="792" y="457" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">爬蟲</text>
+<text x="792" y="473" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Python · cron 3d</text>
+<rect x="812" y="40" width="160" height="64" rx="6" fill="#f7f7f5"/>
+<rect x="812" y="40" width="160" height="64" rx="6" fill="rgba(31,35,40,0.03)" stroke="rgba(31,35,40,0.3)" stroke-width="1"/>
+<rect x="820" y="46" width="28" height="12" rx="2" fill="transparent" stroke="rgba(31,35,40,0.22)" stroke-width="0.8"/>
+<text x="834" y="55" fill="#6b7280" font-size="7" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+<text x="892" y="77" fill="#1f2328" font-size="12" font-weight="600" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif" text-anchor="middle">Gemini API</text>
+<text x="892" y="93" fill="#5c6366" font-size="9" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">LLM · embedding</text>
+<!-- legend -->
+<line x1="116" y1="656" x2="1164" y2="656" stroke="rgba(31,35,40,0.1)" stroke-width="0.8"/>
+<text x="116" y="672" fill="#5c6366" font-size="8" font-family="'Geist Mono', ui-monospace, monospace" letter-spacing="0.18em">LEGEND</text>
+<rect x="116" y="688" width="14" height="10" rx="2" fill="rgba(93,122,0,0.08)" stroke="#5d7a00" stroke-width="1"/>
+<text x="136" y="698" fill="#5c6366" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">核心 API</text>
+<rect x="220" y="688" width="14" height="10" rx="2" fill="#ffffff" stroke="#1f2328" stroke-width="1"/>
+<text x="240" y="698" fill="#5c6366" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">服務</text>
+<rect x="292" y="688" width="14" height="10" rx="2" fill="rgba(31,35,40,0.05)" stroke="#5c6366" stroke-width="1"/>
+<text x="312" y="698" fill="#5c6366" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">儲存</text>
+<rect x="364" y="688" width="14" height="10" rx="2" fill="rgba(31,35,40,0.03)" stroke="rgba(31,35,40,0.3)" stroke-width="1"/>
+<text x="384" y="698" fill="#5c6366" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">外部服務</text>
+<rect x="460" y="688" width="14" height="10" rx="2" fill="rgba(92,99,102,0.10)" stroke="#6b7280" stroke-width="1"/>
+<text x="480" y="698" fill="#5c6366" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">使用者</text>
+<line x1="544" y1="693" x2="572" y2="693" stroke="#5d7a00" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+<text x="580" y="698" fill="#5c6366" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">主要請求</text>
+<line x1="656" y1="693" x2="684" y2="693" stroke="#2a6db0" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+<text x="692" y="698" fill="#5c6366" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">HTTP 呼叫</text>
+<line x1="780" y1="693" x2="808" y2="693" stroke="#5c6366" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="816" y="698" fill="#5c6366" font-size="12" font-weight="500" font-family="'Geist', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif">本機連線</text>
+      </svg>
+    </div>
+    <p class="note">未畫入：Resend 寄信、每日備份到 R2、GitHub Actions 自動部署（見部署圖）、規劃中的 Windows 爬蟲 agent。資料來源：docs/backend.md、docs/scraper.md（2026-11-25）。</p>
+  </div>
+</body>
+</html>
