@@ -139,6 +139,22 @@ describe('POST /internal/ingest', () => {
     expect(await t.db.select().from(welfareSources)).toHaveLength(2)
   })
 
+  it('網址移到另一個 program_key 後，原本的福利沒有其他來源網址就標為 removed', async () => {
+    // 爬蟲把同名的不同福利拆成不同的鍵（services/scraper/src/scraper/siblings.py）
+    const a = 'https://social.kinmen.gov.tw/cp.aspx?n=A&s=1'
+    const b = 'https://social.kinmen.gov.tw/cp.aspx?n=B&s=2'
+    await post('/internal/ingest', item({ url: a }))
+    await post('/internal/ingest', item({ url: b }))
+    // b 拆出去：原本的福利還有 a，不下架
+    await post('/internal/ingest', item({ url: b, program_key: 'kinmen:中低收入老人生活津貼#abc123', content_hash: `sha256:${'b'.repeat(64)}` }))
+    const status = async () => Object.fromEntries((await programs()).map((p) => [p.programKey, p.status]))
+    expect(await status()).toEqual({ 'kinmen:中低收入老人生活津貼': 'pending', 'kinmen:中低收入老人生活津貼#abc123': 'pending' })
+    // a 也移走：原本的福利沒有來源了
+    await post('/internal/ingest', item({ url: a, program_key: 'kinmen:中低收入老人生活津貼#def456' }))
+    expect((await status())['kinmen:中低收入老人生活津貼']).toBe('removed')
+    expect(await t.db.select().from(welfareSources)).toHaveLength(2)
+  })
+
   it('格式錯誤 → 400（共用 schema 的品質關卡）', async () => {
     const res = await post('/internal/ingest', { ...item(), content_md: '太短' })
     expect(res.status).toBe(400)

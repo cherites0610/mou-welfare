@@ -212,3 +212,39 @@ def test_列表頁暫時抓不到_不判定下架() -> None:
     # 列表不完整的那幾次不算沒出現；恢復正常後要再連續 2 次沒看到才下架
     assert run(items(11), state, "r4")[1].removed == []
     assert run(items(11), state, "r5")[1].removed == ["https://s.example/11"]
+
+
+def _program(n: int, title: str, body: str) -> RawItem:
+    return RawItem(url=f"https://s.example/p{n}", html=page(title, body))
+
+
+def test_同名的不同年度_只推送最新的_舊的不推送() -> None:
+    state = State(":memory:")
+    older = _program(1, "113年度老人假牙補助", "113年度老人假牙補助，" + BODY)
+    newer = _program(2, "115年度老人假牙補助", "115年度老人假牙補助，" + BODY + "補助金額調整。")
+    r, sink = run([older, newer, *items(10)], state, "r1")
+    keys = {i.source.url: i.program_key for i in sink.items}
+    assert str(newer.url) in {str(u) for u in keys} and not any("p1" in str(u) for u in keys)
+    assert state.page("https://s.example/p1")["status"] == "superseded"  # type: ignore[index]
+
+
+def test_同名但不同的福利_拆成不同的鍵_之後不重複推送() -> None:
+    state = State(":memory:")
+    a = _program(1, "申請社會救助專戶", "本縣列冊領有身心障礙生活補助之民眾，" + BODY)
+    b = _program(2, "申請社會救助專戶", "本縣列冊低收入戶之民眾，" + BODY + "另需檢附低收入戶證明。")
+    _, sink = run([a, b, *items(10)], state, "r1")
+    keys = sorted(i.program_key for i in sink.items if "/p" in str(i.source.url))
+    assert len(set(keys)) == 2 and keys[0] == "kinmen:申請社會救助專戶"
+    _, sink2 = run([a, b, *items(10)], state, "r2")
+    assert sink2.items == []
+
+
+def test_舊的狀態檔裡同名的網址_重新推送一次正確的那份() -> None:
+    # pushed_key 欄位加入前推送的（同名網址互相覆蓋，資料庫裡不一定是最新的那份）
+    state = State(":memory:")
+    older = _program(1, "113年度老人假牙補助", "113年度老人假牙補助，" + BODY)
+    newer = _program(2, "115年度老人假牙補助", "115年度老人假牙補助，" + BODY + "補助金額調整。")
+    run([older, newer, *items(10)], state, "r1")
+    state.db.execute("UPDATE pages SET pushed_key = NULL, status = 'active'")
+    _, sink = run([older, newer, *items(10)], state, "r2")
+    assert [str(i.source.url) for i in sink.items] == ["https://s.example/p2"]

@@ -1,6 +1,6 @@
 // 爬蟲推送（docs/scraper.md §7）：以 program_key upsert；內容沒變不重新結構化。
 import type { IngestItem, IngestRemove } from '@mou-welfare/shared'
-import { and, eq, inArray, notExists, sql } from 'drizzle-orm'
+import { and, eq, inArray, ne, notExists, sql } from 'drizzle-orm'
 import type { Db } from '../../db/client.ts'
 import { ingestLog, welfareAttachments, welfarePrograms as w, welfareSources } from '../../db/schema/index.ts'
 import type { Queue } from '../../lib/queue.ts'
@@ -60,7 +60,11 @@ export async function ingest(db: Db, queue: Queue, item: IngestItem): Promise<{ 
           .values(item.attachments.map((a) => ({ programId: id, name: clean(a.name), url: a.url, text: clean(a.text) })))
       }
     }
-    // 來源網址可能從別的福利移過來（標題改了 → program_key 不同），以最新的推送為準
+    // 來源網址可能從別的福利移過來（標題改了、或爬蟲把同名的不同福利拆成不同的鍵 → program_key 不同），以最新的推送為準
+    const [moved] = await tx
+      .select({ programId: welfareSources.programId })
+      .from(welfareSources)
+      .where(and(eq(welfareSources.url, url), ne(welfareSources.programId, id)))
     await tx
       .insert(welfareSources)
       .values({ url, programId: id, siteId: item.source.site_id, contentHash: item.content_hash })
@@ -68,6 +72,21 @@ export async function ingest(db: Db, queue: Queue, item: IngestItem): Promise<{ 
         target: welfareSources.url,
         set: { programId: id, contentHash: item.content_hash, lastSeenAt: sql`now()` },
       })
+    // 原本的福利沒有其他來源網址了：標為 removed（否則留下一筆內容過時的重複福利）
+    if (moved) {
+      const [orphan] = await tx
+        .update(w)
+        .set({ status: 'removed' })
+        .where(
+          and(
+            eq(w.id, moved.programId),
+            ne(w.status, 'removed'),
+            notExists(tx.select({ one: sql`1` }).from(welfareSources).where(eq(welfareSources.programId, w.id))),
+          ),
+        )
+        .returning({ programKey: w.programKey })
+      if (orphan) await tx.insert(ingestLog).values({ programKey: orphan.programKey, sourceUrl: url, action: 'removed' })
+    }
     await tx.insert(ingestLog).values({ programKey: item.program_key, sourceUrl: url, action, contentHash: item.content_hash })
     return { id, action }
   })

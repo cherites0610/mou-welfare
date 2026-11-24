@@ -1,6 +1,6 @@
 # 測試規範（v2）
 
-> 狀態：規範定案；CI 與自動部署已運作（API 測試 287 個、爬蟲測試 125 個；2026-11-24）
+> 狀態：規範定案；CI 與自動部署已運作（API 測試 288 個、爬蟲測試 138 個；2026-11-24）
 > 最後更新：2026-11-23
 > 適用範圍：`apps/api`、`apps/web`、`apps/admin`、`packages/shared`、`services/scraper`
 > 相關文件：[後端設計](backend.md)、[爬蟲設計](scraper.md)

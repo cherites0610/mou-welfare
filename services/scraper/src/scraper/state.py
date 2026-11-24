@@ -5,6 +5,9 @@
 - `content_hash`：最後一次「處理完」時的 hash（推送、過濾、隔離都算處理完）。
   hash 沒變就不再重新處理，也不會重新下載附件。
 - `pushed_hash`：最後一次成功推送的 hash。推送失敗時不更新 content_hash，下次會重試。
+- `pushed_key`：最後一次推送用的 program_key（同名網址拆成不同的鍵時會和標題算出來的不同，見 siblings.py）。
+  NULL＝這個欄位加入前推送的，用的是標題算出來的鍵。
+- `superseded`：被同一福利的另一個網址取代（同一頁的另一個網址、或較舊的年度），不推送。
 - 下架：完整跑完、且健康檢查正常的執行中，連續 2 次沒看到才算下架。
 """
 
@@ -21,13 +24,14 @@ CREATE TABLE IF NOT EXISTS pages (
   site_id       TEXT NOT NULL,
   title         TEXT,
   content_hash  TEXT,
-  status        TEXT NOT NULL DEFAULT 'pending',  -- pending | active | filtered | quarantined | removed
+  status        TEXT NOT NULL DEFAULT 'pending',  -- pending | active | filtered | quarantined | superseded | removed
   reason        TEXT,
   label         TEXT,
   first_seen    TEXT NOT NULL,
   last_seen     TEXT NOT NULL,
   last_changed  TEXT,
   pushed_hash   TEXT,
+  pushed_key    TEXT,
   last_run      TEXT,
   miss_count    INTEGER NOT NULL DEFAULT 0
 );
@@ -60,6 +64,11 @@ class State:
         self.db = sqlite3.connect(str(path))
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        # 舊的狀態檔沒有後來加的欄位
+        cols = {r["name"] for r in self.db.execute("PRAGMA table_info(pages)")}
+        if "pushed_key" not in cols:
+            self.db.execute("ALTER TABLE pages ADD COLUMN pushed_key TEXT")
+            self.db.commit()
 
     def close(self) -> None:
         self.db.close()
@@ -101,9 +110,16 @@ class State:
         )
         self.db.commit()
 
-    def mark_pushed(self, url: str, content_hash: str) -> None:
-        self.db.execute("UPDATE pages SET pushed_hash = ? WHERE url = ?", (content_hash, url))
+    def mark_pushed(self, url: str, content_hash: str, program_key: str | None = None) -> None:
+        self.db.execute(
+            "UPDATE pages SET pushed_hash = ?, pushed_key = ? WHERE url = ?", (content_hash, program_key, url)
+        )
         self.db.commit()
+
+    def page(self, url: str) -> sqlite3.Row | None:
+        """status、pushed_hash、pushed_key 等目前的狀態"""
+        row: sqlite3.Row | None = self.db.execute("SELECT * FROM pages WHERE url = ?", (url,)).fetchone()
+        return row
 
     def sweep(self, site_id: str, run_id: str) -> list[str]:
         """這次沒看到的網址累計一次未出現；達到門檻的標為下架，回傳曾推送過、需要通知後端下架的網址。"""

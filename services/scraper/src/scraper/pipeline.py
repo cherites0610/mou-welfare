@@ -8,6 +8,7 @@ adapter 列出內文 → 抽取 → 狀態比對 → 標題規則 → 附件 →
 
 import json
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -21,6 +22,7 @@ from scraper.filter.rules import judge_title
 from scraper.models import Attachment, Classification, IngestItem, Source
 from scraper.normalize import content_hash, program_key
 from scraper.quality import MIN_CONTENT_CHARS, Candidate, quality_issues
+from scraper.siblings import Member, resolve
 from scraper.sites import SiteConfig
 from scraper.state import Change, State
 
@@ -84,6 +86,16 @@ class Ready:
     item: IngestItem
 
 
+@dataclass
+class _Sibling:
+    """這次看到、可以推送的網址（含內容沒變的），用來處理同一個 program_key 底下的多個網址"""
+
+    member: Member
+    raw: RawItem
+    ext: Extracted
+    ready: Ready | None
+
+
 def extract_item(raw: RawItem, adapter: Adapter) -> Extracted:
     if raw.fields is not None:
         lines = [f"- **{k}**：{v}" for k, v in raw.fields.items() if v and not any(s in k for s in _OPENDATA_SKIP)]
@@ -115,6 +127,7 @@ class SiteRun:
         self.result = SiteResult(site.id)
         self._attachment_cache: dict[str, str] = {}
         self._hashes: dict[str, str] = {}  # content_hash → 第一個出現的網址（找重複內容）
+        self._siblings: dict[str, list[_Sibling]] = defaultdict(list)
 
     def attachments(self, ext: Extracted) -> list[Attachment]:
         out: list[Attachment] = []
@@ -141,15 +154,28 @@ class SiteRun:
         r = self.result
         ext = extract_item(raw, self.adapter)
         h = content_hash(ext.content_md, [a.url for a in ext.attachments])
+        key = program_key(self.site.id, ext.title)
+        member = Member(raw.url, h, ext.title, ext.content_md, ext.published_at)
         change = self.state.observe(raw.url, self.site.id, ext.title, h, self.run_id)
         if change is Change.UNCHANGED:
             r.unchanged += 1
+            # 內容沒變也要參與同名網址的判斷（被取代或拆開的決定看的是這次所有的網址）
+            page = self.state.page(raw.url)
+            if page is not None and page["status"] in ("active", "superseded"):
+                self._siblings[key].append(_Sibling(member, raw, ext, None))
             return None
         if change is Change.NEW:
             r.new += 1
         else:
             r.updated += 1
+        ready = self._prepare(raw, ext, h, key)
+        if ready:
+            self._siblings[key].append(_Sibling(member, raw, ext, ready))
+        return ready
 
+    def _prepare(self, raw: RawItem, ext: Extracted, h: str, key: str) -> Ready | None:
+        """標題規則、附件、品質關卡；通過的才組成推送內容"""
+        r = self.result
         verdict = judge_title(ext.title, tuple(self.site.exclude_title))
         if verdict == "exclude":
             r.filtered += 1
@@ -176,7 +202,7 @@ class SiteRun:
 
         item = IngestItem(
             source=Source(site_id=self.site.id, city=self.site.city, url=raw.link or raw.url, kind=self.site.kind),  # type: ignore[arg-type]
-            program_key=program_key(self.site.id, ext.title),
+            program_key=key,
             title=ext.title,
             published_at=ext.published_at,
             content_md=content,
@@ -187,6 +213,30 @@ class SiteRun:
             content_hash=h,
         )
         return Ready(raw.url, h, item)
+
+    def resolve_siblings(self) -> None:
+        """同一個 program_key 底下有多個網址時（siblings.py）：被取代的不推送；拆開的改用新的鍵。
+        內容沒變的網址，若上次推送用的鍵不同、曾被取代、或是 pushed_key 欄位加入前推送的
+        （當時同名網址互相覆蓋，資料庫裡留下哪一份不一定），重新推送一次。"""
+        for key, siblings in self._siblings.items():
+            decisions = resolve(key, [s.member for s in siblings])
+            for s in siblings:
+                d = decisions[s.member.url]
+                if not d.keep:
+                    if s.ready in self._ready:
+                        self._ready.remove(s.ready)
+                    self.state.settle(s.member.url, "superseded", s.member.content_hash, d.reason)
+                    continue
+                if s.ready is not None:
+                    s.ready.item.program_key = d.key
+                    continue
+                page = self.state.page(s.member.url)
+                pushed_key = page["pushed_key"] if page is not None else None
+                legacy = pushed_key is None and len(siblings) > 1
+                if legacy or (pushed_key or key) != d.key or (page is not None and page["status"] == "superseded"):
+                    ready = self._prepare(s.raw, s.ext, s.member.content_hash, d.key)
+                    if ready:
+                        self._ready.append(ready)
 
     def health(self) -> tuple[str, str]:
         r = self.result
@@ -226,6 +276,9 @@ class SiteRun:
         r.health, r.health_detail = self.health()
 
         if r.health == "ok":
+            # 只跑部分內容時看不到同名的其他網址，不判斷（照標題算出來的鍵推送）
+            if not self.limit:
+                self.resolve_siblings()
             for ready in self._ready:
                 try:
                     sink.ingest(ready.item)
@@ -234,7 +287,7 @@ class SiteRun:
                     r.errors.append(f"push {e}")
                     continue
                 self.state.settle(ready.url, "active", ready.hash)
-                self.state.mark_pushed(ready.url, ready.hash)
+                self.state.mark_pushed(ready.url, ready.hash, ready.item.program_key)
                 r.pushed += 1
             # 只跑部分內容、或有列表頁暫時抓不到時，無法判斷下架（金門的目錄頁被截斷時，底下 22 筆會全部看不到）
             if not self.limit and self.adapter.listing_complete:
