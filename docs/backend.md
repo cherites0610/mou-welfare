@@ -586,17 +586,27 @@ LINE 官方帳號（`@417ahfau`）的對話（`features/line/`）。✅ 2026-11-
 | pgvector | ✅ 已安裝 0.6.0（Ubuntu 套件 `postgresql-16-pgvector`，支援 HNSW） |
 | 資料庫 | ✅ `mou_welfare`（UTF8、`C.UTF-8`），擁有者為 `mou_welfare` |
 | 擴充 | ✅ `vector 0.6.0`、`pg_trgm 1.6`、`pgcrypto 1.3` |
-| 帳號 | ✅ `mou_welfare`（LOGIN，非 superuser，連線上限 30），只有自己的資料庫有 CONNECT 權限 |
+| 帳號 | ✅ `mou_welfare`（LOGIN，非 superuser、沒有 CREATEROLE，連線上限 30），只有自己的資料庫有 CONNECT 權限 |
 | 連線字串 | 存在主機上的 `~/.config/mou-welfare/db.env`（權限 600）和 `~/.pgpass`，**不進版控** |
 | 每日備份 | ✅ `~/.local/bin/mou-welfare-backup.sh`，crontab 每天 03:17（主機時區 UTC+8）執行；`pg_dump -Fc` 存到 `~/backups/mou-welfare/`，保留 30 天；日誌在 `~/.local/state/mou-welfare-backup.log` |
 | R2 異地備份 | ✅ bucket `mou-welfare-backups`，lifecycle 規則 `expire-daily-30d`（`daily/` 前綴 30 天後刪除）；2026-11-18 測試上傳並下載比對，內容一致 |
-| 連線測試 | ✅ 透過 `postgres.cherites.org` 以 `sslmode=require` 連線成功（TLSv1.3） |
+| 連線 | ✅ 2026-11-24 起**只聽本機**（`listen_addresses = 'localhost'`），API、背景工作、備份都在同一台主機。v1 的資料庫 `mou-welfare` 同日刪除 |
 
-> 舊版資料庫 `mou-welfare`（連字號，擁有者為 `cherites`）保留不動，作為 v1 資料參考。
+**2026-11-24 強化**（修改前的設定為 `/etc/postgresql/16/main/*.bak-202611241400`）
 
-**已知限制**
-- `mou_welfare` 帳號可以連線到同一台主機上的 `pet-erp`、`lexicon`、`mou-welfare`，因為這些資料庫保留了預設的 PUBLIC CONNECT 權限。實測**任何資料表都不可讀，也無法建立物件**。若要完全拒絕連線，需要在 `pg_hba.conf` 加一條 `reject` 規則（尚未執行，見第 11 節）。
-- 5432 port 目前對外開放（`pg_hba` 允許 `0.0.0.0/0` 用密碼連線，`ufw` 未啟用）。依目前決定**暫不變更**。API 改部署在同一台主機後，v2 不再需要從外部連資料庫，之後可以關閉對外開放（見第 11 節）。
+起因：5432 對所有網路開放，`pg_hba` 允許任何 IP、任何帳號用密碼連任何資料庫；日誌顯示 9 月以來有 23,242 次猜密碼（`postgres`、`root`、`admin` 等常見帳號，沒有針對 `cherites`、`mou_welfare`），而 `cherites` 是有密碼的 superuser。
+
+| 項目 | 改成 |
+|---|---|
+| `listen_addresses` | `'localhost'`（只聽 127.0.0.1） |
+| `pg_hba.conf` | 白名單：`postgres`、`cherites` 只能在主機上以同名系統帳號登入（peer）；`mou_welfare` 只能從本機以密碼（scram-sha-256）連 `mou_welfare`、`mou_welfare_dev`、`mou_welfare_test`；其他一律 `reject`。移除複寫規則（沒有使用） |
+| `cherites`（superuser） | 移除密碼，只能 peer 登入 |
+| `mou_welfare` | 移除 CREATEROLE |
+| `pet-erp`（舊專案，保留不動） | 移除 PUBLIC 的 CONNECT／TEMPORARY；只有 superuser 能連。11/17 起沒有任何程式使用（API 在 11/17 的主機整理時從 pm2 移除），只有兩個測試租戶共 168 筆資料 |
+| 驗證 | v2 API、背景工作（重啟後自動重連）、每日備份正常；`cherites` 走 TCP、`mou_welfare` 連 `pet-erp` 都被拒絕；從主機的公開 IP 連 5432 回 Connection refused |
+
+- 雲端防火牆：騰訊雲安全群組的 5432 規則也應移除（多一層保護）。主機的 ufw 不啟用：設錯會鎖住 SSH，而資料庫已經只聽本機。
+- 之後要讓其他主機連資料庫時，用 Tailscale：`listen_addresses` 加上 Tailscale 的位址，`pg_hba` 只允許 `100.64.0.0/10` 與指定的帳號、資料庫。
 
 ---
 
@@ -694,8 +704,8 @@ v1 的 API（NestJS，pm2 `mou-welfare-api`，port 5009）與前端（Vue，Cadd
 - [ ] **人工檢核被判為非福利的 455 筆**：在管理後台依縣市檢核（[admin.md](admin.md) §4.3），屏東縣 191 筆最多。
 
 **之後再決定**
-- [ ] `pg_hba.conf` 加入規則，限制 `mou_welfare` 只能連自己的資料庫。
-- [ ] 關閉 5432 對外開放：API 和資料庫在同一台，爬蟲也透過 API 推資料，所以資料庫只需要聽 localhost（另外兩個專案若需要遠端連線，可改用 Tailscale，主機上已有）。
+- [x] ~~`pg_hba.conf` 加入規則，限制 `mou_welfare` 只能連自己的資料庫~~：2026-11-24 改成白名單（§9）。
+- [x] ~~關閉 5432 對外開放~~：2026-11-24 資料庫只聽本機（§9）；騰訊雲安全群組的 5432 規則待移除。
 - [ ] pgvector 要不要升級：改用 PostgreSQL 官方的 PGDG 套件庫，可以裝到較新的版本（目前 0.6.0 已夠用）。
 - [x] ~~v1 前端的 `VITE_LIFF_ID`~~：v1 已停用，不需要。
 - [x] ~~外部監控~~：2026-11-23 GitHub Actions `uptime.yml` 每 30 分鐘檢查；結構化錯誤增加、爬蟲中斷與逾期由 API 每小時檢查並寄信（§8.4.2）。
