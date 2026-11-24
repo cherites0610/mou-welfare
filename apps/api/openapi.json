@@ -5789,6 +5789,50 @@
         }
       }
     },
+    "/v1/sitemap": {
+      "get": {
+        "tags": [
+          "welfare"
+        ],
+        "summary": "上架中福利的 id 與更新時間（前端產生 sitemap.xml 用）",
+        "responses": {
+          "200": {
+            "description": "福利清單",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "updatedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/welfare/simulate": {
       "post": {
         "tags": [
