@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import type { AppEnv } from '../../app.ts'
 import { familyMode } from '../family/service.ts'
 import { FamilyIdQuery, SearchQuery, SimulateBody, splitCsv, WelfareDetailSchema, WelfareListSchema } from './schema.ts'
-import { getProgram, profileOf, searchPrograms } from './service.ts'
+import { getProgram, listSitemap, profileOf, searchPrograms } from './service.ts'
 
 const ErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) })
 const json = <T extends z.ZodType>(schema: T, description: string) => ({
@@ -37,6 +37,16 @@ const detail = createRoute({
   },
 })
 
+const sitemap = createRoute({
+  method: 'get',
+  path: '/v1/sitemap',
+  tags: ['welfare'],
+  summary: '上架中福利的 id 與更新時間（前端產生 sitemap.xml 用）',
+  responses: {
+    200: json(z.object({ data: z.array(z.object({ id: z.uuid(), updatedAt: z.string() })) }), '福利清單'),
+  },
+})
+
 const simulate = createRoute({
   method: 'post',
   path: '/v1/welfare/simulate',
@@ -61,6 +71,11 @@ export const welfareRoutes = new OpenAPIHono<AppEnv>()
     const program = await getProgram(c.var.deps.db, id, profileOf(u), u?.id ?? null, family)
     if (!program) return c.json({ error: { code: 'not_found', message: '找不到這個福利' } }, 404)
     return c.json({ data: program }, 200)
+  })
+  .openapi(sitemap, async (c) => {
+    const rows = await listSitemap(c.var.deps.db)
+    c.header('Cache-Control', 'public, max-age=3600')
+    return c.json({ data: rows.map((r) => ({ id: r.id, updatedAt: r.updatedAt.toISOString() })) }, 200)
   })
   .openapi(simulate, async (c) => {
     const b = c.req.valid('json')

@@ -32,3 +32,14 @@ html body {
   --el-input-focus-border-color: #92c700;
   --el-component-size-large: 40px;
 }
+
+/* 允許縮放後，iOS Safari 會在聚焦字級小於 16px 的輸入框時自動放大畫面：手機上一律用 16px */
+@media screen and (width <= 768px) {
+  input,
+  textarea,
+  select,
+  .el-input__inner,
+  .el-textarea__inner {
+    font-size: 16px !important;
+  }
+}

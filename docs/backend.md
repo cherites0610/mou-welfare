@@ -236,7 +236,7 @@ alert_state(key pk, value, sent_at)                                   -- 系統�
 | 登入 | `/v1/auth/*`（由 Better Auth 處理：Email 密碼、Google、LINE、LIFF ID Token、驗證信、重設密碼） | 公開 |
 | 個人 | `GET/PATCH /v1/me`（含 `isSubscribed` 訂閱通知、`createdAt`）、`DELETE /v1/me`（body 必須有 `"confirm":"DELETE"`；有密碼的帳號另需 `password`） | 登入 |
 | 收藏 | `GET /v1/me/favorites?familyId=`、`PUT/DELETE /v1/me/favorites/:programId` | 登入 |
-| 福利 | `GET /v1/welfare?q=&city=&category=&familyId=&page=`、`GET /v1/welfare/:id?familyId=` | 公開；**帶比對結果時以登入身分為準**，不再接受從前端傳 `userId`；帶 `familyId` 時必須登入（401）且為成員（403） |
+| 福利 | `GET /v1/welfare?q=&city=&category=&familyId=&page=`、`GET /v1/welfare/:id?familyId=`、`GET /v1/sitemap`（上架中福利的 id 與更新時間，前端產生 `sitemap.xml` 用） | 公開；**帶比對結果時以登入身分為準**，不再接受從前端傳 `userId`；帶 `familyId` 時必須登入（401）且為成員（403）。列表只有 `active`；詳情只開放 `active` 與 `expired`（標示已過期），`pending`、`rejected`、`removed` 一律 404，收藏也一樣 |
 | 試算 | `POST /v1/welfare/simulate`（手動輸入身分試算；`identities` 可直接指定年齡組與性別，對應前端的「進階篩選」） | 公開 |
 | 家庭 | `GET/POST /v1/families`、`GET/PATCH/DELETE /v1/families/:id` | 登入；查看需為成員，修改或刪除需為 admin |
 | 成員 | `GET /v1/families/:id/members`、`PATCH/DELETE /v1/families/:id/members/:userId` | 成員 / admin |

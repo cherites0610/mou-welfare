@@ -1,10 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
-import { and, desc, eq, ne } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import type { AppEnv } from '../../app.ts'
-import { favorites, welfarePrograms as w } from '../../db/schema/index.ts'
+import { favorites, PUBLIC_STATUSES, welfarePrograms as w } from '../../db/schema/index.ts'
 import { familyMode, matchFamily } from '../family/service.ts'
 import { FamilyIdQuery, WelfareSummarySchema } from '../welfare/schema.ts'
-import { profileOf } from '../welfare/service.ts'
+import { isPublic, profileOf } from '../welfare/service.ts'
 import { match } from '@mou-welfare/shared'
 
 const ErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) })
@@ -59,7 +59,7 @@ export const favoriteRoutes = new OpenAPIHono<AppEnv>()
       })
       .from(favorites)
       .innerJoin(w, eq(w.id, favorites.programId))
-      .where(and(eq(favorites.userId, u.id), ne(w.status, 'removed')))
+      .where(and(eq(favorites.userId, u.id), inArray(w.status, [...PUBLIC_STATUSES])))
       .orderBy(desc(favorites.createdAt))
     const profile = profileOf(u)!
     const family = await familyMode(c.var.deps.db, c.req.valid('query').familyId, u.id)
@@ -74,7 +74,7 @@ export const favoriteRoutes = new OpenAPIHono<AppEnv>()
     const { programId } = c.req.valid('param')
     const db = c.var.deps.db
     const [p] = await db.select({ status: w.status }).from(w).where(eq(w.id, programId))
-    if (!p || p.status === 'removed') return c.json({ error: { code: 'not_found', message: '找不到這個福利' } }, 404)
+    if (!p || !isPublic(p.status)) return c.json({ error: { code: 'not_found', message: '找不到這個福利' } }, 404)
     await db.insert(favorites).values({ userId: c.var.user!.id, programId }).onConflictDoNothing()
     return c.body(null, 204)
   })

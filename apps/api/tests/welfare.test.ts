@@ -117,16 +117,31 @@ describe('GET /v1/welfare/:id', () => {
     })
   })
 
-  it('已過期仍可查看並標示 expired；已下架回傳 404', async () => {
+  it('已過期仍可查看並標示 expired；待整理、雜訊、已下架回傳 404', async () => {
     const expired = await createProgram(t.db, { status: 'expired' })
-    const removed = await createProgram(t.db, { status: 'removed' })
     expect((await json(await get(`/v1/welfare/${expired.id}`))).data.expired).toBe(true)
-    expect((await get(`/v1/welfare/${removed.id}`)).status).toBe(404)
+    for (const status of ['pending', 'rejected', 'removed'] as const) {
+      const p = await createProgram(t.db, { status })
+      expect((await get(`/v1/welfare/${p.id}`)).status).toBe(404)
+    }
   })
 
   it('不存在回傳 404；id 格式錯誤回傳 400', async () => {
     expect((await get('/v1/welfare/00000000-0000-4000-8000-000000000000')).status).toBe(404)
     expect((await get('/v1/welfare/not-a-uuid')).status).toBe(400)
+  })
+})
+
+describe('GET /v1/sitemap', () => {
+  it('只列上架中的福利', async () => {
+    const active = await createProgram(t.db)
+    for (const status of ['pending', 'rejected', 'expired', 'removed'] as const) await createProgram(t.db, { status })
+    const res = await get('/v1/sitemap')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('cache-control')).toContain('max-age')
+    const body = await json(res)
+    expect(body.data.map((x: { id: string }) => x.id)).toEqual([active.id])
+    expect(Number.isNaN(Date.parse(body.data[0].updatedAt))).toBe(false)
   })
 })
 
@@ -171,11 +186,13 @@ describe('收藏', () => {
     expect((await json(await get('/v1/me/favorites', cookie))).data).toEqual([])
   })
 
-  it('收藏不存在或已下架的福利回傳 404', async () => {
+  it('收藏不存在或前台看不到的福利回傳 404', async () => {
     const removed = await createProgram(t.db, { status: 'removed' })
+    const rejected = await createProgram(t.db, { status: 'rejected' })
     const { cookie } = await signUp(t)
     const put = (id: string) => t.app.request(`/v1/me/favorites/${id}`, { method: 'PUT', headers: { cookie } })
     expect((await put(removed.id)).status).toBe(404)
+    expect((await put(rejected.id)).status).toBe(404)
     expect((await put('00000000-0000-4000-8000-000000000000')).status).toBe(404)
   })
 

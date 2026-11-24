@@ -11,6 +11,8 @@ import { user } from './auth.ts'
  * removed：來源網頁都已下架
  */
 export const WELFARE_STATUSES = ['pending', 'active', 'rejected', 'expired', 'removed'] as const
+/** 前台看得到的狀態：過期的仍可查看（標示已過期）；待整理、判為雜訊、已下架的一律當作不存在 */
+export const PUBLIC_STATUSES = ['active', 'expired'] as const
 /** 結構化方式：llm＝Gemini；rules＝沒有 LLM 金鑰時的關鍵字規則（有金鑰後會重新結構化） */
 export const STRUCTURED_BY = ['llm', 'rules'] as const
 

@@ -56,16 +56,23 @@ watch(personal, (p) => (isFavorite.value = !!p?.isFavorite))
 const loadingFavorite = ref(false)
 
 // 頁面 title、OG meta 與 JSON-LD（伺服器端就會輸出）
+// canonical 不帶查詢參數（?familyId=、?review=1 都是同一頁）；已過期的保留頁面但不讓搜尋引擎收錄
+const { public: cfg } = useRuntimeConfig()
 useHead(() => {
   const welfare = base.value
   if (!welfare) return { title: '福利詳情 | 哞福利' }
   const desc = welfare.summary || `${welfare.city}｜${welfare.categories.join('、')}`
+  const url = `${cfg.siteUrl}/welfares/${welfare.id}`
   return {
     title: `${welfare.name} | 哞福利`,
+    link: [{ rel: 'canonical', href: url }],
     meta: [
       { name: 'description', content: desc },
       { property: 'og:title', content: `${welfare.name} | 哞福利` },
       { property: 'og:description', content: desc },
+      { property: 'og:url', content: url },
+      { property: 'og:type', content: 'article' },
+      ...(welfare.expired ? [{ name: 'robots', content: 'noindex, follow' }] : []),
     ],
     script: [
       {
@@ -77,7 +84,7 @@ useHead(() => {
           description: desc,
           areaServed: welfare.city,
           serviceType: welfare.categories.join('、'),
-          url: `https://mou-welfare.com/welfares/${welfare.id}`,
+          url,
           ...(welfare.publishedAt && { datePublished: welfare.publishedAt }),
           ...(welfare.deadline && { expires: welfare.deadline }),
         }),

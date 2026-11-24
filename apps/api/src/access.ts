@@ -40,6 +40,7 @@ export const ROUTE_ACCESS = {
   'GET /v1/welfare': 'optional', // 帶 familyId 時必須登入且為成員（R6）
   'GET /v1/welfare/:id': 'optional',
   'POST /v1/welfare/simulate': 'public',
+  'GET /v1/sitemap': 'public',
   'POST /v1/uploads/avatar': 'user',
   'GET /v1/chat/sessions': 'user',
   'POST /v1/chat/sessions': 'user',

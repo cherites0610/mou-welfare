@@ -10,7 +10,7 @@ import {
 } from '@mou-welfare/shared'
 import { and, arrayOverlaps, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from 'drizzle-orm'
 import type { Db } from '../../db/client.ts'
-import { favorites, welfareAttachments, welfarePrograms as w } from '../../db/schema/index.ts'
+import { favorites, PUBLIC_STATUSES, welfareAttachments, welfarePrograms as w } from '../../db/schema/index.ts'
 import { type FamilyMatch, type FamilyProfile, matchFamily } from '../family/service.ts'
 
 export type SearchParams = {
@@ -129,7 +129,7 @@ export async function getProgram(
     })
     .from(w)
     .where(eq(w.id, id))
-  if (!row || row.status === 'removed') return null
+  if (!row || !isPublic(row.status)) return null
 
   const [attachments, fav] = await Promise.all([
     db
@@ -152,6 +152,17 @@ export async function getProgram(
     match: profile ? match(profile, row.identities) : null,
     familyMatches: family ? matchFamily(family, row.identities) : null,
   }
+}
+
+export const isPublic = (status: string) => (PUBLIC_STATUSES as readonly string[]).includes(status)
+
+/** sitemap 用：所有上架中福利的 id 與最後更新時間 */
+export async function listSitemap(db: Db) {
+  return db
+    .select({ id: w.id, updatedAt: w.updatedAt })
+    .from(w)
+    .where(eq(w.status, 'active'))
+    .orderBy(asc(w.id))
 }
 
 export function profileOf(u: { birthday?: string | null; gender?: string | null; identities?: string[] | null } | null) {

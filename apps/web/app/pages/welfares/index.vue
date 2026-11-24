@@ -6,7 +6,19 @@ import { Icon } from '@iconify/vue'
 import type { FilterState } from '~/components/WelfareFilterBar.vue'
 import type { WelfareList, WelfareSummary } from '~/utils/welfare'
 
-useHead({ title: '福利搜尋 | 哞福利' })
+// 篩選條件不同仍是同一個列表：canonical 一律指向 /welfares
+const { public: cfg } = useRuntimeConfig()
+const LIST_DESC = '依縣市、類別與身分查詢全台各縣市政府的社會福利與補助，登入後自動比對你符不符合資格。'
+useHead({
+  title: '福利搜尋 | 哞福利',
+  link: [{ rel: 'canonical', href: `${cfg.siteUrl}/welfares` }],
+  meta: [
+    { name: 'description', content: LIST_DESC },
+    { property: 'og:title', content: '福利搜尋 | 哞福利' },
+    { property: 'og:description', content: LIST_DESC },
+    { property: 'og:url', content: `${cfg.siteUrl}/welfares` },
+  ],
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -155,6 +167,7 @@ const toggleChat = () => {
 
 <template>
   <div class="flex flex-col h-screen md:h-[calc(100vh-8rem)] overflow-hidden">
+    <h1 class="sr-only">全台政府福利與補助查詢</h1>
     <div class="flex gap-3 items-center transition-colors duration-300 bg-mygreen md:bg-white p-4 shrink-0">
       <el-input v-model="search" placeholder="Ex.租屋補助" class="w-60" clearable @keyup.enter="handleSearch"
         @clear="handleSearch">

@@ -14,8 +14,15 @@ const props = defineProps<{
   familyId?: string | null
 }>()
 
-const goToDetail = () =>
-  router.push({ path: `/welfares/${props.data.id}`, query: props.familyId ? { familyId: props.familyId } : {} })
+// 標題是真正的連結（搜尋引擎從列表頁追得到詳情頁）；點卡片其他地方也進詳情頁
+const detailTo = computed(() => ({
+  path: `/welfares/${props.data.id}`,
+  query: props.familyId ? { familyId: props.familyId } : {},
+}))
+const goToDetail = (e: MouseEvent) => {
+  if ((e.target as HTMLElement).closest('a')) return // 標題連結自己會換頁
+  router.push(detailTo.value)
+}
 
 const emit = defineEmits<{
   (e: 'update-favorites'): void
@@ -133,7 +140,7 @@ const handleCollect = async () => {
         </div>
 
         <h3 class="text-lg text-gray-800 font-bold leading-relaxed group-hover:text-mygreen transition-colors">
-          {{ data.name }}
+          <NuxtLink :to="detailTo">{{ data.name }}</NuxtLink>
         </h3>
 
         <div v-if="visibleFamilyMatches.length > 0" class="flex items-center gap-2 mt-1">
