@@ -43,7 +43,7 @@ export function createApp(deps: Deps) {
     },
   })
 
-  // 前端在不同網域（mou-welfare.com ↔ api-v2.mou-welfare.com），只允許 TRUSTED_ORIGINS 帶 cookie 呼叫
+  // 前端在不同網域（mou-welfare.com ↔ api.mou-welfare.com），只允許 TRUSTED_ORIGINS 帶 cookie 呼叫
   app.use(
     '*',
     cors({

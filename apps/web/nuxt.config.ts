@@ -10,7 +10,7 @@ export default defineNuxtConfig({
   nitro: { preset: 'cloudflare_module' },
   runtimeConfig: {
     public: {
-      // NUXT_PUBLIC_API_BASE 覆寫；正式環境為 https://api-v2.mou-welfare.com
+      // NUXT_PUBLIC_API_BASE 覆寫；正式環境為 https://api.mou-welfare.com
       apiBase: 'http://localhost:5031',
       // NUXT_PUBLIC_LIFF_ID 覆寫；空字串＝不啟用 LIFF 自動登入（plugins/liff.client.ts）
       liffId: '',
@@ -29,6 +29,8 @@ export default defineNuxtConfig({
     '/profile/**': { ssr: false },
     '/favorites': { ssr: false },
     '/chat': { ssr: false },
+    // v1 的家庭頁在 v2 併入個人設定
+    '/family': { redirect: { to: '/profile', statusCode: 301 } },
   },
   app: {
     head: {

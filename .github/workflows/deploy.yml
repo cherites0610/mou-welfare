@@ -126,8 +126,8 @@ jobs:
         run: pnpm --filter @mou-welfare/admin build
         env:
           # 純前端：API 位址在建置時寫入（docs/admin.md）
-          NUXT_PUBLIC_API_BASE: https://api-v2.mou-welfare.com
-          NUXT_PUBLIC_WEB_BASE: https://v2.mou-welfare.com
+          NUXT_PUBLIC_API_BASE: https://api.mou-welfare.com
+          NUXT_PUBLIC_WEB_BASE: https://mou-welfare.com
       - if: steps.cfg.outputs.enabled == 'true'
         run: pnpm --filter @mou-welfare/admin run deploy  # 要加 run：pnpm 有同名的內建指令 deploy
 
@@ -137,18 +137,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: api-v2 /health
+      - name: api /health
         run: |
           for i in $(seq 1 12); do
-            body=$(curl -fsS -m 10 https://api-v2.mou-welfare.com/health || true)
+            body=$(curl -fsS -m 10 https://api.mou-welfare.com/health || true)
             echo "$body" | grep -q '"status":"ok"' && { echo "$body"; exit 0; }
             sleep 5
           done
-          echo "::error::api-v2 health check failed: $body"; exit 1
+          echo "::error::api health check failed: $body"; exit 1
       - name: web /login
         run: |
-          code=$(curl -s -m 15 -o /dev/null -w '%{http_code}' https://v2.mou-welfare.com/login)
-          [ "$code" = "200" ] || { echo "::error::v2.mou-welfare.com/login returned $code"; exit 1; }
+          code=$(curl -s -m 15 -o /dev/null -w '%{http_code}' https://mou-welfare.com/login)
+          [ "$code" = "200" ] || { echo "::error::mou-welfare.com/login returned $code"; exit 1; }
           echo "web ok ($code)"
       - name: admin /login
         run: |

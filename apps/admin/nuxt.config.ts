@@ -11,7 +11,7 @@ export default defineNuxtConfig({
   vite: { plugins: [tailwindcss()] },
   runtimeConfig: {
     public: {
-      // 建置時以 NUXT_PUBLIC_API_BASE 覆寫；正式環境為 https://api-v2.mou-welfare.com
+      // 建置時以 NUXT_PUBLIC_API_BASE 覆寫；正式環境為 https://api.mou-welfare.com
       apiBase: 'http://localhost:5031',
       // 使用者網站（從後台開啟福利的前台頁面）
       webBase: 'http://localhost:3000',

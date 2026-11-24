@@ -4,8 +4,8 @@
 
 | 環境 | 網址 |
 |---|---|
-| 使用者網站（v2 過渡期） | https://v2.mou-welfare.com |
-| API | https://api-v2.mou-welfare.com（`/health`、`/openapi.json`） |
+| 使用者網站 | https://mou-welfare.com |
+| API | https://api.mou-welfare.com（`/health`、`/openapi.json`） |
 | 管理後台 | https://admin.mou-welfare.com |
 
 ## 文件

@@ -18,7 +18,7 @@ jobs:
       - name: API /health
         run: |
           for i in 1 2 3; do
-            body="$(curl -fsS -m 10 https://api-v2.mou-welfare.com/health || true)"
+            body="$(curl -fsS -m 10 https://api.mou-welfare.com/health || true)"
             echo "$body"
             # status 只在資料庫、migration、背景工作心跳都正常時才是 ok（LLM 額度暫停不影響）
             echo "$body" | grep -q '"status":"ok"' && exit 0
@@ -28,5 +28,5 @@ jobs:
           exit 1
       - name: 前端與管理後台
         run: |
-          curl -fsS -m 15 -o /dev/null https://v2.mou-welfare.com/welfares
+          curl -fsS -m 15 -o /dev/null https://mou-welfare.com/welfares
           curl -fsSL -m 15 -o /dev/null https://admin.mou-welfare.com/login
