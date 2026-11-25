@@ -31,6 +31,10 @@ describe('R2 必要的 secret 缺少時拒絕啟動', () => {
   it('未設定 BETTER_AUTH_SECRET', () => {
     expect(() => loadEnv(src({ BETTER_AUTH_SECRET: undefined }))).toThrow(EnvError)
   })
+  it('NODE_ENV=test（密碼不雜湊）只能連測試資料庫', () => {
+    expect(() => loadEnv(src({ DATABASE_URL: 'postgresql://mou_welfare@localhost:5432/mou_welfare' }))).toThrow(/NODE_ENV/)
+    expect(() => loadEnv(src({ NODE_ENV: 'production', DATABASE_URL: 'postgresql://mou_welfare@localhost:5432/mou_welfare' }))).not.toThrow()
+  })
 })
 
 describe('R10 不能透過註冊端點寫入身分、角色等欄位', () => {

@@ -61,6 +61,10 @@ const EnvSchema = z
     R2_PUBLIC_BASE_URL: z.url().optional(),
   })
   .superRefine((e, ctx) => {
+    // 測試模式的密碼不雜湊（lib/auth.ts），只允許連測試資料庫
+    if (e.NODE_ENV === 'test' && !/_test\b/.test(e.DATABASE_URL)) {
+      ctx.addIssue({ code: 'custom', path: ['NODE_ENV'], message: 'NODE_ENV=test 只能連名稱含 _test 的資料庫' })
+    }
     if (e.MAIL_DRIVER === 'resend' && !e.RESEND_API_KEY) {
       ctx.addIssue({ code: 'custom', path: ['RESEND_API_KEY'], message: 'MAIL_DRIVER=resend 時必填' })
     }

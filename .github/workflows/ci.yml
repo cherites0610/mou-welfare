@@ -1,10 +1,13 @@
 # PR 檢查（docs/testing.md §9）。全部通過才能合併到 main。
 name: ci
 
+# 只改文件時不跑（deploy 由 ci 完成觸發，所以也不會部署）
 on:
   pull_request:
+    paths-ignore: ['docs/**', '**/*.md', '.diagram-design']
   push:
     branches: [main]
+    paths-ignore: ['docs/**', '**/*.md', '.diagram-design']
 
 concurrency:
   group: ci-${{ github.ref }}

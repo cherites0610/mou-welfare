@@ -18,20 +18,55 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+# resolve 要查上一次成功的部署（actions: read）
+permissions:
+  contents: read
+  actions: read
+
 jobs:
+  # 決定要部署的 commit，以及哪些部分有變動：和上一次成功的部署比較（中間 CI 失敗沒部署的 commit 也算進去）。
+  # 手動執行、或找不到上一次的部署時，全部部署。
   resolve:
     name: resolve commit
     if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
+      api: ${{ steps.changes.outputs.api }}
+      web: ${{ steps.changes.outputs.web }}
+      admin: ${{ steps.changes.outputs.admin }}
     steps:
       - id: sha
         run: echo "sha=${{ github.event.workflow_run.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          fetch-depth: 0
+      - id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          all() { for k in api web admin; do echo "$k=true" >> "$GITHUB_OUTPUT"; done; echo "部署全部：$1"; exit 0; }
+          [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && all '手動執行'
+          base="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/deploy.yml/runs?branch=main&status=success&per_page=1" \
+            --jq '.workflow_runs[0].head_sha // empty')" || all '查詢上一次部署失敗'
+          { [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; } || all '找不到上一次成功的部署'
+          files="$(git diff --name-only "$base" "$SHA")"
+          echo "和上一次部署 ${base:0:7} 比較，變動的檔案："; echo "$files"
+          # 三者共用：shared 套件、依賴、Node 版本、這個 workflow 本身
+          common='^(packages/shared/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|tsconfig\.base\.json$|\.nvmrc$|\.github/workflows/deploy\.yml$)'
+          has() { printf '%s\n' "$files" | grep -qE "$common|$1" && echo true || echo false; }
+          # 爬蟲與排程腳本跑在主機的部署目錄，由 API 的部署更新
+          echo "api=$(has '^(apps/api/|services/scraper/|ops/)')" >> "$GITHUB_OUTPUT"
+          echo "web=$(has '^apps/web/')" >> "$GITHUB_OUTPUT"
+          echo "admin=$(has '^apps/admin/')" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
 
   api:
     name: deploy api (ssh → pm2)
     needs: resolve
+    if: needs.resolve.outputs.api == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -60,6 +95,7 @@ jobs:
   web:
     name: deploy web (Cloudflare Workers)
     needs: resolve
+    if: needs.resolve.outputs.web == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -95,6 +131,7 @@ jobs:
   admin:
     name: deploy admin (Cloudflare Workers, admin.mou-welfare.com)
     needs: resolve
+    if: needs.resolve.outputs.admin == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -133,7 +170,9 @@ jobs:
 
   smoke:
     name: production smoke test
-    needs: [api, web, admin]
+    needs: [resolve, api, web, admin]
+    # 沒變動的部分會被略過（skipped），仍要檢查正式環境；任何一個部署失敗就不跑
+    if: ${{ !cancelled() && !failure() && needs.resolve.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

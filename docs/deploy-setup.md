@@ -43,12 +43,14 @@ Actions → deploy → Run workflow。`api`、`web`、`admin` 三個 job 都應�
 
 | job | 內容 |
 |---|---|
-| `resolve` | 取得通過 CI 的 commit SHA（手動執行時用目前的 commit） |
+| `resolve` | 取得通過 CI 的 commit SHA（手動執行時用目前的 commit），並和**上一次成功的部署**比較變動的檔案，決定 `api`、`web`、`admin` 哪些要部署：`apps/api/`、`services/scraper/`、`ops/` → api；`apps/web/` → web；`apps/admin/` → admin；`packages/shared/`、`package.json`、`pnpm-lock.yaml`、`.nvmrc`、`deploy.yml` 本身 → 全部。手動執行或找不到上一次的部署時全部部署 |
 | `api` | SSH 到主機，以 forced command 執行 `ops/deploy-api.sh <sha>`：拉取、安裝、build、migration、`pm2 reload`、煙霧測試，失敗自動退回 |
 | `web` | `pnpm --filter @mou-welfare/web build` → `wrangler deploy`（`apps/web/wrangler.jsonc`） |
 | `admin` | 以 `NUXT_PUBLIC_API_BASE`、`NUXT_PUBLIC_WEB_BASE` 建置 `@mou-welfare/admin`（`nuxt generate`）→ `wrangler deploy`（`apps/admin/wrangler.jsonc`，詳見 `docs/admin.md` §8） |
 | `smoke` | 上述三者完成後檢查正式環境（health、前台與後台 `/login`、SEO） |
 
 另有兩個排程 workflow：`uptime.yml`（每 30 分鐘檢查 API、前台、後台，docs/backend.md §8.4.2）、`seo-check.yml`（每天台灣時間 06:41，docs/testing.md §7.3）。
+
+只改文件（`docs/**`、`*.md`、`.diagram-design`）的 push 不跑 CI，所以也不部署（`ci.yml` 的 `paths-ignore`）。
 
 注意：CI 剛開始時會觸發一次 `deploy`，因為 CI 還沒成功而被略過（`skipped`）；真正的部署在 CI 成功後才執行。

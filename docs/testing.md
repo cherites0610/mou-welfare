@@ -216,12 +216,12 @@ const matrix = [
 目前的實作（2026-11-25）：
 
 ```
-ci.yml（push 與 PR）
+ci.yml（push 與 PR；只改 docs/**、*.md 時不跑）
  ├─ node：typecheck、packages/shared 單元測試、契約（ingest schema、openapi.json）、build
  ├─ api-integration：API 測試（Postgres + pgvector 容器）
  └─ scraper：ruff、ruff format、mypy、pytest
 
-deploy.yml（main 的 CI 通過後）
+deploy.yml（main 的 CI 通過後；只部署和上一次部署相比有變動的部分）
  ├─ api：SSH 到主機執行 ops/deploy-api.sh → 主機上的煙霧測試，失敗自動退回
  ├─ web、admin：wrangler deploy 到 Workers（正式環境）
  └─ smoke：正式環境 health、/login、SEO 檢查

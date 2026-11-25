@@ -41,7 +41,7 @@ describe('GET /health', () => {
   })
 
   it('資料庫無法連線時回傳 503', async () => {
-    const env = testEnv({ DATABASE_URL: 'postgresql://nobody:x@127.0.0.1:1/none' })
+    const env = testEnv({ DATABASE_URL: 'postgresql://nobody:x@127.0.0.1:1/none_test' })
     const { db, sql } = createDb(env.DATABASE_URL, { max: 1 })
     const mailer = new MemoryMailer()
     const app = createApp({ db, auth: createAuth(db, env, mailer), env, mailer, storage: null, queue: new MemoryQueue() })

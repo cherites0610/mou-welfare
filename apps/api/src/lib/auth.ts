@@ -18,6 +18,12 @@ export const isPlaceholderEmail = (email: string) => email.toLowerCase().endsWit
 
 type LineProfile = { sub: string; email?: string }
 
+/** 只給測試用的密碼雜湊（見 createAuth）：可逆，不能用在任何真實資料。 */
+const TEST_PASSWORD_HASHER = {
+  hash: async (password: string) => `test:${password}`,
+  verify: async ({ hash, password }: { hash: string; password: string }) => hash === `test:${password}`,
+}
+
 function socialProviders(env: Env) {
   return {
     ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
@@ -51,6 +57,9 @@ export function createAuth(db: Db, env: Env, mailer: Mailer) {
       enabled: true,
       requireEmailVerification: true,
       minPasswordLength: 8,
+      // 測試環境不用 scrypt：每次註冊、登入都要算一次，佔 API 測試將近一半的時間。
+      // env.ts 限定 NODE_ENV=test 只能連測試資料庫，正式環境不會走到這裡。
+      ...(env.NODE_ENV === 'test' ? { password: TEST_PASSWORD_HASHER } : {}),
       resetPasswordTokenExpiresIn: 60 * 60,
       revokeSessionsOnPasswordReset: true,
       // R14：Better Auth 對不存在的 email 也回傳相同結果，只是不寄信
