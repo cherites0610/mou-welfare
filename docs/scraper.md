@@ -1,6 +1,6 @@
 # 爬蟲設計文件（v2）
 
-> 狀態：P0 原型完成，13 個來源（12 縣市、1,471 筆）已推送到正式環境，後端已用 Gemini 結構化完成（可搜尋 985 筆）；尚未排程，見第 10 節
+> 狀態：P0 原型完成，13 個來源（12 縣市、1,471 筆）已推送到正式環境，後端已用 Gemini 結構化完成（可搜尋 985 筆）；2026-11-23 起在主機上每 3 天排程執行（§10.4）。台灣 IP 的執行環境規劃中（§5）
 > 最後更新：2026-11-24（臺北點閱數、新北頁首時鐘不再混進 hash；截斷的頁面與暫時抓不到的頁面保留上次狀態）
 > 範圍：22 縣市社會福利資料蒐集，從抓取到推送給後端
 
@@ -46,7 +46,7 @@ v1 的其他問題：
    
    另外合併跨年度的同一個福利。
 7. **品質關卡與健康檢查**：資料不合格就不推送；數量異常下降視為改版，自動暫停該站並警告。
-8. **必須從台灣 IP 執行**：建議 GCP `asia-east1`（彰化）。從海外連線時，6 個社會局（處）網站和多數縣市福利平台都逾時（見第 4.2 節）。
+8. **必須從台灣 IP 執行**：原本建議 GCP `asia-east1`（彰化），2026-11-24 改為家用電腦上的 Windows agent（§5）。從海外連線時，6 個社會局（處）網站和多數縣市福利平台都逾時（見第 4.2 節）。
 9. **繼續使用 Python**：文件解析（PDF、ODT、DOCX）的套件比 Node 成熟。依賴用 uv 管理。
 
 ---
@@ -158,9 +158,14 @@ v1 的其他問題：
 ## 5. 執行環境
 
 - **地點**：必須是台灣 IP。從東京測試時，有 6 個社會局（處）網站逾時：臺中、高雄、新竹縣、嘉義縣、臺東、澎湖；另有 6 個福利平台逾時：雲林、花蓮、彰化、屏東、臺中、澎湖。
-- **建議**：GCP Cloud Run Jobs 放在 `asia-east1`，由 Cloud Scheduler 每天凌晨觸發；各站平行，站內依序。
+- **原本的建議**（已改為下面的 Windows agent）：GCP Cloud Run Jobs 放在 `asia-east1`，由 Cloud Scheduler 每天凌晨觸發；各站平行，站內依序。
 - **替代方案**：台灣的 VPS，或在後端主機上用 cron 執行。
-- **目前**（2026-11-23）：在東京的後端主機上以 crontab 執行，每 3 天一次（§10.4），只能爬得到 12 縣市。台灣 IP 的環境之後再加。
+- **目前**（2026-11-23）：在東京的後端主機上以 crontab 執行，每 3 天一次（§10.4），只能爬得到 12 縣市。
+- **台灣 IP 的規劃**（2026-11-24 決定，尚未實作）：從東京連不到的約 10 縣市（臺中社會局網站、高雄、新竹縣市、苗栗、南投、雲林、嘉義縣、臺東、澎湖、連江，以及宜蘭的附件）改由家用桌機（Tailscale 節點 `my-desktop-at-home`）上的 Windows 程式執行：
+  - 跑完整的 Python 爬蟲（只負責這些站點，自己的 `state.db`），透過新的 `/internal/agent/*` API 推送，使用可單獨撤銷的 agent token（不共用 HMAC 金鑰）。
+  - 系統匣常駐，每 3 天執行一次，有「立即執行」按鈕與進度視窗；執行中防止睡眠，定時送心跳。
+  - exe 在 GitHub Actions 的 Windows runner 建置，啟動時檢查版本。
+  - 步驟一：在該電腦跑連線測試腳本 `mou-check.ps1`，確認各站可連線；步驟二：依結果實作完整的 agent。
 - **執行模式**：
   - 每日增量：抓列表頁，只對新增或變動的網址抓內文。
   - 每週全量：重新檢查所有已知網址，偵測下架。
@@ -382,21 +387,23 @@ X-Mou-Signature: sha256=<hex>                     # HMAC-SHA256(INGEST_HMAC_KEY,
 ```
 services/scraper/
 ├── pyproject.toml
-├── sites/                  # 站點設定（YAML），一站一檔
+├── sites/                  # 站點設定（YAML），一站一檔；目前 13 個，以下列各族代表
 │   ├── kinmen.yaml         # A 族
 │   ├── ntpc.yaml           # B 族
 │   ├── klcg.yaml           # C 族
 │   └── taichung.yaml       # 開放資料
 ├── src/scraper/
-│   ├── cli.py              # scrape sites / scrape run
+│   ├── cli.py              # scrape sites / run / replay / sample
+│   ├── models.py           # RawItem 等資料結構
+│   ├── sites.py            # 讀取 sites/*.yaml
 │   ├── fetch.py            # 共用 HTTP client：限速、robots.txt、重試、大小上限
 │   ├── adapters/
 │   │   ├── base.py         # Adapter 介面：list_items() -> Iterator[RawItem]
 │   │   ├── crawl.py        # 列表 → 內文的通用爬法；CmsA、CmsB 只是預設值不同
 │   │   ├── opendata.py
-│   │   └── custom/         # C 族：klcg.py …（多數只需要覆寫預設值）
+│   │   └── custom/         # C 族：klcg.py、hualien.py、changhua.py（多數只需要覆寫預設值）
 │   ├── extract/            # html.py（trafilatura、標題、附件連結）、dates.py、files.py（附件解析）
-│   ├── filter/             # rules.py、classify.py（LLM，P1）
+│   ├── filter/             # rules.py；classify.py（LLM，P1，尚未建立）
 │   ├── normalize.py        # program_key、content_hash
 │   ├── siblings.py         # 同一個鍵有多個網址時：同一頁、不同年度、不同福利
 │   ├── state.py
@@ -404,7 +411,7 @@ services/scraper/
 │   ├── pipeline.py         # 單站流程與健康檢查
 │   ├── push.py             # 推送到後端（HMAC 簽章）
 │   ├── report.py
-│   └── initgen.py          # AI 產生設定與修復設定（P2）
+│   └── initgen.py          # AI 產生設定與修復設定（P2，尚未建立）
 └── tests/
     ├── fixtures/{site}/*   # 存成檔案的網頁快照，測試不連網路
     └── test_*.py
@@ -419,7 +426,7 @@ services/scraper/
 | **P0 原型** | 3 站各代表一族：**金門（A）、新北（B）、基隆（C）**；再加臺中開放資料（L1）。只做抓取、抽取、狀態、規則過濾，不做 AI 產生設定 | 3 站都能穩定跑完；人工檢查 50 篇，抽取品質可接受 |
 | **P1 去雜訊** | LLM 分類加上 200 篇驗證集 | 準確率 ≥ 95%、召回率 ≥ 90% |
 | **P2 A 族擴展** | 其餘 10 個 A 族縣市（用 `scrape init` 產生設定） | 11 站上線；記錄 AI 產生設定第一次就成功的比例 |
-| **P3 部署** | 排程、執行報告與警告（後端 ingest upsert 已在 2026-11-19 完成） | 2026-11-23 先在東京主機以 crontab 每 3 天執行，回報到管理後台（§10.4）；台灣 IP 的環境（Cloud Run Jobs `asia-east1` 或台灣 VPS）待定 |
+| **P3 部署** | 排程、執行報告與警告（後端 ingest upsert 已在 2026-11-19 完成） | 2026-11-23 先在東京主機以 crontab 每 3 天執行，回報到管理後台（§10.4）；台灣 IP 改用家用電腦的 Windows agent（2026-11-24 決定，§5） |
 | **P4 B、C 族與平台** | 新竹市、澎湖（B）；高雄、彰化、南投、花蓮、臺東、連江（C）；雲林、彰化 L2 平台 | 22 縣市全數上線 |
 | **P5 自動修復** | 健康檢查觸發重新產生設定 | 模擬改版能被偵測並產生修復建議 |
 

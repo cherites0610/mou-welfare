@@ -213,25 +213,25 @@ const matrix = [
 
 ## 9. CI 流程（GitHub Actions）
 
-```
-PR 開啟 / 更新
- ├─ lint（eslint、ruff）+ 型別檢查（tsc、vue-tsc、mypy）
- ├─ 單元測試（TS 和 Python 並行）
- ├─ 整合測試（Postgres service container）
- ├─ 契約檢查（OpenAPI → client 有沒有差異；ingest schema）
- ├─ 覆蓋率門檻
- └─ build（api、web）
-      全部通過才能合併
+目前的實作（2026-11-25）：
 
-合併到 main
- ├─ 部署 API 到主機（api.mou-welfare.com）→ 煙霧測試 → 失敗就回滾
- ├─ 部署 web 到 Workers 的預覽環境
- └─ 對 staging 跑 E2E 和 SEO 測試
-
-每晚
- ├─ 完整 E2E（手機加桌機）
- └─ 爬蟲金絲雀（GCP 台灣，另外排程）
 ```
+ci.yml（push 與 PR）
+ ├─ node：typecheck、packages/shared 單元測試、契約（ingest schema、openapi.json）、build
+ ├─ api-integration：API 測試（Postgres + pgvector 容器）
+ └─ scraper：ruff、ruff format、mypy、pytest
+
+deploy.yml（main 的 CI 通過後）
+ ├─ api：SSH 到主機執行 ops/deploy-api.sh → 主機上的煙霧測試，失敗自動退回
+ ├─ web、admin：wrangler deploy 到 Workers（正式環境）
+ └─ smoke：正式環境 health、/login、SEO 檢查
+
+排程
+ ├─ uptime.yml：每 30 分鐘檢查 API、前台、後台
+ └─ seo-check.yml：每天 06:41（台灣時間）
+```
+
+還沒做的目標：PR 的 lint（eslint）、覆蓋率門檻、staging 環境與預覽部署、每晚完整 E2E（手機加桌機）、從台灣 IP 跑爬蟲金絲雀（§10）。
 
 - **PR 檢查的時間預算 < 10 分鐘**：超過就把慢的測試移到每晚執行，或改成平行執行。
 - `main` 分支要設定保護規則：必須通過 CI 才能合併，禁止 force push。
@@ -253,7 +253,7 @@ API 執行 `pm2 reload` 之後：
 1. `GET /health` 回傳 200，而且回應內容包含資料庫連線狀態和目前的 migration 版本。
 2. 用一個公開端點實際查詢資料庫，例如 `GET /v1/faq`。
 3. 背景工作在 30 秒內回報心跳（`/health` 的 `jobs.lastBeatSecondsAgo`；`WORKER_MODE=separate` 時檢查獨立的 worker 程序）。
-4. GitHub Actions 部署後另外檢查：`api.mou-welfare.com/health` 為 ok、`mou-welfare.com/login` 與 `admin.mou-welfare.com/login`（跟隨轉址）回 200。
+4. GitHub Actions 部署後另外檢查：`api.mou-welfare.com/health` 為 ok、`mou-welfare.com/login` 與 `admin.mou-welfare.com/login`（跟隨轉址）回 200，以及 SEO 檢查（§7.3）。
 
 LLM 額度暫停（`/health` 的 `llm.paused`）**不算**部署失敗。
 
@@ -275,29 +275,31 @@ LLM 額度暫停（`/health` 的 `llm.paused`）**不算**部署失敗。
 
 ## 11. 檔案結構與命名
 
-```
-apps/api/
-├── src/features/welfare/matching.ts
-├── src/features/welfare/matching.test.ts     # 單元測試：和原始碼放在一起
-└── tests/
-    ├── setup.ts                             # 測試資料庫、migration、交易 rollback
-    ├── factories.ts
-    ├── permissions.test.ts                  # 權限矩陣 + 路由普查
-    ├── regressions.test.ts                  # R1–R15
-    └── integration/*.test.ts
+目前的結構（2026-11-25）：
 
-apps/web/
-├── components/**/*.test.ts
-└── e2e/*.spec.ts                            # Playwright
+```
+packages/shared/src/
+├── matching.ts、matching.test.ts            # 單元測試和原始碼放在一起（age、identities、ingest、topics 同）
+
+apps/api/tests/
+├── global-setup.ts、test-env.ts、helpers.ts  # 測試資料庫、migration
+├── factories.ts
+├── permissions.test.ts                      # 權限矩陣 + 路由普查
+├── regressions.test.ts                      # R1–R15
+└── {功能}.test.ts                           # admin、auth、chat、chat-parse、family、features、gemini、ingest、jobs、line、scraper、social、storage、upload、welfare
+
+apps/web/e2e/
+├── auth-flow.cjs                            # Playwright 腳本（§7.2）
+└── seo-check.cjs                            # §7.3
 
 services/scraper/tests/
-├── fixtures/{site}/*.html
-├── fixtures/{site}/*.expected.json
-├── test_{adapter}.py
-├── test_filter.py
-├── test_quality.py
-└── live/test_canary.py                      # @pytest.mark.live
+├── fixtures/{site}/                         # 網頁快照
+├── test_adapters.py、test_extract.py、test_files.py、test_fetch.py
+├── test_rules.py、test_quality.py、test_state.py、test_siblings.py、test_normalize.py
+└── test_pipeline.py、test_push.py、test_contract.py、test_sites.py
 ```
+
+還沒有的：`apps/web` 的元件測試（§7.1）、Playwright 的 `*.spec.ts` 正式 E2E、爬蟲的 `live/test_canary.py`。
 
 - 測試名稱用中文描述行為，例如 `it('非成員讀取家庭回傳 403')`，讓失敗訊息一看就懂。
 - 回歸測試的名稱要加上編號，例如 `R5 年齡：生日前一天未滿 65 歲`。

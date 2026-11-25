@@ -24,11 +24,13 @@
 | 佇列與排程 | **pg-boss**（佇列與 cron 都存在 Postgres） | Redis + BullMQ | 不需要 Redis；工作和業務資料在同一個資料庫，可以一起備份 |
 | 檔案 | **R2**（透過 S3 相容 API） | GCS | 沒有流量費；Nuxt 端也能直接取用 |
 | LLM | **`@google/genai`**，外面包自己的 `lib/llm` 介面 | openai SDK + 自己解析 JSON | 只依賴官方 SDK；之後換模型只需新增一個實作檔。主機在日本，不會遇到 Gemini 的地區限制 |
-| 爬蟲 | Python，部署在 **GCP asia-east1** | — | 需要台灣 IP（見爬蟲文件）；資料透過 API 推送，不直接連資料庫 |
+| 爬蟲 | Python，目前在**同一台主機**以 crontab 每 3 天執行（12 縣市） | — | 從東京連不到的約 10 縣市需要台灣 IP，規劃見 [scraper.md](scraper.md) §5；資料透過 API 推送，不直接連資料庫 |
 
 ---
 
 ## 2. 系統架構
+
+> 圖表版：[架構圖](diagrams/mou-welfare-architecture.html)、[部署圖](diagrams/mou-welfare-deployment.html)（用瀏覽器開；產生方式見 `docs/diagrams/README.md`）。
 
 ```
         使用者（瀏覽器 / LINE LIFF）                          LINE Platform
@@ -54,7 +56,7 @@
                                       │   每日備份 → 本機 + R2                      │
                                       └──────────────────▲──────────────────────────┘
                                                          │ HTTPS（HMAC 簽章）
-                                    爬蟲（Python）@ GCP asia-east1 ── POST /internal/ingest
+                                    爬蟲（Python，主機 crontab）──── POST /internal/ingest
                                                                          Gemini API ◀─ api 程序
 ```
 
@@ -77,7 +79,7 @@ mou-welfare/
 │       ├── drizzle.config.ts
 │       ├── drizzle/            # migrations
 │       ├── eval/               # 結構化回測的評測集（§8.3.1）
-│       ├── scripts/            # 主機上的維運腳本：restructure、llm-usage、set-role、eval-structure、compare-llm、seed-mock-welfare、openapi
+│       ├── scripts/            # 主機上的維運腳本：restructure、llm-usage、set-role、eval-structure、eval-chat、compare-llm、seed-mock-welfare、openapi
 │       └── src/
 │           ├── server.ts       # HTTP 入口（@hono/node-server）
 │           ├── worker.ts       # 獨立背景工作入口，只在 WORKER_MODE=separate 時使用
@@ -98,15 +100,21 @@ mou-welfare/
 │           │   ├── admin/      # 管理端 /v1/admin/*（admin.md）
 │           │   ├── health/
 │           │   ├── chat/       # 阿哞聊天：規則解析、混合檢索、SSE 串流（§8.9）
-│           │   ├── line-bot/   # （P4）webhook、回覆、Flex message
-│           │   └── notify/     # （P4）
-│           ├── jobs/           # pg-boss 的工作與 cron；startJobs() 由 server.ts 或 worker.ts 呼叫；llm-pause.ts（§8.4.1）
+│           │   ├── line/       # LINE Bot：webhook、回覆、Flex message（§8.7）
+│           │   └── scraper/    # 爬蟲執行回報 /internal/scrape-runs 與後台的爬蟲頁（admin.md §4.6）
+│           ├── curated/        # 人工整理的全國性精選福利（啟動時同步進資料庫，§6）
+│           ├── jobs/           # pg-boss 的工作與 cron；startJobs() 由 server.ts 或 worker.ts 呼叫；structure.ts、llm-pause.ts（§8.4.1）、monitor.ts（§8.4.2）、curated.ts
 │           └── lib/
 │               ├── llm/        # 介面、gemini.ts、pricing.ts（價格表）、recorder.ts（用量寫入 llm_calls）
 │               ├── auth.ts     # 取得 session、權限 helper
 │               ├── queue.ts    # pg-boss 封裝（send / work / schedule）
 │               ├── errors.ts
-│               └── storage.ts  # R2
+│               ├── storage.ts  # R2
+│               ├── image.ts    # 頭像處理（sharp，§8.6）
+│               ├── hmac.ts     # 爬蟲推送的簽章驗證
+│               ├── line.ts     # LINE Messaging API client
+│               ├── mail/       # Resend 與信件範本（§8.5）
+│               └── notify.ts   # 系統通知寄到 ALERT_EMAIL（§8.4.2）
 ├── packages/
 │   └── shared/                 # Zod schema、常數（身分與類別白名單）、型別
 ├── services/
@@ -125,14 +133,13 @@ mou-welfare/
 
 | 項目 | 狀況 | 對策 |
 |---|---|---|
-| 主機資源 | 2 vCPU、1.9 GB RAM、1.9 GB swap；同時跑 Postgres、v1 API、lexicon API、Caddy、Redis（v1 用）。2026-11-18 時已用約 1 GB，swap 用了 234 MB | v2 預設只跑一個程序（背景工作在 API 程序內，實測 150 MB），以 pm2 `max_memory_restart: 300M` 限制；v1 下線後停掉 v1 API 和 Redis，可以釋放約 200 MB；持續觀察 swap 使用量 |
+| 主機資源 | 2 vCPU、1.9 GB RAM、1.9 GB swap；同時跑 Postgres、lexicon API、Caddy 等。v1 API 與 Redis 已於 2026-11-24 移除；2026-11-25 已用約 900 MB，swap 111 MB | v2 預設只跑一個程序（背景工作在 API 程序內，約 110 MB），以 pm2 `max_memory_restart: 300M` 限制；持續觀察 swap 使用量 |
 | 單點故障 | 主機掛了，API 就停 | 每日備份本機加 R2；記錄重建步驟（見第 10 節）；Nuxt 在 Cloudflare，API 掛掉時頁面仍能顯示錯誤提示 |
 | 長時間工作 | LLM 結構化、批次通知 | 一律放進 pg-boss 佇列，由同一程序內的背景工作處理；結構化一次處理一筆（實測每筆約 1.3 秒，全量 1,471 筆約 37 分鐘），避免影響 API 回應。工作量變大時改 `WORKER_MODE=separate` 拆成獨立程序（不需改程式） |
 | 聊天串流 | SSE 長連線經過 Cloudflare 和 Caddy | 回應加 `cache-control: no-transform`、`x-accel-buffering: no`；2026-11-24 正式環境實測逐段出現，沒有被緩衝 |
 | Nuxt on Workers | 伺服器端渲染時呼叫 API 會跨區到東京 | 熱門頁面（福利列表、詳情）用 Nuxt 的路由規則做 SWR 快取；登入後的個人化資料改由瀏覽器端呼叫 |
 | 真實客戶端 IP | 經過 Cloudflare 和 Caddy，IP 會被換掉 | Caddy 設定 `trusted_proxies` 為 Cloudflare 的 IP 段；Better Auth 的限流讀 `CF-Connecting-IP` |
 | 背景工作模式 | 預設 `WORKER_MODE=inline`：pg-boss 在 API 程序內處理佇列與 cron，省下一個程序（約 120 MB）；代價是 API 重啟時進行中的工作會中斷 | pg-boss 自動重試，工作設計為冪等（重複執行結果不變）；`/health` 回報 `jobs.mode` 與心跳 |
-| 與 v1 共存 | v1 API 在同一台主機的 5009 port | v2 用不同 port（5030）和不同的 pm2 名稱（`mou-welfare-v2-*`）；兩者使用不同資料庫 |
 
 ---
 
@@ -262,7 +269,7 @@ alert_state(key pk, value, sent_at)                                   -- 系統�
 | `user` | 需登入 |
 | `admin` | 需登入、Email 已驗證且 `role = 'admin'`，否則 403（[admin.md](admin.md) §3） |
 | `hmac` | 爬蟲：HMAC 簽章加時間戳 |
-| `line` | LINE webhook 簽章（P4 實作前一律拒絕） |
+| `line` | LINE webhook 簽章（`x-line-signature`，§8.7）；未設定 channel secret 時一律拒絕 |
 
 資源層級的檢查集中寫成 helper，每個路由都必須呼叫：
 
@@ -390,6 +397,7 @@ cd ~/apps/mou-welfare-v2/apps/api
 | 名稱 | 類型 | 內容 |
 |---|---|---|
 | `welfare-structure` | pg-boss 佇列 | 結構化、embedding、寫回資料庫；一次一筆；失敗重試 3 次（指數退避，30 秒起）。內容 hash 沒變就略過，所以重複執行是安全的；啟動時補送遺失的工作（backfill）。結構化期間內容又被更新時不寫回，由新的工作處理。額度不足時自動暫停與恢復，見 §8.4.1 |
+| `line-event` | pg-boss 佇列 | LINE Bot 的事件，同時處理 4 則、不重試（§8.7） |
 | `notify` | pg-boss 佇列 | Email（Resend）、LINE push |
 | `deadline-reminder` | pg-boss cron（每日） | 通知收藏的福利即將截止 |
 | `expire` | pg-boss cron（每日） | 把超過截止日的福利標為 `expired` |
@@ -512,7 +520,7 @@ LINE 官方帳號（`@417ahfau`）的對話（`features/line/`）。✅ 2026-11-
 
 ### 8.9 聊天（阿哞）
 
-> 狀態：2026-11-23 完成（API、前端、檢索評測集）；LINE Bot 共用聊天服務尚未做（§8.7）。原則：**只有「產生文字」交給外部 LLM**；理解問題、檢索、對話紀錄都在自己這邊，LLM 不可用時聊天仍能列出符合的福利。
+> 狀態：2026-11-23 完成（API、前端、檢索評測集）；2026-11-24 LINE Bot 共用聊天服務（§8.7）。原則：**只有「產生文字」交給外部 LLM**；理解問題、檢索、對話紀錄都在自己這邊，LLM 不可用時聊天仍能列出符合的福利。
 
 **與 v1 的差別**：v1 每則訊息呼叫兩次 LLM（NLU 判斷意圖、產生回答），檢索交給 Google Vertex AI Search（福利資料另外同步到 Google、要服務帳號金鑰），沒有串流；任一服務出問題聊天就整個不能用。
 
@@ -582,7 +590,7 @@ LINE 官方帳號（`@417ahfau`）的對話（`features/line/`）。✅ 2026-11-
 
 | 項目 | 狀態 |
 |---|---|
-| Postgres 版本 | 16.11，SSL 已開啟 |
+| Postgres 版本 | 16（2026-11-25 為 16.15，隨 Ubuntu 套件更新），SSL 已開啟 |
 | pgvector | ✅ 已安裝 0.6.0（Ubuntu 套件 `postgresql-16-pgvector`，支援 HNSW） |
 | 資料庫 | ✅ `mou_welfare`（UTF8、`C.UTF-8`），擁有者為 `mou_welfare` |
 | 擴充 | ✅ `vector 0.6.0`、`pg_trgm 1.6`、`pgcrypto 1.3` |
@@ -632,7 +640,7 @@ LINE 官方帳號（`@417ahfau`）的對話（`features/line/`）。✅ 2026-11-
 |---|---|
 | 部署目錄 | ✅ `~/apps/mou-welfare-v2`（獨立的 git clone），目前為 `main` 最新版 |
 | 資料庫 | ✅ 正式資料庫 `mou_welfare` 已套用 12 個 migration（`0000_init`、`0001_welfare`；`0002_ingest`：`welfare_sources`、`ingest_log`、福利狀態 `pending` / `rejected`；`0003_family`：家庭、成員、邀請碼；`0004_subscribed`：`user.is_subscribed`；`0005_pinned`：`welfare_programs.pinned_at`；`0006_llm_pause`：額度不足的暫停狀態；`0007_llm_calls`：LLM 用量紀錄與 `structured_model`、`structured_prompt_version`；`0008_admin`：人工判定欄位、`admin_audit`；`0009_scraper_runs`：`scrape_runs`、`alert_state`；`0010_chat`：`chat_sessions`、`chat_messages`、`chat_usage`；`0011_line`：`chat_sessions.channel`） |
-| pm2 | ✅ `mou-welfare-v2-api` 運作中（約 120 MB），已 `pm2 save` |
+| pm2 | ✅ `mou-welfare-v2-api` 運作中（約 110 MB，2026-11-25），已 `pm2 save` |
 | Caddy | ✅ `api.mou-welfare.com` → `127.0.0.1:5030`（`flush_interval -1`），修改前的設定備份在 `/etc/caddy/Caddyfile.bak-*`（切換前為 `Caddyfile.bak-202611241039`） |
 | DNS | ✅ `api.mou-welfare.com` A 紀錄 → `43.130.226.136`（Proxied）；`mou-welfare.com`、`admin.mou-welfare.com` 是 Workers 自訂網域 |
 | 自動部署 | ✅ 2026-11-22 設定完成：CI 通過後部署 API（SSH）、前端與管理後台（Workers），再做正式環境煙霧測試（API `/health`、前台 `/login`、後台 `/login`）；最近一次成功為 `68b79fd`（2026-11-23） |
@@ -667,7 +675,7 @@ LINE 官方帳號（`@417ahfau`）的對話（`features/line/`）。✅ 2026-11-
 3. ✅ Caddy：移除 v1 的 `mou-welfare.com`（靜態檔）與 `api.mou-welfare.com`（port 5009），`api.mou-welfare.com` 改代理到 5030，`api-v2` 保留。`api.env` 的 `BETTER_AUTH_URL`、`scraper.env` 的 `API_BASE` 改為 `https://api.mou-welfare.com`（修改前的檔案為 `*.bak-cutover`）。
 4. ✅ 移除 v1：pm2 刪除 `mou-welfare-api` 並 `pm2 save`；停用 Redis（只有 v1 在用）；刪除 worktree `~/Project/mou-welfare-v1`、`~/Project/mou-welfare-v1-web`（程式在 git tag `v1-api`、`v1-web`）。
 5. ✅ 同日移除：v1 的資料庫 `mou-welfare`、v1 的本機檔案（`~/Project/mou-welfare-v1-local`）；舊網域 `v2.mou-welfare.com`（Workers 設定）、`api-v2.mou-welfare.com`（Caddy）、`TRUSTED_ORIGINS` 裡的 `v2.mou-welfare.com`。
-6. 待處理（Cloudflare、LINE、GCP 後台）：刪除 DNS 紀錄 `api-v2.mou-welfare.com`、`mou-welfare.cherites.org`、`api.mou-welfare.cherites.org`，以及 Workers 上的自訂網域 `v2.mou-welfare.com`；LINE Login 刪除 `api-v2` 的 Callback URL；LIFF Endpoint 改為 `https://mou-welfare.com/`；Messaging API webhook 關閉或改成自動回覆（v1 的 LINE Bot 已停，v2 的在 P4）；GCP 刪除 v1 的 Vertex AI Search 並停用服務帳號金鑰；重新發行 v1 用過的 LINE Messaging token。
+6. 待處理（Cloudflare、LINE、GCP 後台）：刪除 DNS 紀錄 `api-v2.mou-welfare.com`、`mou-welfare.cherites.org`、`api.mou-welfare.cherites.org`，以及 Workers 上的自訂網域 `v2.mou-welfare.com`；LINE Login 刪除 `api-v2` 的 Callback URL；LIFF Endpoint 改為 `https://mou-welfare.com/`；GCP 刪除 v1 的 Vertex AI Search 並停用服務帳號金鑰；重新發行 v1 用過的 LINE Messaging token。
 
 **影響**：已登入 v2 的人要重新登入一次（session cookie 屬於 API 網域）。v1 的福利網址（`/welfares/{v1 的 id}`）在 v2 找不到。
 
@@ -715,7 +723,7 @@ v1 的 API（NestJS，pm2 `mou-welfare-api`，port 5009）與前端（Vue，Cadd
 
 **P0 原型必須驗證**
 - [ ] Nuxt 在 Workers 上做伺服器端渲染並呼叫東京的 API，熱門頁面的 TTFB（目標 p95 < 500ms，有快取時 < 100ms）。
-- [ ] Better Auth 的 cookie 在 `mou-welfare.com`（Workers）和 `api.mou-welfare.com`（主機）之間能正常共用，包括 LIFF 的 ID Token 登入。
+- [x] Better Auth 的 cookie 在 `mou-welfare.com`（Workers）和 `api.mou-welfare.com`（主機）之間能正常共用，包括 LIFF 的 ID Token 登入（2026-11-23 起正式環境 Email、LINE、LIFF 登入實測正常，§8.5.1）。
 - [x] SSE 串流經過 Cloudflare 和 Caddy 不會被緩衝（2026-11-24 正式環境實測）。
 - [x] ~~v2 的記憶體用量~~：2026-11-18 實測，合併為單一程序後為 150 MB（原本 api 加 worker 兩個程序合計 272 MB）。
 

@@ -1,6 +1,6 @@
 # 哞福利 mou-welfare
 
-一站式政府福利查詢平台（v2 重寫中）。
+一站式政府福利查詢平台（v2，2026-11-24 起上線，v1 已停用）。
 
 | 環境 | 網址 |
 |---|---|
@@ -17,6 +17,7 @@
 | [`docs/scraper.md`](docs/scraper.md) | 爬蟲設計與 22 縣市資料來源調查 |
 | [`docs/testing.md`](docs/testing.md) | 測試規範（權限矩陣、v1 回歸清單、CI 流程） |
 | [`docs/deploy-setup.md`](docs/deploy-setup.md) | GitHub Actions 自動部署的金鑰與 secrets（已設定完成，重建時參考） |
+| [`docs/diagrams/`](docs/diagrams/) | 系統架構圖與部署圖（HTML，用瀏覽器開；`gen.py` 重新產生） |
 | [`docs/v1/`](docs/v1/) | v1 的 API、頁面與樣式紀錄（用瀏覽器開 `index.html`） |
 
 ## 結構

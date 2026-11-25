@@ -1,7 +1,7 @@
 # 管理後台（v2）
 
 > 狀態：第一版上線（2026-11-23），https://admin.mou-welfare.com
-> 最後更新：2026-11-23
+> 最後更新：2026-11-25
 > 範圍：`apps/admin`（前端）、`apps/api/src/features/admin`（API）
 > 相關文件：[後端設計](backend.md)（§8.3 結構化與 LLM 用量、§8.4.1 額度保護）、[測試規範](testing.md)、[自動部署設定](deploy-setup.md)
 
@@ -141,7 +141,7 @@ API 定義在 `apps/api/src/features/admin/routes.ts`（爬蟲在 `features/scra
 
 - 期間可選 7、30、90 天或一年。
 - 數字卡：呼叫次數、失敗、輸入與輸出 tokens（輸出含思考）、預估費用。
-- 每日費用依用途堆疊（結構化、embedding、額度探測）。
+- 每日費用依用途堆疊（結構化、embedding、額度探測、聊天）。
 - 明細依日期、用途、模型彙總，含平均耗時。錯誤依類型彙總並附最近一則訊息。另列出花費最多的福利，點了開詳情。
 - 費用依 `apps/api/src/lib/llm/pricing.ts` 估算，實際以 AI Studio 帳單為準。Embedding 的 API 不回報 token 數，所以沒有費用（全量約 0.07 美元）。
 - 資料來源是 `llm_calls`（backend.md §8.3.2）。主機上的 `scripts/llm-usage.ts` 可以看到同樣的資料。
@@ -250,16 +250,13 @@ cd apps/api && ./node_modules/.bin/tsx --env-file=.env scripts/set-role.ts <本�
   pnpm --filter @mou-welfare/admin run deploy
   ```
 
-- **v1 切換到 v2 時**（backend.md §10.3）：
-  1. API 網域改成 `api.mou-welfare.com`、前台改成 `mou-welfare.com`。
-  2. 把 CI 的 `NUXT_PUBLIC_API_BASE`、`NUXT_PUBLIC_WEB_BASE` 一起改掉。
-  3. 確認 `TRUSTED_ORIGINS` 仍包含 `https://admin.mou-welfare.com`。
+- **v1 切換到 v2**（backend.md §10.3）：✅ 2026-11-24 完成。API 網域為 `api.mou-welfare.com`、前台為 `mou-welfare.com`，CI 的 `NUXT_PUBLIC_API_BASE`、`NUXT_PUBLIC_WEB_BASE` 已一起改；`TRUSTED_ORIGINS` 包含 `https://admin.mou-welfare.com`。
 
 ---
 
 ## 9. 之後可以做的
 
-- [ ] 檢核 455 筆被判為非福利的資料（2026-11-23 起，從屏東縣 191 筆開始）。
+- [ ] 檢核被判為非福利的資料（2026-11-23 全量後 455 筆，2026-11-25 為 459 筆；從屏東縣 191 筆開始）。
 - [ ] 把人工判定的結果匯出成評測集的補充案例。
 - [ ] 福利結構化欄位的人工修正（目前只能改狀態），需要先設計「人工修正的欄位不被結構化覆蓋」。
 - [ ] 批次操作（一次判定多筆）。
